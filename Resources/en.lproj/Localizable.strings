@@ -1,0 +1,497 @@
+/* Navigation */
+"Dashboard" = "Dashboard";
+"Import" = "Import";
+"Transactions" = "Transactions";
+"Analysis" = "Analysis";
+"Review" = "Review";
+"Categories" = "Categories";
+"Budgets" = "Budgets";
+"Settings" = "Settings";
+
+/* Settings General */
+"Language" = "Language";
+
+/* Settings - ML */
+"Local ML Readiness" = "Local ML Readiness";
+"Learning in progress" = "Learning in progress";
+"The local model is still collecting labeled examples." = "The local model is still collecting labeled examples.";
+"Learned examples" = "Learned examples";
+"Covered categories" = "Covered categories";
+"Last update" = "Last update";
+"Not trained yet" = "Not trained yet";
+"Automatic categorization improves as you correct more movements, but the app should never promise 100% accuracy." = "Automatic categorization improves as you correct more movements, but the app should never promise 100% accuracy.";
+
+/* Settings - AI */
+"Artificial Intelligence" = "Artificial Intelligence";
+"Enable AI suggestions" = "Enable AI suggestions";
+"Enable Foundation Models when available" = "Enable Foundation Models when available";
+"Auto-accept threshold" = "Auto-accept threshold";
+"Soft-accept threshold" = "Soft-accept threshold";
+"Review threshold" = "Review threshold";
+"The deterministic engine is the primary categorization path. AI is only used for ambiguous transactions." = "The deterministic engine is the primary categorization path. AI is only used for ambiguous transactions.";
+
+/* Settings - Privacy */
+"Privacy" = "Privacy";
+"Enable privacy mode (hide amounts)" = "Enable privacy mode (hide amounts)";
+"When enabled, all monetary amounts are masked with asterisks across the entire app." = "When enabled, all monetary amounts are masked with asterisks across the entire app.";
+
+/* Settings - Payroll */
+"Payroll" = "Payroll";
+"Payroll cutoff day: %lld" = "Payroll cutoff day: %lld";
+"Payroll income received from day %lld onwards is attributed to the following month's budget for accurate monthly reporting." = "Payroll income received from day %lld onwards is attributed to the following month's budget for accurate monthly reporting.";
+
+/* Settings - Automation */
+"Automation" = "Automation";
+"Management of Rules" = "Management of Rules";
+
+/* Dashboard Header */
+"Understand the month in one glance: net balance, pressure points and the next best move." = "Understand the month in one glance: net balance, pressure points and the next best move.";
+"Show amounts" = "Show amounts";
+"Hide amounts" = "Hide amounts";
+
+/* Dashboard Hero */
+"Expenses are up %lld versus the previous month." = "Expenses are up %lld versus the previous month.";
+"Expenses are down %lld versus the previous month." = "Expenses are down %lld versus the previous month.";
+"This is the first comparable monthly snapshot available." = "This is the first comparable monthly snapshot available.";
+"No previous-month comparison yet." = "No previous-month comparison yet.";
+"%@ spending by %@ (%@)." = "%@ spending by %@ (%@).";
+"Higher" = "Higher";
+"Lower" = "Lower";
+"Income" = "Income";
+"Expenses" = "Expenses";
+"Delta" = "Delta";
+"Not enough monthly movement yet to draw a trend." = "Not enough monthly movement yet to draw a trend.";
+
+/* Dashboard Actions */
+"Import File" = "Import File";
+"Review Queue" = "Review Queue";
+"Open Transactions" = "Open Transactions";
+
+/* Dashboard KPIs */
+"Savings Rate" = "Savings Rate";
+"Net over income this month" = "Net over income this month";
+"Dominant Category" = "Dominant Category";
+"No category yet" = "No category yet";
+"Main pressure point of the month" = "Main pressure point of the month";
+"Pending Review" = "Pending Review";
+"Month is mostly settled" = "Month is mostly settled";
+"Movements still affecting certainty" = "Movements still affecting certainty";
+
+/* Dashboard AI Copilot */
+"AI Copilot" = "AI Copilot";
+"Open Analysis" = "Open Analysis";
+"No AI summary available yet." = "No AI summary available yet.";
+"Alerts" = "Alerts";
+"No important alerts right now." = "No important alerts right now.";
+"Next Actions" = "Next Actions";
+"No actions suggested right now." = "No actions suggested right now.";
+
+/* Dashboard Other Cards */
+"Top Categories" = "Top Categories";
+"No categorized expenses yet this month." = "No categorized expenses yet this month.";
+"Recent Imports" = "Recent Imports";
+"No imports yet. Start by loading a CSV, XLSX or PDF export." = "No imports yet. Start by loading a CSV, XLSX or PDF export.";
+"Month Confidence" = "Month Confidence";
+"%lld movements still need review in %@, so some totals and category weights may still move." = "%lld movements still need review in %@, so some totals and category weights may still move.";
+"Categorized coverage: %@" = "Categorized coverage: %@";
+
+/* AI Service Deterministic Output */
+"Sin categorizar" = "Uncategorized";
+"Spending is up %lld versus last month." = "Spending is up %lld versus last month.";
+"Spending is down %lld versus last month." = "Spending is down %lld versus last month.";
+"There is not enough previous-month data to compare spending." = "There is not enough previous-month data to compare spending.";
+"The household remains in positive territory for %@. %@ The main expense pressure is %@." = "The household remains in positive territory for %@. %@ The main expense pressure is %@.";
+"The household is currently running a negative balance in %@. %@ The main expense pressure is %@." = "The household is currently running a negative balance in %@. %@ The main expense pressure is %@.";
+"Net balance is negative this month." = "Net balance is negative this month.";
+"Expenses are rising noticeably versus the previous month." = "Expenses are rising noticeably versus the previous month.";
+"Several movements are still pending review and may distort the picture." = "Several movements are still pending review and may distort the picture.";
+"A significant part of the month is still weakly categorized." = "A significant part of the month is still weakly categorized.";
+"%@ is taking an unusually large share of spending." = "%@ is taking an unusually large share of spending.";
+"Review the pending movements to stabilize the dashboard numbers." = "Review the pending movements to stabilize the dashboard numbers.";
+"Confirm ambiguous categories so the monthly picture becomes more reliable." = "Confirm ambiguous categories so the monthly picture becomes more reliable.";
+"Open Analysis to inspect which categories are pushing the month negative." = "Open Analysis to inspect which categories are pushing the month negative.";
+"Check the top categories to understand the spending spike versus last month." = "Check the top categories to understand the spending spike versus last month.";
+"Keep importing and reviewing movements to preserve a reliable monthly snapshot." = "Keep importing and reviewing movements to preserve a reliable monthly snapshot.";
+
+/* States */
+"Preparing dashboard..." = "Preparing dashboard...";
+"No Financial Snapshot Yet" = "No Financial Snapshot Yet";
+"Import real bank movements to see your monthly balance, AI briefing and top household spending categories." = "Import real bank movements to see your monthly balance, AI briefing and top household spending categories.";
+
+/* Imports Screen */
+"Bring in a bank export, validate the structure, then run a single clear import path." = "Bring in a bank export, validate the structure, then run a single clear import path.";
+"Recognized headers include Fecha, F. valor, Fecha cble, Fecha valor, Concepto, Concepto ampliado, Importe, Moneda and Saldo." = "Recognized headers include Fecha, F. valor, Concepto, Importe, Moneda and Saldo.";
+"Choose File" = "Choose File";
+"Preview Import" = "Preview Import";
+"Run Import" = "Run Import";
+"Choose Another File" = "Choose Another File";
+"Import Another File" = "Import Another File";
+"Advanced Validation" = "Advanced Validation";
+"Column Mapping" = "Column Mapping";
+"Selected file" = "Selected file";
+"Preview rows" = "Preview rows";
+"Rows ready for validation" = "Rows ready for validation";
+"Detected accounts" = "Detected accounts";
+"Accounts found in source" = "Accounts found in source";
+"Items queued for confirmation" = "Items queued for confirmation";
+"Import in progress" = "Import in progress";
+"Import ready" = "Import ready";
+"Categorizing movements and preparing the final summary." = "Categorizing movements and preparing the final summary.";
+"The import finished. Open Transactions to review the results." = "The import finished. Open Transactions to review the results.";
+"Preview" = "Preview";
+"Choose a CSV or XLSX bank export to preview imported movements." = "Choose a CSV or XLSX bank export to preview imported movements.";
+"Import Issues" = "Import Issues";
+"Adjust the columns only when the automatic preview is incomplete or incorrect." = "Adjust the columns only when the automatic preview is incomplete or incorrect.";
+"Not Mapped" = "Not Mapped";
+
+/* Transactions & Categories */
+"All Transactions" = "All Transactions";
+"Search transactions..." = "Search transactions...";
+"Date" = "Date";
+"Concept" = "Concept";
+"Amount" = "Amount";
+"Category" = "Category";
+"Status" = "Status";
+"Add Category" = "Add Category";
+"Edit Category" = "Edit Category";
+"Income Categories" = "Income Categories";
+"Expense Categories" = "Expense Categories";
+"Name" = "Name";
+"Color" = "Color";
+
+/* Budgets */
+"Monthly Budget" = "Monthly Budget";
+"Allocated" = "Allocated";
+"Spent" = "Spent";
+"Remaining" = "Remaining";
+"Total Budgeted" = "Total Budgeted";
+"Budget details for %@" = "Budget details for %@";
+
+/* Analysis & Insights */
+"Monthly Analysis" = "Monthly Analysis";
+"Detailed insights generated by AI based on your actual spending patterns." = "Detailed insights generated by AI based on your actual spending patterns.";
+"Financial Health" = "Financial Health";
+"Cash Flow" = "Cash Flow";
+"Top Spending Drivers" = "Top Spending Drivers";
+
+/* Insights & AI Engine */
+"insights.topPressure.title" = "Top spending pressure";
+"insights.topPressure.body" = "%@ is currently the strongest expense category.";
+"insights.recurring.title" = "Recurring charge candidate";
+"insights.recurring.body" = "%@ appears repeatedly and may be a subscription or recurring expense.";
+"insights.anomaly.title" = "Expense Anomaly";
+"insights.anomaly.body" = "Higher than usual spending in %@ (%@ EUR).";
+"insights.incomeGap.title" = "Income Gap Detected";
+"insights.incomeGap.body" = "No payroll income detected after cutoff day (%lld).";
+"insights.savingsStreak.title" = "Savings Streak!";
+"insights.savingsStreak.body" = "You've maintained a positive balance for %lld consecutive months.";
+
+/* Apple AI Context */
+"Apple AI" = "Apple AI";
+"Open contextual Apple AI actions for the current screen" = "Open contextual Apple AI actions for the current screen";
+"Imports" = "Imports";
+"Review Queue" = "Review Queue";
+"Finance" = "Finance";
+"Supported formats: CSV, XLSX, PDF (Openbank digital statements)." = "Supported formats: CSV, XLSX, PDF (Openbank digital statements).";
+"Paste CSV" = "Paste CSV";
+"Expected header: date, concept, amount" = "Expected header: date, concept, amount";
+"Source file name" = "Source file name";
+"Actions" = "Actions";
+"Type to re-categorize" = "Type to re-categorize";
+"Expense" = "Expense";
+"Transfer" = "Transfer";
+"New category" = "New category";
+"Create category" = "Create category";
+"Movements" = "Movements";
+"Search concepts" = "Search concepts";
+"No Transactions Yet" = "No Transactions Yet";
+"Import a CSV from the Import tab and your transactions will appear here." = "Import a CSV from the Import tab and your transactions will appear here.";
+"No Transactions" = "No Transactions";
+"Import a CSV or XLSX file to populate your desktop transaction list." = "Import a CSV or XLSX file to populate your desktop transaction list.";
+"import.error.chooseSource" = "Choose a CSV/XLSX file or paste CSV content before previewing.";
+"import.status.imported" = "Imported %@ rows into SwiftData. Skipped %@ duplicates.";
+"import.status.loading" = "Loading %@...";
+"import.status.loaded" = "Loaded %@. %@ rows ready to import.";
+"import.error.adjustMapping" = "We could not build a valid preview automatically. Adjust the column mapping below.";
+"import.error.noRowsParsed" = "No rows could be parsed from the selected source.";
+"import.status.duplicateDetected" = "Duplicate detected: %@. Already imported as %@.";
+"import.status.sourceSummary" = "Source: %@. Valid rows: %@. Invalid rows: %@.";
+"import.error.duplicateFile" = "This file looks duplicated. %@, already imported as '%@' on %@.";
+"import.source.csv" = "CSV";
+"import.source.file" = "file";
+"settings.ml.unavailable.title" = "Unable to evaluate the model";
+"settings.ml.unavailable.detail" = "The model status could not be evaluated right now.";
+"settings.ml.ready.title" = "Model ready for reliable assistance";
+"settings.ml.ready.detail" = "The model has enough corrected examples across several categories to assist with strong confidence. Keep validating edge cases, because no ML path can guarantee 100%% accuracy.";
+"settings.ml.learning.title" = "Learning in progress";
+"settings.ml.learning.detail" = "Keep correcting movements. We still need %@ more learned examples and %@ more well-covered categories before marking the model as ready.";
+"settings.ml.noModel.detail" = "The local model still needs labeled movements before we can trust it for reliable automatic categorization.";
+"settings.ml.notTrainedYet" = "Not trained yet";
+"settings.ml.unavailable" = "Unavailable";
+"localModel.profileSummary.notTrained" = "No local model trained yet.";
+"localModel.profileSummary.updated" = "Local model updated %@ with %@ learned examples.";
+"review.filter.all" = "All";
+"review.filter.lowConfidence" = "Low Confidence";
+"review.filter.uncategorized" = "Uncategorized";
+"review.filter.similar" = "With Similar";
+"review.error.writeCategoryName" = "Write a category name before creating it.";
+"review.status.categoryAvailable" = "Category '%@' is now available for this movement.";
+"review.error.selectTransactionBeforeType" = "Select a transaction before editing its type.";
+"review.status.updatedType" = "Movement type updated to %@.";
+"review.error.selectTransactionBeforeTransfer" = "Select a transaction to mark as transfer.";
+"review.status.markedAsTransfer" = "Marked as internal transfer.";
+"review.error.selectTransactionWithCategory" = "Select a transaction with a suggested or chosen category.";
+"review.error.chooseCategoryBeforeCorrection" = "Choose a category before applying the correction.";
+"review.error.chooseCategoryBeforeSimilar" = "Choose a category before applying it to similar movements.";
+"review.error.noSimilarMovements" = "No similar pending movements were found for batch review.";
+"review.status.appliedToSimilar" = "Applied the category to %@ similar movements.";
+"review.error.selectTransactionBeforeAI" = "Select a transaction before asking the AI copilot.";
+"review.status.aiNoReliableCategory" = "The AI copilot did not find a reliable category. Keep this movement in review.";
+"review.status.aiSuggests" = "AI suggests %@ with %@ confidence.";
+"review.status.noPendingToRecategorize" = "No pending movements to re-categorize.";
+"review.status.autoResolved" = "%@ auto-resolved";
+"review.status.suggestionsUpdated" = "%@ suggestions updated";
+"review.status.mlNoImprovements" = "ML has no improvements yet. Keep correcting movements to train it.";
+"review.status.mlRerun" = "ML re-run: %@.";
+"review.status.savedDecision" = "Saved review decision for '%@'.";
+"dashboard.copilot.spendingUp" = "Spending is up %@ versus last month.";
+"dashboard.copilot.spendingDown" = "Spending is down %@ versus last month.";
+"dashboard.copilot.summaryPositive" = "The household remains in positive territory for %@. %@ The main expense pressure is %@.";
+"dashboard.copilot.summaryNegative" = "The household is currently running a negative balance in %@. %@ The main expense pressure is %@.";
+"dashboard.copilot.topCategoryAlert" = "%@ is taking an unusually large share of spending.";
+"dashboard.hero.expensesUp" = "Expenses are up %@ versus the previous month.";
+"dashboard.hero.expensesDown" = "Expenses are down %@ versus the previous month.";
+"dashboard.hero.deltaCaption" = "%@ spending by %@ (%@).";
+"dashboard.confidence.pendingReview" = "%@ movements still need review in %@, so some totals and category weights may still move.";
+"dashboard.confidence.coverage" = "Categorized coverage: %@";
+"appleAI.intent.monthlyBriefing.title" = "Monthly briefing";
+"appleAI.intent.monthlyBriefing.subtitle" = "Short overview of the current month";
+"appleAI.intent.optimizeSpending.title" = "Optimize spending";
+"appleAI.intent.optimizeSpending.subtitle" = "Detect concentration and immediate actions";
+"appleAI.intent.importHealth.title" = "Import health";
+"appleAI.intent.importHealth.subtitle" = "Recent activity, volume and review drag";
+"appleAI.intent.importTips.title" = "Import tips";
+"appleAI.intent.importTips.subtitle" = "Practical ways to improve the next batch";
+"appleAI.intent.uncategorizedScan.title" = "Scan uncategorized";
+"appleAI.intent.uncategorizedScan.subtitle" = "What is blocking automatic categorization";
+"appleAI.intent.recurringMerchants.title" = "Recurring merchants";
+"appleAI.intent.recurringMerchants.subtitle" = "Repeated patterns useful for rules";
+"appleAI.intent.analysisPatterns.title" = "Spending patterns";
+"appleAI.intent.analysisPatterns.subtitle" = "Trends, concentration and forecast";
+"appleAI.intent.savingsIdeas.title" = "Savings ideas";
+"appleAI.intent.savingsIdeas.subtitle" = "Where to cut without losing context";
+"appleAI.intent.reviewPriorities.title" = "Review priorities";
+"appleAI.intent.reviewPriorities.subtitle" = "Best order to empty the queue";
+"appleAI.intent.batchResolution.title" = "Batch resolution";
+"appleAI.intent.batchResolution.subtitle" = "Similar groups to fix in one go";
+"appleAI.intent.categoryCleanup.title" = "Category cleanup";
+"appleAI.intent.categoryCleanup.subtitle" = "Empty, duplicate or weak categories";
+"appleAI.intent.ruleCandidates.title" = "Rule candidates";
+"appleAI.intent.ruleCandidates.subtitle" = "Merchants that already look automatable";
+"appleAI.intent.budgetPressure.title" = "Budget pressure";
+"appleAI.intent.budgetPressure.subtitle" = "Limits under tension or exceeded this month";
+"appleAI.intent.categoriesOverPlan.title" = "Over-plan categories";
+"appleAI.intent.categoriesOverPlan.subtitle" = "Which categories are over budget";
+"appleAI.intent.aiDiagnostics.title" = "AI diagnostics";
+"appleAI.intent.aiDiagnostics.subtitle" = "Real availability and local coverage";
+"appleAI.intent.learningReadiness.title" = "Learning readiness";
+"appleAI.intent.learningReadiness.subtitle" = "How mature the learning signal is";
+"appleAI.currentScreen" = "Current screen: %@";
+"appleAI.generating" = "Generating...";
+"appleAI.runAction" = "Run action";
+"appleAI.noActionSelected" = "No action selected";
+"appleAI.selectAction" = "Select an action in the left panel.";
+"appleAI.emptyState.description" = "Press “Run action” to generate a contextual response with Foundation Models or local fallback.";
+"appleAI.whatItWillDo" = "What it will do";
+"appleAI.actions" = "Actions";
+"appleAI.regenerate" = "Regenerate";
+"appleAI.movements.short" = "movements";
+"appleAI.charges.short" = "charges";
+"appleAI.average.short" = "avg.";
+"appleAI.noData" = "no data";
+"appleAI.rows.short" = "rows";
+"recentImports.rows" = "%@ rows";
+"importSummary.read" = "Read";
+"importSummary.valid" = "Valid";
+"importSummary.invalid" = "Invalid";
+"importSummary.imported" = "Imported";
+"importSummary.autoCategorized" = "Auto-categorized";
+"importSummary.duplicates" = "Duplicates";
+"importSummary.dateRange" = "Date range";
+"importSummary.detectedAccounts" = "Detected accounts";
+"importSummary.openImportedTransactions" = "Open Imported Transactions";
+
+/* AI Analysis Summary */
+"analysis.summary.deltaPositive" = "- Net household balance is positive in the selected period.";
+"analysis.summary.deltaNegative" = "- Net household balance is negative in the selected period.";
+"analysis.summary.topCategory" = "- The main expense category is %@.";
+"analysis.summary.pendingReview" = "- %lld transactions are still pending review and may affect the final picture.";
+"analysis.summary.riskNegative" = "Attention: the current trend is negative.";
+"analysis.summary.riskSustainable" = "The current trend remains sustainable.";
+
+/* Apple AI Deterministic Results */
+"appleAI.deterministic.monthlyBriefing.title" = "Pulse of the month";
+"appleAI.deterministic.monthlyBriefing.summary" = "In %@ you have %@ in income, %@ in expenses and a net of %@. There are %lld pending movements that can still change the final picture.";
+"appleAI.deterministic.monthlyBriefing.noHistory" = "There is not enough history yet to summarize the current month. As soon as there are imported movements, the copilot will be able to synthesize income, expenses and net of the period.";
+"appleAI.deterministic.monthlyBriefing.bullet1" = "Prioritize the pending queue to stabilize the monthly dashboard.";
+"appleAI.deterministic.monthlyBriefing.bullet2" = "Main pressure point now: %@.";
+"appleAI.deterministic.monthlyBriefing.bullet2.empty" = "No dominant expense category yet.";
+"appleAI.deterministic.monthlyBriefing.bullet3" = "Main merchant by weight: %@.";
+"appleAI.deterministic.monthlyBriefing.bullet3.empty" = "No merchants with enough weight to stand out yet.";
+"appleAI.deterministic.monthlyBriefing.bullet4" = "As categorized coverage increases, the monthly summary becomes much more reliable.";
+
+"appleAI.deterministic.optimizeSpending.title" = "Immediate optimization";
+"appleAI.deterministic.optimizeSpending.summary" = "To optimize spending, it is best to start with concentration, recurrences and merchants that accumulate several charges. The local base already allows pointing where to start without touching aggressive rules yet.";
+"appleAI.deterministic.optimizeSpending.bullet1" = "Start by reviewing the dominant category: %@.";
+"appleAI.deterministic.optimizeSpending.bullet1.empty" = "Activate a strong first category before adjusting spending.";
+"appleAI.deterministic.optimizeSpending.bullet2" = "Review this recurring pattern: %@.";
+"appleAI.deterministic.optimizeSpending.bullet2.empty" = "Keep correcting repeated charges to detect clear recurrences.";
+"appleAI.deterministic.optimizeSpending.bullet3" = "Look for quick savings in %@.";
+"appleAI.deterministic.optimizeSpending.bullet3.empty" = "No clearly dominant merchant yet.";
+"appleAI.deterministic.optimizeSpending.bullet4" = "Convert repeated corrections into rules only when the pattern is stable.";
+
+"appleAI.deterministic.importHealth.title" = "Import status";
+"appleAI.deterministic.importHealth.summary" = "The last %lld imports total %lld imported rows and %lld items sent to review. That already gives a useful signal about input quality and subsequent manual load.";
+"appleAI.deterministic.importHealth.noHistory" = "There are no recent imports registered yet, so the app does not have a stable import flow to evaluate yet.";
+"appleAI.deterministic.importHealth.bullet1" = "Last import: %@ with %lld rows.";
+"appleAI.deterministic.importHealth.bullet1.empty" = "Make a first import to activate the full circuit.";
+"appleAI.deterministic.importHealth.bullet2" = "It is advisable to quickly review the pending items left by recent imports.";
+"appleAI.deterministic.importHealth.bullet2.empty" = "Recent imports are not leaving a large review queue.";
+"appleAI.deterministic.importHealth.bullet3" = "Maintaining the same bank format improves automatic mapping.";
+"appleAI.deterministic.importHealth.bullet4" = "If the preview comes out clean, subsequent learning also improves.";
+
+"appleAI.deterministic.importTips.title" = "Improve the next import";
+"appleAI.deterministic.importTips.summary" = "The best import is the one that enters with clear dates, amount and concept, and leaves a small review queue. The app already has tools to detect problems before confirming the batch.";
+"appleAI.deterministic.importTips.bullet1" = "Check the preview before importing, especially concept, date and amount.";
+"appleAI.deterministic.importTips.bullet2" = "If the bank headers change, adjust the manual mapping in the preview.";
+"appleAI.deterministic.importTips.bullet3" = "After the import, correct repeated merchants to reinforce local learning.";
+"appleAI.deterministic.importTips.bullet4" = "Avoid mixing exports of different formats in the same monthly routine.";
+
+"appleAI.deterministic.uncategorizedScan.title" = "Current ambiguity";
+"appleAI.deterministic.uncategorizedScan.summary" = "Right now there are %lld movements pending or without category. That group is the main brake to automate better and read the financial status with clarity.";
+"appleAI.deterministic.uncategorizedScan.bullet1" = "Representative examples: %@.";
+"appleAI.deterministic.uncategorizedScan.bullet1.empty" = "No pending examples visible right now.";
+"appleAI.deterministic.uncategorizedScan.bullet2" = "There is a clear repeated pattern: %@.";
+"appleAI.deterministic.uncategorizedScan.bullet2.empty" = "A repeated merchant does not appear clear enough yet.";
+"appleAI.deterministic.uncategorizedScan.bullet3" = "Correct common groups first and leave unique cases for the end.";
+"appleAI.deterministic.uncategorizedScan.bullet4" = "Each good correction improves future suggestions and possible rules.";
+
+"appleAI.deterministic.recurringMerchants.title" = "Repeated merchants";
+"appleAI.deterministic.recurringMerchants.summary" = "Repeated patterns are the most profitable way to reduce manual work and detect stable spending. When the merchant is consistent, it is usually a good candidate for memory or rule.";
+"appleAI.deterministic.recurringMerchants.bullet1" = "Candidates detected: %@.";
+"appleAI.deterministic.recurringMerchants.bullet1.empty" = "Clear recurrences are not detected yet with current data.";
+"appleAI.deterministic.recurringMerchants.bullet2" = "Review if any deserve a persistent rule.";
+"appleAI.deterministic.recurringMerchants.bullet2.empty" = "Keep importing and correcting to consolidate patterns.";
+"appleAI.deterministic.recurringMerchants.bullet3" = "They can also point to subscriptions or fixed expenses that should be monitored.";
+"appleAI.deterministic.recurringMerchants.bullet3.empty" = "Consistent merchants improve both analysis and automation.";
+"appleAI.deterministic.recurringMerchants.bullet4" = "If a merchant always ends up in the same category, it already has a good signal to automate.";
+
+"appleAI.deterministic.analysisPatterns.title" = "Spending patterns";
+"appleAI.deterministic.analysisPatterns.summary" = "In the range of %@, the net is %@ and the monthly average forecast points to %@. The reading improves a lot when the pending queue goes down and the categorized coverage goes up.";
+"appleAI.deterministic.analysisPatterns.noHistory" = "There is not enough history yet to build a reliable analytical reading.";
+"appleAI.deterministic.analysisPatterns.bullet1" = "The category with most weight is %@.";
+"appleAI.deterministic.analysisPatterns.bullet1.empty" = "No dominant category clear yet.";
+"appleAI.deterministic.analysisPatterns.bullet2" = "Leading merchant of the period: %@.";
+"appleAI.deterministic.analysisPatterns.bullet2.empty" = "A dominant merchant is not detected yet.";
+"appleAI.deterministic.analysisPatterns.bullet3" = "6-month forecast: %@.";
+"appleAI.deterministic.analysisPatterns.bullet3.empty" = "Not enough forecast for 6 months yet.";
+"appleAI.deterministic.analysisPatterns.bullet4" = "Reducing pending improvements the reading of real trends.";
+
+"appleAI.deterministic.savingsIdeas.title" = "Savings ideas";
+"appleAI.deterministic.savingsIdeas.summary" = "To save usefully, it is best to attack first dominant spending, recurrences and tight budgets. The priority is not to touch everything, but to find 1 or 2 focuses with real volume.";
+"appleAI.deterministic.savingsIdeas.bullet1" = "Start by reviewing %@.";
+"appleAI.deterministic.savingsIdeas.bullet1.empty" = "First stabilize categories to be able to detect real savings.";
+"appleAI.deterministic.savingsIdeas.bullet2" = "Audit this recurrence: %@.";
+"appleAI.deterministic.savingsIdeas.bullet2.empty" = "Look for subscriptions or monthly charges that are not yet clear.";
+"appleAI.deterministic.savingsIdeas.bullet3" = "There is direct pressure on budget: %@.";
+"appleAI.deterministic.savingsIdeas.bullet3.empty" = "There is no category clearly over budget yet.";
+"appleAI.deterministic.savingsIdeas.bullet4" = "Avoid creating rules too broad when the merchant is still ambiguous.";
+
+"appleAI.deterministic.reviewPriorities.title" = "Review priority";
+"appleAI.deterministic.reviewPriorities.summary" = "The queue should not be reviewed at random. It is advisable to order by repetition, impact and ability to generate reusable learning.";
+"appleAI.deterministic.reviewPriorities.bullet1" = "Start with %@.";
+"appleAI.deterministic.reviewPriorities.bullet1.empty" = "Start with the most repeated and similar movements.";
+"appleAI.deterministic.reviewPriorities.bullet2" = "Priority examples: %@.";
+"appleAI.deterministic.reviewPriorities.bullet2.empty" = "No pending examples visible.";
+"appleAI.deterministic.reviewPriorities.bullet3" = "Then correct merchants of medium or high amount.";
+"appleAI.deterministic.reviewPriorities.bullet4" = "Leave unique and little informative movements for the end.";
+
+"appleAI.deterministic.batchResolution.title" = "Batch resolution";
+"appleAI.deterministic.batchResolution.summary" = "The fastest way to empty the queue is to group merchants or descriptions that are repeated with the same pattern. That's where each correction returns more time.";
+"appleAI.deterministic.batchResolution.bullet1" = "Clear batches: %@.";
+"appleAI.deterministic.batchResolution.bullet1.empty" = "Not yet clear batches to resolve in block.";
+"appleAI.deterministic.batchResolution.bullet2" = "Apply category to repeated groups before individual cases.";
+"appleAI.deterministic.batchResolution.bullet3" = "If the pattern is stable, consider creating a rule after confirming the batch.";
+"appleAI.deterministic.batchResolution.bullet4" = "That reduces the manual load of the next import.";
+
+"appleAI.deterministic.categoryCleanup.title" = "Category cleanup";
+"appleAI.deterministic.categoryCleanup.summary" = "A small, clear and no-duplicates catalog improves both analysis and learning. Empty categories or almost without use usually add noise before value.";
+"appleAI.deterministic.categoryCleanup.bullet1" = "Unused categories: %@.";
+"appleAI.deterministic.categoryCleanup.bullet1.empty" = "No obvious empty categories.";
+"appleAI.deterministic.categoryCleanup.bullet2" = "Possible duplicates: %@.";
+"appleAI.deterministic.categoryCleanup.bullet2.empty" = "No clearly duplicated names are detected.";
+"appleAI.deterministic.categoryCleanup.bullet3" = "Avoid too fine categories if they barely receive movements.";
+"appleAI.deterministic.categoryCleanup.bullet4" = "Unify overlaps before creating new rules.";
+
+"appleAI.deterministic.ruleCandidates.title" = "Candidates for rules";
+"appleAI.deterministic.ruleCandidates.summary" = "The best rules are born from repeated merchants with low ambiguity. The most valuable signal appears when several corrections always end in the same category.";
+"appleAI.deterministic.ruleCandidates.bullet1" = "Merchants with good potential: %@.";
+"appleAI.deterministic.ruleCandidates.bullet1.empty" = "Not yet enough repeated pending merchants to automate safely.";
+"appleAI.deterministic.ruleCandidates.bullet2" = "Prioritize rules by merchant before too generic text.";
+"appleAI.deterministic.ruleCandidates.bullet3" = "If a pattern is repeated and always ends the same, it is already a strong candidate.";
+"appleAI.deterministic.ruleCandidates.bullet4" = "Avoid broad rules when the description is still ambiguous.";
+
+"appleAI.deterministic.budgetPressure.title" = "Budget pressure";
+"appleAI.deterministic.budgetPressure.summary" = "There are %lld active budgets this month. %lld are exceeded and %lld go near the limit.";
+"appleAI.deterministic.budgetPressure.noBudgets" = "There are no active budgets for this month yet, so real pressure cannot be measured by category.";
+"appleAI.deterministic.budgetPressure.bullet1" = "Highest tension now: %@.";
+"appleAI.deterministic.budgetPressure.bullet1.empty" = "No exceeded budgets at this time.";
+"appleAI.deterministic.budgetPressure.bullet2" = "It is advisable to monitor now: %@.";
+"appleAI.deterministic.budgetPressure.bullet2.empty" = "No categories clearly on the edge of the limit.";
+"appleAI.deterministic.budgetPressure.bullet3" = "Cross the tight budgets with your recurring merchants to detect fixed vs. variable spending.";
+"appleAI.deterministic.budgetPressure.bullet4" = "If a category is exceeded every month, the limit or the habit needs adjustment.";
+
+"appleAI.deterministic.categoriesOverPlan.title" = "Categories over plan";
+"appleAI.deterministic.categoriesOverPlan.summary" = "Categories over plan require a quick look because they usually concentrate the month deviation.";
+"appleAI.deterministic.categoriesOverPlan.noExcess" = "No categories have exceeded the monthly budget at this time.";
+"appleAI.deterministic.categoriesOverPlan.bullet1" = "Exceeded categories: %@.";
+"appleAI.deterministic.categoriesOverPlan.bullet1.empty" = "No excesses detected right now.";
+"appleAI.deterministic.categoriesOverPlan.bullet2" = "Also watch out: %@.";
+"appleAI.deterministic.categoriesOverPlan.bullet2.empty" = "No other categories near the limit.";
+"appleAI.deterministic.categoriesOverPlan.bullet3" = "Review if the excess comes from a one-time purchase or from a repeated pattern.";
+"appleAI.deterministic.categoriesOverPlan.bullet4" = "If the deviation is structural, adjust budget or create a rule to improve monitoring.";
+
+"appleAI.deterministic.aiDiagnostics.title" = "AI Diagnostics";
+"appleAI.deterministic.aiDiagnostics.summary" = "Foundation Models is available and the app can use structured generation for global actions.";
+"appleAI.deterministic.aiDiagnostics.summary.unavailable" = "Foundation Models is not available right now, so the app falls into deterministic logic based on local data.";
+"appleAI.deterministic.aiDiagnostics.bullet1" = "Foundation Models available: %@.";
+"appleAI.deterministic.aiDiagnostics.bullet2" = "Total movements in local base: %lld.";
+"appleAI.deterministic.aiDiagnostics.bullet3" = "Categorized coverage: %lld/%lld.";
+"appleAI.deterministic.aiDiagnostics.bullet4" = "Pending review: %lld.";
+
+"appleAI.deterministic.learningReadiness.title" = "Learning readiness";
+"appleAI.deterministic.learningReadiness.summary" = "Automation improves when categorized coverage goes up, pending queue goes down and repeated merchants appear with consistent decisions.";
+"appleAI.deterministic.learningReadiness.bullet1" = "Current coverage: %@.";
+"appleAI.deterministic.learningReadiness.bullet2" = "Current pending: %lld.";
+"appleAI.deterministic.learningReadiness.bullet3" = "Next clear lever: %@.";
+"appleAI.deterministic.learningReadiness.bullet3.empty" = "The next lever is to keep correcting repeated merchants.";
+"appleAI.deterministic.learningReadiness.bullet4" = "With more consistent data, suggestions and rules will be more reliable.";
+
+"ruleEditor.information" = "Rule Information";
+"ruleEditor.enabled" = "Enabled";
+"ruleEditor.conditions" = "Conditions";
+"ruleEditor.merchantContains" = "Merchant contains";
+"ruleEditor.descriptionContains" = "Description contains";
+"ruleEditor.minAmount" = "Min Amount";
+"ruleEditor.maxAmount" = "Max Amount";
+"ruleEditor.assignCategory" = "Assign Category";
+"ruleEditor.newRule" = "New Rule";
+"ruleEditor.editRule" = "Edit Rule";
+"importDropZone.dropHere" = "Drop your bank file here";
+"importDropZone.supportedFormats" = "Supports .csv, .xlsx and .pdf exports. The raw data stays on device.";
+"importDropZone.previewFirst" = "Preview first, then import only when the data looks right.";
+"importDropZone.advancedMapping" = "Advanced mapping and diagnostics stay hidden until validation.";
+"transactions.recategorizing" = "Re-categorizing...";
+"transactions.recategorizeSelectedType" = "Re-categorize selected type";
+"categories.groupCount" = "%@ • %@ transactions";
+"insights.pendingCount" = "%@ pending";

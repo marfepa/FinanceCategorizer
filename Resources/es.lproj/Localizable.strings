@@ -1,0 +1,547 @@
+/* Navigation */
+"Dashboard" = "Panel";
+"Import" = "Importar";
+"Transactions" = "Transacciones";
+"Analysis" = "Análisis";
+"Review" = "Revisión";
+"Categories" = "Categorías";
+"Budgets" = "Presupuestos";
+"Settings" = "Ajustes";
+
+/* Settings General */
+"Language" = "Idioma";
+
+/* Settings - ML */
+"Local ML Readiness" = "Estado del ML Local";
+"Learning in progress" = "Aprendizaje en curso";
+"The local model is still collecting labeled examples." = "El modelo local todavía está recopilando ejemplos etiquetados.";
+"Learned examples" = "Ejemplos aprendidos";
+"Covered categories" = "Categorías cubiertas";
+"Last update" = "Última actualización";
+"Not trained yet" = "Aún no entrenado";
+"Automatic categorization improves as you correct more movements, but the app should never promise 100% accuracy." = "La categorización automática mejora a medida que corriges más movimientos, pero la app nunca debe prometer una precisión del 100%.";
+
+/* Settings - AI */
+"Artificial Intelligence" = "Inteligencia Artificial";
+"Enable AI suggestions" = "Activar sugerencias por IA";
+"Enable Foundation Models when available" = "Activar modelos fundacionales cuando estén disponibles";
+"Auto-accept threshold" = "Umbral de auto-aceptación";
+"Soft-accept threshold" = "Umbral de aceptación suave";
+"Review threshold" = "Umbral de revisión";
+"The deterministic engine is the primary categorization path. AI is only used for ambiguous transactions." = "El motor determinista es la ruta de categorización principal. La IA solo se usa para transacciones ambiguas.";
+
+/* Settings - Privacy */
+"Privacy" = "Privacidad";
+"Enable privacy mode (hide amounts)" = "Activar modo privacidad (ocultar importes)";
+"When enabled, all monetary amounts are masked with asterisks across the entire app." = "Cuando está activado, todos los importes monetarios se ocultan con asteriscos en toda la aplicación.";
+
+/* Settings - Payroll */
+"Payroll" = "Nómina";
+"Payroll cutoff day: %lld" = "Día de corte de nómina: %lld";
+"Payroll income received from day %lld onwards is attributed to the following month's budget for accurate monthly reporting." = "Los ingresos de nómina recibidos a partir del día %lld se atribuyen al presupuesto del mes siguiente para un informe mensual preciso.";
+
+/* Settings - Automation */
+"Automation" = "Automatización";
+"Management of Rules" = "Gestión de Reglas";
+
+/* Dashboard Header */
+"Understand the month in one glance: net balance, pressure points and the next best move." = "Entiende el mes de un vistazo: balance neto, puntos de presión e ideas inteligentes.";
+"Show amounts" = "Mostrar importes";
+"Hide amounts" = "Ocultar importes";
+
+/* Dashboard Hero */
+"Expenses are up %lld versus the previous month." = "Los gastos han subido un %lld respecto al mes anterior.";
+"Expenses are down %lld versus the previous month." = "Los gastos han bajado un %lld respecto al mes anterior.";
+"This is the first comparable monthly snapshot available." = "Este es el primer informe mensual disponible.";
+"No previous-month comparison yet." = "Sin comparación con el mes anterior todavía.";
+"%@ spending by %@ (%@)." = "Gasto un %@ de %@ (%@)."; /* Ej: Un 15% más de 200€ (15%) */
+"Higher" = "Más";
+"Lower" = "Menos";
+"Income" = "Ingresos";
+"Expenses" = "Gastos";
+"Delta" = "Diferencia";
+"Not enough monthly movement yet to draw a trend." = "No hay suficiente movimiento mensual para dibujar una tendencia.";
+
+/* Dashboard Actions */
+"Import File" = "Importar Archivo";
+"Review Queue" = "Cola de Revisión";
+"Open Transactions" = "Ver Transacciones";
+
+/* Dashboard KPIs */
+"Savings Rate" = "Tasa de Ahorro";
+"Net over income this month" = "Neto sobre ingresos este mes";
+"Dominant Category" = "Categoría Dominante";
+"No category yet" = "Sin categoría aún";
+"Main pressure point of the month" = "Principal punto de gasto del mes";
+"Pending Review" = "Pendiente de Revisión";
+"Month is mostly settled" = "El mes está mayormente cerrado";
+"Movements still affecting certainty" = "Movimientos que afectan a la certeza";
+
+/* Dashboard AI Copilot */
+"AI Copilot" = "Copiloto IA";
+"Open Analysis" = "Ver Análisis";
+"No AI summary available yet." = "Sin resumen de IA disponible todavía.";
+"Alerts" = "Alertas";
+"No important alerts right now." = "Sin alertas importantes ahora mismo.";
+"Next Actions" = "Próximas Acciones";
+"No actions suggested right now." = "Sin acciones sugeridas por ahora.";
+
+/* Dashboard Other Cards */
+"Top Categories" = "Categorías Principales";
+"No categorized expenses yet this month." = "Sin gastos categorizados este mes.";
+"Recent Imports" = "Importaciones Recientes";
+"No imports yet. Start by loading a CSV, XLSX or PDF export." = "Sin importaciones. Empieza cargando un archivo CSV, XLSX o PDF.";
+"Month Confidence" = "Confianza del Mes";
+"%lld movements still need review in %@, so some totals and category weights may still move." = "%lld movimientos necesitan revisión en %@, por lo que los totales podrían variar.";
+"Categorized coverage: %@" = "Cobertura categorizada: %@";
+
+/* AI Service Deterministic Output */
+"Sin categorizar" = "Sin categorizar";
+"Spending is up %lld versus last month." = "El gasto ha subido un %lld respecto al mes pasado.";
+"Spending is down %lld versus last month." = "El gasto ha bajado un %lld respecto al mes pasado.";
+"There is not enough previous-month data to compare spending." = "No hay suficientes datos del mes anterior para comparar el gasto.";
+"The household remains in positive territory for %@. %@ The main expense pressure is %@." = "La economía familiar sigue en positivo para %@. %@ La principal presión de gasto es %@.";
+"The household is currently running a negative balance in %@. %@ The main expense pressure is %@." = "La economía familiar tiene un balance negativo en %@. %@ La principal presión de gasto es %@.";
+"Net balance is negative this month." = "El balance neto es negativo este mes.";
+"Expenses are rising noticeably versus the previous month." = "Los gastos están subiendo notablemente respecto al mes anterior.";
+"Several movements are still pending review and may distort the picture." = "Varios movimientos están pendientes de revisión y pueden distorsionar los datos.";
+"A significant part of the month is still weakly categorized." = "Una parte importante del mes está poco categorizada.";
+"%@ is taking an unusually large share of spending." = "%@ se está llevando una parte inusualmente grande del gasto.";
+"Review the pending movements to stabilize the dashboard numbers." = "Revisa los movimientos pendientes para estabilizar los datos del panel.";
+"Confirm ambiguous categories so the monthly picture becomes more reliable." = "Confirma categorías ambiguas para que el informe mensual sea más fiable.";
+"Open Analysis to inspect which categories are pushing the month negative." = "Abre Análisis para inspeccionar qué categorías están empujando el mes a negativo.";
+"Check the top categories to understand the spending spike versus last month." = "Consulta las categorías principales para entender el pico de gasto respecto al mes anterior.";
+"Keep importing and reviewing movements to preserve a reliable monthly snapshot." = "Sigue importando y revisando movimientos para mantener un informe mensual fiable.";
+
+/* States */
+"Preparing dashboard..." = "Preparando el panel...";
+"No Financial Snapshot Yet" = "Sin Informe Financiero";
+"Import real bank movements to see your monthly balance, AI briefing and top household spending categories." = "Importa movimientos bancarios para ver tu balance mensual, resumen por IA y categorías de gasto.";
+
+/* Imports Screen */
+"Bring in a bank export, validate the structure, then run a single clear import path." = "Importa un extracto bancario, valida su estructura y ejecútalo en un solo paso.";
+"Recognized headers include Fecha, F. valor, Fecha cble, Fecha valor, Concepto, Concepto ampliado, Importe, Moneda and Saldo." = "Cabeceras: Fecha, F. valor, Concepto, Importe, Moneda y Saldo.";
+"Choose File" = "Elegir Archivo";
+"Preview Import" = "Vista Previa";
+"Run Import" = "Ejecutar Importación";
+"Choose Another File" = "Elegir Otro Archivo";
+"Import Another File" = "Importar Otro Archivo";
+"Advanced Validation" = "Validación Avanzada";
+"Column Mapping" = "Mapeo de Columnas";
+"Selected file" = "Archivo seleccionado";
+"Preview rows" = "Filas en vista previa";
+"Rows ready for validation" = "Filas listas para validar";
+"Accounts found in source" = "Cuentas encontradas";
+"Items queued for confirmation" = "Movimientos en cola";
+"Import in progress" = "Importación en curso";
+"Import ready" = "Importación lista";
+"Categorizing movements and preparing the final summary." = "Categorizando movimientos y preparando el resumen final.";
+"The import finished. Open Transactions to review the results." = "Importación finalizada. Abre Transacciones para ver los resultados.";
+"Preview" = "Vista Previa";
+"Choose a CSV or XLSX bank export to preview imported movements." = "Elige un archivo CSV o XLSX para previsualizar los movimientos.";
+"Import Issues" = "Problemas de Importación";
+"Adjust the columns only when the automatic preview is incomplete or incorrect." = "Ajusta las columnas solo si la previsualización es incorrecta.";
+"Not Mapped" = "No mapeado";
+
+/* Categories */
+"No Categories" = "Sin Categorías";
+"Import movements to seed and use the base category catalog." = "Importa movimientos para generar y usar el catálogo base de categorías.";
+"System" = "Sistema";
+
+/* Budgets */
+"Monthly Budgets" = "Presupuestos Mensuales";
+"New Budget" = "Nuevo Presupuesto";
+"No limits set" = "Sin límites definidos";
+"Create a budget to monitor spending for specific categories." = "Crea un presupuesto para controlar el gasto por categorías.";
+"Unknown Category" = "Categoría desconocida";
+"of %@" = "de %@";
+"Limit exceeded" = "Límite excedido";
+"Approaching limit" = "Límite próximo";
+"Create Budget" = "Crear Presupuesto";
+"Select a category" = "Selecciona una categoría";
+"Limit Amount (€)" = "Importe máximo (€)";
+"Save Budget" = "Guardar Presupuesto";
+"Track your spending limits for %@" = "Controla tus límites de gasto para %@";
+
+/* Rules */
+"Automation Rules" = "Reglas de Automatización";
+"Search rules..." = "Buscar reglas...";
+"Add Rule" = "Añadir Regla";
+"Rule Name" = "Nombre de Regla";
+"Condition" = "Condición";
+"Hits" = "Impactos";
+"Actions" = "Acciones";
+"Learning System" = "Sistema de Aprendizaje";
+"Merchant: %@" = "Comercio: %@";
+"Description: %@" = "Descripción: %@";
+"Amount Range" = "Rango de Importe";
+"Unknown" = "Desconocido";
+
+/* Insights & AI Engine */
+"insights.topPressure.title" = "Presión de gasto máxima";
+"insights.topPressure.body" = "%@ es actualmente la categoría con más gasto.";
+"insights.recurring.title" = "Candidato a cargo recurrente";
+"insights.recurring.body" = "%@ aparece repetidamente y puede ser una suscripción o gasto recurrente.";
+"insights.anomaly.title" = "Anomalía de gasto";
+"insights.anomaly.body" = "Gasto superior al habitual en %@ (%@ EUR).";
+"insights.incomeGap.title" = "Brecha de ingresos detectada";
+"insights.incomeGap.body" = "No se detectó ingreso de nómina después del día límite (%lld).";
+"insights.savingsStreak.title" = "¡Racha de ahorros!";
+"insights.savingsStreak.body" = "Has mantenido un saldo positivo durante %lld meses consecutivos.";
+"No date range" = "Sin rango de fechas";
+
+/* Shared */
+"Cancel" = "Cancelar";
+"Save" = "Guardar";
+"Delete" = "Eliminar";
+"Edit" = "Editar";
+"Clear" = "Limpiar";
+"Export CSV" = "Exportar CSV";
+"Found" = "Encontradas";
+"Pending" = "Pendiente";
+"Accepted" = "Aceptado";
+"Ignored" = "Ignorado";
+"Source" = "Origen";
+"Deterministic" = "Determinista";
+"Manual" = "Manual";
+"Ambiguous" = "Ambiguo";
+
+/* Transactions & Categories */
+"All Transactions" = "Todas las Transacciones";
+"Search transactions..." = "Buscar transacciones...";
+"Date" = "Fecha";
+"Concept" = "Concepto";
+"Amount" = "Importe";
+"Category" = "Categoría";
+"Status" = "Estado";
+"Add Category" = "Añadir Categoría";
+"Edit Category" = "Editar Categoría";
+"Income Categories" = "Categorías de Ingresos";
+"Expense Categories" = "Categorías de Gastos";
+"Name" = "Nombre";
+"Color" = "Color";
+
+/* Budgets */
+"Monthly Budget" = "Presupuesto Mensual";
+"Allocated" = "Asignado";
+"Spent" = "Gastado";
+"Remaining" = "Restante";
+"Total Budgeted" = "Total Presupuestado";
+"Budget details for %@" = "Detalles del presupuesto para %@";
+
+/* Analysis & Insights */
+"Monthly Analysis" = "Análisis Mensual";
+"Detailed insights generated by AI based on your actual spending patterns." = "Información detallada generada por IA según tus patrones de gasto.";
+"Financial Health" = "Salud Financiera";
+"Cash Flow" = "Flujo de Caja";
+"Top Spending Drivers" = "Principales Gastos";
+
+/* Apple AI Context */
+"Apple AI" = "Apple AI";
+"Open contextual Apple AI actions for the current screen" = "Abrir acciones contextuales de Apple AI";
+"Imports" = "Importaciones";
+"Review Queue" = "Cola de revisión";
+"Finance" = "Finanzas";
+"Supported formats: CSV, XLSX, PDF (Openbank digital statements)." = "Formatos compatibles: CSV, XLSX, PDF (extractos digitales de Openbank).";
+"Paste CSV" = "Pegar CSV";
+"Expected header: date, concept, amount" = "Cabecera esperada: fecha, concepto, importe";
+"Source file name" = "Nombre del archivo";
+"Actions" = "Acciones";
+"Type to re-categorize" = "Tipo a recategorizar";
+"Expense" = "Gasto";
+"Transfer" = "Transferencia";
+"New category" = "Nueva categoría";
+"Create category" = "Crear categoría";
+"Movements" = "Movimientos";
+"Search concepts" = "Buscar conceptos";
+"No Transactions Yet" = "Aún no hay transacciones";
+"Import a CSV from the Import tab and your transactions will appear here." = "Importa un CSV desde la pestaña Importar y tus transacciones aparecerán aquí.";
+"No Transactions" = "Sin transacciones";
+"Import a CSV or XLSX file to populate your desktop transaction list." = "Importa un archivo CSV o XLSX para rellenar la lista de transacciones.";
+"import.error.chooseSource" = "Elige un archivo CSV/XLSX o pega contenido CSV antes de previsualizar.";
+"import.status.imported" = "Se han importado %@ filas en SwiftData. Se han omitido %@ duplicados.";
+"import.status.loading" = "Cargando %@...";
+"import.status.loaded" = "Se ha cargado %@. %@ filas listas para importar.";
+"import.error.adjustMapping" = "No se pudo construir una vista previa válida automáticamente. Ajusta el mapeo de columnas a continuación.";
+"import.error.noRowsParsed" = "No se pudo analizar ninguna fila de la fuente seleccionada.";
+"import.status.duplicateDetected" = "Duplicado detectado: %@. Ya se importó como %@.";
+"import.status.sourceSummary" = "Origen: %@. Filas válidas: %@. Filas inválidas: %@.";
+"import.error.duplicateFile" = "Este archivo parece duplicado. %@, ya se importó como '%@' el %@.";
+"import.source.csv" = "CSV";
+"import.source.file" = "archivo";
+"settings.ml.unavailable.title" = "No se puede evaluar el modelo";
+"settings.ml.unavailable.detail" = "No se pudo evaluar el estado del modelo en este momento.";
+"settings.ml.ready.title" = "Modelo listo para ayuda fiable";
+"settings.ml.ready.detail" = "El modelo tiene suficientes ejemplos corregidos en varias categorías para ayudar con confianza. Sigue validando casos límite, porque ninguna ruta de ML puede garantizar el 100%% de acierto.";
+"settings.ml.learning.title" = "Aprendizaje en curso";
+"settings.ml.learning.detail" = "Sigue corrigiendo movimientos. Todavía hacen falta %@ ejemplos aprendidos y %@ categorías bien cubiertas antes de marcar el modelo como listo.";
+"settings.ml.noModel.detail" = "El modelo local todavía necesita movimientos etiquetados antes de que podamos confiar en él para una categorización automática fiable.";
+"settings.ml.notTrainedYet" = "Aún no entrenado";
+"settings.ml.unavailable" = "No disponible";
+"localModel.profileSummary.notTrained" = "Todavía no hay un modelo local entrenado.";
+"localModel.profileSummary.updated" = "Modelo local actualizado el %@ con %@ ejemplos aprendidos.";
+"review.filter.all" = "Todos";
+"review.filter.lowConfidence" = "Baja confianza";
+"review.filter.uncategorized" = "Sin categorizar";
+"review.filter.similar" = "Con similares";
+"review.error.writeCategoryName" = "Escribe un nombre de categoría antes de crearla.";
+"review.status.categoryAvailable" = "La categoría '%@' ya está disponible para este movimiento.";
+"review.error.selectTransactionBeforeType" = "Selecciona una transacción antes de editar su tipo.";
+"review.status.updatedType" = "El tipo de movimiento se ha actualizado a %@.";
+"review.error.selectTransactionBeforeTransfer" = "Selecciona una transacción para marcarla como transferencia.";
+"review.status.markedAsTransfer" = "Marcado como transferencia interna.";
+"review.error.selectTransactionWithCategory" = "Selecciona una transacción con categoría sugerida o elegida.";
+"review.error.chooseCategoryBeforeCorrection" = "Elige una categoría antes de aplicar la corrección.";
+"review.error.chooseCategoryBeforeSimilar" = "Elige una categoría antes de aplicarla a movimientos similares.";
+"review.error.noSimilarMovements" = "No se encontraron movimientos pendientes similares para revisar en lote.";
+"review.status.appliedToSimilar" = "La categoría se ha aplicado a %@ movimientos similares.";
+"review.error.selectTransactionBeforeAI" = "Selecciona una transacción antes de pedir ayuda al copiloto de IA.";
+"review.status.aiNoReliableCategory" = "El copiloto de IA no encontró una categoría fiable. Mantén este movimiento en revisión.";
+"review.status.aiSuggests" = "La IA sugiere %@ con una confianza del %@.";
+"review.status.noPendingToRecategorize" = "No hay movimientos pendientes para recategorizar.";
+"review.status.autoResolved" = "%@ resueltos automáticamente";
+"review.status.suggestionsUpdated" = "%@ sugerencias actualizadas";
+"review.status.mlNoImprovements" = "El ML todavía no aporta mejoras. Sigue corrigiendo movimientos para entrenarlo.";
+"review.status.mlRerun" = "Nueva pasada de ML: %@.";
+"review.status.savedDecision" = "Decisión de revisión guardada para '%@'.";
+"dashboard.copilot.spendingUp" = "El gasto ha subido un %@ respecto al mes pasado.";
+"dashboard.copilot.spendingDown" = "El gasto ha bajado un %@ respecto al mes pasado.";
+"dashboard.copilot.summaryPositive" = "La economía familiar sigue en positivo para %@. %@ La principal presión de gasto es %@.";
+"dashboard.copilot.summaryNegative" = "La economía familiar tiene un balance negativo en %@. %@ La principal presión de gasto es %@.";
+"dashboard.copilot.topCategoryAlert" = "%@ se está llevando una parte inusualmente grande del gasto.";
+"dashboard.hero.expensesUp" = "Los gastos han subido un %@ respecto al mes anterior.";
+"dashboard.hero.expensesDown" = "Los gastos han bajado un %@ respecto al mes anterior.";
+"dashboard.hero.deltaCaption" = "%@ gasto por %@ (%@).";
+"dashboard.confidence.pendingReview" = "%@ movimientos siguen pendientes de revisión en %@, así que algunos totales y pesos por categoría todavía pueden cambiar.";
+"dashboard.confidence.coverage" = "Cobertura categorizada: %@";
+"appleAI.intent.monthlyBriefing.title" = "Resumen del mes";
+"appleAI.intent.monthlyBriefing.subtitle" = "Panorámica corta del mes actual";
+"appleAI.intent.optimizeSpending.title" = "Optimizar gasto";
+"appleAI.intent.optimizeSpending.subtitle" = "Detecta concentración y acciones inmediatas";
+"appleAI.intent.importHealth.title" = "Salud de imports";
+"appleAI.intent.importHealth.subtitle" = "Actividad reciente, volumen y arrastre a revisión";
+"appleAI.intent.importTips.title" = "Consejos de importación";
+"appleAI.intent.importTips.subtitle" = "Cómo mejorar el siguiente lote";
+"appleAI.intent.uncategorizedScan.title" = "Escanear sin categorizar";
+"appleAI.intent.uncategorizedScan.subtitle" = "Qué bloquea la clasificación automática";
+"appleAI.intent.recurringMerchants.title" = "Merchants repetidos";
+"appleAI.intent.recurringMerchants.subtitle" = "Patrones repetidos útiles para reglas";
+"appleAI.intent.analysisPatterns.title" = "Patrones de gasto";
+"appleAI.intent.analysisPatterns.subtitle" = "Tendencias, concentración y forecast";
+"appleAI.intent.savingsIdeas.title" = "Ideas de ahorro";
+"appleAI.intent.savingsIdeas.subtitle" = "Dónde recortar sin perder contexto";
+"appleAI.intent.reviewPriorities.title" = "Prioridades de revisión";
+"appleAI.intent.reviewPriorities.subtitle" = "Orden óptimo para vaciar la cola";
+"appleAI.intent.batchResolution.title" = "Resolución por lotes";
+"appleAI.intent.batchResolution.subtitle" = "Grupos similares para corregir de una vez";
+"appleAI.intent.categoryCleanup.title" = "Limpieza de categorías";
+"appleAI.intent.categoryCleanup.subtitle" = "Vacías, duplicadas o poco útiles";
+"appleAI.intent.ruleCandidates.title" = "Candidatos a reglas";
+"appleAI.intent.ruleCandidates.subtitle" = "Merchants que ya parecen automatizables";
+"appleAI.intent.budgetPressure.title" = "Presión de presupuestos";
+"appleAI.intent.budgetPressure.subtitle" = "Límites tensos o superados este mes";
+"appleAI.intent.categoriesOverPlan.title" = "Categorías fuera de plan";
+"appleAI.intent.categoriesOverPlan.subtitle" = "Qué categorías van fuera de presupuesto";
+"appleAI.intent.aiDiagnostics.title" = "Diagnóstico de IA";
+"appleAI.intent.aiDiagnostics.subtitle" = "Disponibilidad real y cobertura local";
+"appleAI.intent.learningReadiness.title" = "Madurez del aprendizaje";
+"appleAI.intent.learningReadiness.subtitle" = "Qué tan madura está la señal de aprendizaje";
+"appleAI.currentScreen" = "Pantalla actual: %@";
+"appleAI.generating" = "Generando...";
+"appleAI.runAction" = "Ejecutar acción";
+"appleAI.noActionSelected" = "Sin acción seleccionada";
+"appleAI.selectAction" = "Selecciona una acción en el panel izquierdo.";
+"appleAI.emptyState.description" = "Pulsa “Ejecutar acción” para generar una respuesta contextual con Foundation Models o fallback local.";
+"appleAI.whatItWillDo" = "Qué hará";
+"appleAI.actions" = "Acciones";
+"appleAI.regenerate" = "Volver a generar";
+"appleAI.movements.short" = "mov.";
+"appleAI.charges.short" = "cargos";
+"appleAI.average.short" = "media";
+"appleAI.noData" = "sin datos";
+"appleAI.rows.short" = "filas";
+"recentImports.rows" = "%@ filas";
+"importSummary.read" = "Leídas";
+"importSummary.valid" = "Válidas";
+"importSummary.invalid" = "Inválidas";
+"importSummary.imported" = "Importadas";
+"importSummary.autoCategorized" = "Auto-categorizadas";
+"importSummary.duplicates" = "Duplicados";
+"importSummary.dateRange" = "Rango de fechas";
+"importSummary.detectedAccounts" = "Cuentas detectadas";
+"importSummary.openImportedTransactions" = "Abrir transacciones importadas";
+
+/* AI Analysis Summary */
+"analysis.summary.deltaPositive" = "- El saldo neto del hogar es positivo en el periodo seleccionado.";
+"analysis.summary.deltaNegative" = "- El saldo neto del hogar es negativo en el periodo seleccionado.";
+"analysis.summary.topCategory" = "- La categoría principal de gasto es %@.";
+"analysis.summary.pendingReview" = "- Hay %lld transacciones aún pendientes de revisión que pueden afectar a la imagen final.";
+"analysis.summary.riskNegative" = "Atención: la tendencia actual es negativa.";
+"analysis.summary.riskSustainable" = "La tendencia actual se mantiene sostenible.";
+
+/* Apple AI Deterministic Results */
+"appleAI.deterministic.monthlyBriefing.title" = "Pulso del mes";
+"appleAI.deterministic.monthlyBriefing.summary" = "En %@ llevas %@ de ingresos, %@ de gastos y un neto de %@. Hay %lld movimientos pendientes que todavía pueden mover la foto final.";
+"appleAI.deterministic.monthlyBriefing.noHistory" = "Todavía no hay suficiente histórico para resumir el mes actual. En cuanto haya movimientos importados, el copiloto podrá sintetizar ingresos, gasto y neto del periodo.";
+"appleAI.deterministic.monthlyBriefing.bullet1" = "Prioriza la cola pendiente para estabilizar el panel mensual.";
+"appleAI.deterministic.monthlyBriefing.bullet2" = "Principal punto de gasto ahora: %@.";
+"appleAI.deterministic.monthlyBriefing.bullet2.empty" = "Aún no hay una categoría de gasto dominante.";
+"appleAI.deterministic.monthlyBriefing.bullet3" = "Comercio con más peso ahora: %@.";
+"appleAI.deterministic.monthlyBriefing.bullet3.empty" = "Todavía no hay comercios con peso suficiente para destacar.";
+"appleAI.deterministic.monthlyBriefing.bullet4" = "Cuando sube la cobertura categorizada, el resumen mensual se vuelve mucho más fiable.";
+
+"appleAI.deterministic.optimizeSpending.title" = "Optimización inmediata";
+"appleAI.deterministic.optimizeSpending.summary" = "Para optimizar gasto conviene empezar por concentración, recurrencias y comercios que acumulan varios cargos. La base local ya permite señalar por dónde empezar sin tocar todavía reglas agresivas.";
+"appleAI.deterministic.optimizeSpending.bullet1" = "Empieza revisando la categoría dominante: %@.";
+"appleAI.deterministic.optimizeSpending.bullet1.empty" = "Activa una primera categoría fuerte antes de ajustar el gasto.";
+"appleAI.deterministic.optimizeSpending.bullet2" = "Revisa este patrón recurrente: %@.";
+"appleAI.deterministic.optimizeSpending.bullet2.empty" = "Sigue corrigiendo cargos repetidos para detectar recurrencias claras.";
+"appleAI.deterministic.optimizeSpending.bullet3" = "Busca ahorro rápido en %@.";
+"appleAI.deterministic.optimizeSpending.bullet3.empty" = "Aún no hay un comercio claramente dominante.";
+"appleAI.deterministic.optimizeSpending.bullet4" = "Convierte correcciones repetidas en reglas solo cuando el patrón sea estable.";
+
+"appleAI.deterministic.importHealth.title" = "Estado de importaciones";
+"appleAI.deterministic.importHealth.summary" = "Las últimas %lld importaciones suman %lld filas importadas y %lld elementos enviados a revisión. Eso ya da una señal útil sobre la calidad de entrada y carga manual posterior.";
+"appleAI.deterministic.importHealth.noHistory" = "Todavía no hay importaciones recientes registradas, por lo que la app no tiene un flujo de importación estable que evaluar.";
+"appleAI.deterministic.importHealth.bullet1" = "Última importación: %@ con %lld filas.";
+"appleAI.deterministic.importHealth.bullet1.empty" = "Haz una primera importación para activar el circuito completo.";
+"appleAI.deterministic.importHealth.bullet2" = "Conviene revisar rápido los pendientes que dejan las importaciones recientes.";
+"appleAI.deterministic.importHealth.bullet2.empty" = "Las últimas importaciones no están dejando una cola grande de revisión.";
+"appleAI.deterministic.importHealth.bullet3" = "Mantener el mismo formato bancario mejora el mapeo automático.";
+"appleAI.deterministic.importHealth.bullet4" = "Si la vista previa sale limpia, el aprendizaje posterior también mejora.";
+
+"appleAI.deterministic.importTips.title" = "Mejorar la siguiente importación";
+"appleAI.deterministic.importTips.summary" = "La mejor importación es la que entra con fechas, importe y concepto claros, y deja una cola de revisión pequeña. La app ya tiene herramientas para detectar problemas antes de confirmar el lote.";
+"appleAI.deterministic.importTips.bullet1" = "Comprueba la vista previa antes de importar, sobre todo concepto, fecha e importe.";
+"appleAI.deterministic.importTips.bullet2" = "Si cambian las cabeceras del banco, ajusta el mapeo manual en la vista previa.";
+"appleAI.deterministic.importTips.bullet3" = "Después de importar, corrige comercios repetidos para reforzar el aprendizaje local.";
+"appleAI.deterministic.importTips.bullet4" = "Evita mezclar exportaciones de formatos distintos en la misma rutina mensual.";
+
+"appleAI.deterministic.uncategorizedScan.title" = "Ambigüedad actual";
+"appleAI.deterministic.uncategorizedScan.summary" = "Ahora mismo hay %lld movimientos pendientes o sin categoría. Ese grupo es el mayor freno para automatizar mejor y leer con claridad el estado financiero.";
+"appleAI.deterministic.uncategorizedScan.bullet1" = "Ejemplos representativos: %@.";
+"appleAI.deterministic.uncategorizedScan.bullet1.empty" = "No hay ejemplos pendientes visibles ahora mismo.";
+"appleAI.deterministic.uncategorizedScan.bullet2" = "Hay un patrón repetido claro: %@.";
+"appleAI.deterministic.uncategorizedScan.bullet2.empty" = "Un comercio repetido no aparece lo bastante claro todavía.";
+"appleAI.deterministic.uncategorizedScan.bullet3" = "Corrige primero grupos repetidos y deja para el final los casos únicos.";
+"appleAI.deterministic.uncategorizedScan.bullet4" = "Cada buena corrección mejora futuras sugerencias y posibles reglas.";
+
+"appleAI.deterministic.recurringMerchants.title" = "Comercios repetidos";
+"appleAI.deterministic.recurringMerchants.summary" = "Los patrones repetidos son la vía más rentable para reducir trabajo manual y detectar gasto estable. Cuando el comercio es consistente, suele ser un buen candidato para memoria o regla.";
+"appleAI.deterministic.recurringMerchants.bullet1" = "Candidatos detectados: %@.";
+"appleAI.deterministic.recurringMerchants.bullet1.empty" = "Aún no se detectan recurrencias claras con los datos actuales.";
+"appleAI.deterministic.recurringMerchants.bullet2" = "Revisa si alguno merece una regla persistente.";
+"appleAI.deterministic.recurringMerchants.bullet2.empty" = "Sigue importando y corrigiendo para consolidar patrones.";
+"appleAI.deterministic.recurringMerchants.bullet3" = "También pueden señalar suscripciones o gasto fijo que conviene vigilar.";
+"appleAI.deterministic.recurringMerchants.bullet3.empty" = "Los comercios consistentes mejoran tanto el análisis como la automatización.";
+"appleAI.deterministic.recurringMerchants.bullet4" = "Si un comercio siempre acaba en la misma categoría, ya tiene buena señal para automatizar.";
+
+"appleAI.deterministic.analysisPatterns.title" = "Patrones de gasto";
+"appleAI.deterministic.analysisPatterns.summary" = "En el rango de %@, el neto es %@ y el pronóstico medio mensual apunta a %@. La lectura mejora mucho cuando baja la cola pendiente y sube la cobertura categorizada.";
+"appleAI.deterministic.analysisPatterns.noHistory" = "Todavía no hay suficiente histórico para construir una lectura analítica fiable.";
+"appleAI.deterministic.analysisPatterns.bullet1" = "La categoría con más peso es %@.";
+"appleAI.deterministic.analysisPatterns.bullet1.empty" = "No hay una categoría dominante clara todavía.";
+"appleAI.deterministic.analysisPatterns.bullet2" = "Comercio destacado del periodo: %@.";
+"appleAI.deterministic.analysisPatterns.bullet2.empty" = "No se detecta un comercio dominante todavía.";
+"appleAI.deterministic.analysisPatterns.bullet3" = "Pronóstico a 6 meses: %@.";
+"appleAI.deterministic.analysisPatterns.bullet3.empty" = "Aún no hay pronóstico suficiente para 6 meses.";
+"appleAI.deterministic.analysisPatterns.bullet4" = "Reducir pendientes mejora mucho la lectura de tendencias reales.";
+
+"appleAI.deterministic.savingsIdeas.title" = "Ideas de ahorro";
+"appleAI.deterministic.savingsIdeas.summary" = "Para ahorrar de forma útil conviene atacar primero el gasto dominante, recurrencias y presupuestos tensos. La prioridad no es tocar todo, sino encontrar 1 o 2 focos con volumen real.";
+"appleAI.deterministic.savingsIdeas.bullet1" = "Empieza revisando %@.";
+"appleAI.deterministic.savingsIdeas.bullet1.empty" = "Primero estabiliza categorías para poder detectar ahorro real.";
+"appleAI.deterministic.savingsIdeas.bullet2" = "Audita esta recurrencia: %@.";
+"appleAI.deterministic.savingsIdeas.bullet2.empty" = "Busca suscripciones o cargos mensuales que aún no estén claros.";
+"appleAI.deterministic.savingsIdeas.bullet3" = "Hay presión directa en presupuesto: %@.";
+"appleAI.deterministic.savingsIdeas.bullet3.empty" = "Todavía no hay una categoría claramente pasada de presupuesto.";
+"appleAI.deterministic.savingsIdeas.bullet4" = "Evita crear reglas demasiado amplias cuando el comercio aún sea ambiguo.";
+
+"appleAI.deterministic.reviewPriorities.title" = "Prioridad de revisión";
+"appleAI.deterministic.reviewPriorities.summary" = "La cola no debe revisarse al azar. Conviene ordenar por repetición, impacto y capacidad de generar aprendizaje reutilizable.";
+"appleAI.deterministic.reviewPriorities.bullet1" = "Empieza por %@.";
+"appleAI.deterministic.reviewPriorities.bullet1.empty" = "Empieza por los movimientos más repetidos y parecidos.";
+"appleAI.deterministic.reviewPriorities.bullet2" = "Ejemplos prioritarios: %@.";
+"appleAI.deterministic.reviewPriorities.bullet2.empty" = "No hay ejemplos pendientes visibles.";
+"appleAI.deterministic.reviewPriorities.bullet3" = "Después corrige comercios de importe medio o alto.";
+"appleAI.deterministic.reviewPriorities.bullet4" = "Deja para el final los movimientos únicos y poco informativos.";
+
+"appleAI.deterministic.batchResolution.title" = "Resolución por lotes";
+"appleAI.deterministic.batchResolution.summary" = "La forma más rápida de vaciar la cola es agrupar comercios o descripciones que se repiten con el mismo patrón. Ahí es donde cada corrección devuelve más tiempo.";
+"appleAI.deterministic.batchResolution.bullet1" = "Lotes claros: %@.";
+"appleAI.deterministic.batchResolution.bullet1.empty" = "Todavía no hay lotes claros para resolver en bloque.";
+"appleAI.deterministic.batchResolution.bullet2" = "Aplica categoría a grupos repetidos antes que a casos sueltos.";
+"appleAI.deterministic.batchResolution.bullet3" = "Si el patrón es estable, considera crear una regla tras confirmar el lote.";
+"appleAI.deterministic.batchResolution.bullet4" = "Eso reduce la carga manual del siguiente import.";
+
+"appleAI.deterministic.categoryCleanup.title" = "Limpieza de categorías";
+"appleAI.deterministic.categoryCleanup.summary" = "Un catálogo pequeño, claro y sin duplicados mejora tanto el análisis como el aprendizaje. Las categorías vacías o casi sin uso suelen añadir ruido antes que valor.";
+"appleAI.deterministic.categoryCleanup.bullet1" = "Categorías sin uso: %@.";
+"appleAI.deterministic.categoryCleanup.bullet1.empty" = "No hay categorías vacías obvias.";
+"appleAI.deterministic.categoryCleanup.bullet2" = "Posibles duplicadas: %@.";
+"appleAI.deterministic.categoryCleanup.bullet2.empty" = "No se detectan nombres claramente duplicados.";
+"appleAI.deterministic.categoryCleanup.bullet3" = "Evita categorías demasiado finas si apenas reciben movimientos.";
+"appleAI.deterministic.categoryCleanup.bullet4" = "Unifica solapamientos antes de crear nuevas reglas.";
+
+"appleAI.deterministic.ruleCandidates.title" = "Candidatos para reglas";
+"appleAI.deterministic.ruleCandidates.summary" = "Las mejores reglas nacen de comercios repetidos con baja ambigüedad. La señal más valiosa aparece cuando varias correcciones terminan siempre en la misma categoría.";
+"appleAI.deterministic.ruleCandidates.bullet1" = "Comercios con buen potencial: %@.";
+"appleAI.deterministic.ruleCandidates.bullet1.empty" = "Aún no hay comercios pendientes repetidos suficientes para automatizar con seguridad.";
+"appleAI.deterministic.ruleCandidates.bullet2" = "Prioriza reglas por comercio antes que por texto demasiado genérico.";
+"appleAI.deterministic.ruleCandidates.bullet3" = "Si un patrón se repite y termina siempre igual, ya es un candidato fuerte.";
+"appleAI.deterministic.ruleCandidates.bullet4" = "Evita reglas amplias cuando la descripción sigue siendo ambigua.";
+
+"appleAI.deterministic.budgetPressure.title" = "Presión de presupuestos";
+"appleAI.deterministic.budgetPressure.summary" = "Hay %lld presupuestos activos este mes. %lld están superados y %lld van cerca del límite.";
+"appleAI.deterministic.budgetPressure.noBudgets" = "Todavía no hay presupuestos activos para este mes, por lo que no se puede medir la presión real por categoría.";
+"appleAI.deterministic.budgetPressure.bullet1" = "Mayor tensión ahora: %@.";
+"appleAI.deterministic.budgetPressure.bullet1.empty" = "No hay presupuestos superados en este momento.";
+"appleAI.deterministic.budgetPressure.bullet2" = "Conviene vigilar ya: %@.";
+"appleAI.deterministic.budgetPressure.bullet2.empty" = "No hay categorías claramente al borde del límite.";
+"appleAI.deterministic.budgetPressure.bullet3" = "Cruza los presupuestos tensos con tus comercios recurrentes para detectar gasto fijo vs. variable.";
+"appleAI.deterministic.budgetPressure.bullet4" = "Si una categoría se pasa cada mes, el límite o el hábito necesitan un ajuste.";
+
+"appleAI.deterministic.categoriesOverPlan.title" = "Categorías fuera de plan";
+"appleAI.deterministic.categoriesOverPlan.summary" = "Las categorías fuera de plan requieren una mirada rápida porque suelen concentrar la desviación del mes.";
+"appleAI.deterministic.categoriesOverPlan.noExcess" = "No hay categorías que hayan superado el presupuesto mensual en este momento.";
+"appleAI.deterministic.categoriesOverPlan.bullet1" = "Categorías superadas: %@.";
+"appleAI.deterministic.categoriesOverPlan.bullet1.empty" = "No se detectan excesos ahora mismo.";
+"appleAI.deterministic.categoriesOverPlan.bullet2" = "También vigila: %@.";
+"appleAI.deterministic.categoriesOverPlan.bullet2.empty" = "No hay otras categorías cerca del límite.";
+"appleAI.deterministic.categoriesOverPlan.bullet3" = "Revisa si el exceso viene de una compra puntual o de un patrón repetido.";
+"appleAI.deterministic.categoriesOverPlan.bullet4" = "Si el desvío es estructural, ajusta el presupuesto o crea una regla para mejorar el seguimiento.";
+
+"appleAI.deterministic.aiDiagnostics.title" = "Diagnóstico de IA";
+"appleAI.deterministic.aiDiagnostics.summary" = "Foundation Models está disponible y la app puede usar generación estructurada para acciones globales.";
+"appleAI.deterministic.aiDiagnostics.summary.unavailable" = "Foundation Models no está disponible ahora mismo, por lo que la app usa lógica determinista basada en datos locales.";
+"appleAI.deterministic.aiDiagnostics.bullet1" = "Foundation Models disponible: %@.";
+"appleAI.deterministic.aiDiagnostics.bullet2" = "Total movimientos en base local: %lld.";
+"appleAI.deterministic.aiDiagnostics.bullet3" = "Cobertura categorizada: %lld/%lld.";
+"appleAI.deterministic.aiDiagnostics.bullet4" = "Pendientes de revisión: %lld.";
+
+"appleAI.deterministic.learningReadiness.title" = "Madurez del aprendizaje";
+"appleAI.deterministic.learningReadiness.summary" = "La automatización mejora cuando sube la cobertura categorizada, baja la cola pendiente y aparecen comercios repetidos con decisiones consistentes.";
+"appleAI.deterministic.learningReadiness.bullet1" = "Cobertura actual: %@.";
+"appleAI.deterministic.learningReadiness.bullet2" = "Pendientes actuales: %lld.";
+"appleAI.deterministic.learningReadiness.bullet3" = "Próxima palanca clara: %@.";
+"appleAI.deterministic.learningReadiness.bullet3.empty" = "La siguiente palanca es seguir corrigiendo comercios repetidos.";
+"appleAI.deterministic.learningReadiness.bullet4" = "Con más datos consistentes, las sugerencias y reglas serán más fiables.";
+
+"ruleEditor.information" = "Información de la regla";
+"ruleEditor.enabled" = "Activada";
+"ruleEditor.conditions" = "Condiciones";
+"ruleEditor.merchantContains" = "Merchant contiene";
+"ruleEditor.descriptionContains" = "Descripción contiene";
+"ruleEditor.minAmount" = "Importe mínimo";
+"ruleEditor.maxAmount" = "Importe máximo";
+"ruleEditor.assignCategory" = "Asignar categoría";
+"ruleEditor.newRule" = "Nueva regla";
+"ruleEditor.editRule" = "Editar regla";
+"importDropZone.dropHere" = "Suelta aquí tu archivo bancario";
+"importDropZone.supportedFormats" = "Admite exportaciones .csv, .xlsx y .pdf. Los datos en bruto permanecen en el dispositivo.";
+"importDropZone.previewFirst" = "Primero revisa la vista previa y luego importa solo cuando los datos estén bien.";
+"importDropZone.advancedMapping" = "El mapeo avanzado y los diagnósticos permanecen ocultos hasta la validación.";
+"transactions.recategorizing" = "Recategorizando...";
+"transactions.recategorizeSelectedType" = "Recategorizar el tipo seleccionado";
+"categories.groupCount" = "%@ • %@ transacciones";
+"insights.pendingCount" = "%@ pendientes";

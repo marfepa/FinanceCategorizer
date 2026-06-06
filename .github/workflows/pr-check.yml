@@ -1,0 +1,41 @@
+name: PR Check
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  pr-verification:
+    name: Verify PR Compliance
+    runs-on: macos-15
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Make Scripts Executable
+        run: chmod +x scripts/*.sh
+
+      - name: Run Sensitive Files Scanner
+        run: ./scripts/verify_no_sensitive_files.sh
+
+      - name: Run Version Consistency Check
+        run: ./scripts/check_version_consistency.sh
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode Project
+        run: xcodegen generate
+
+      - name: Build iOS Application
+        run: xcodebuild -project FinanceCategorizer.xcodeproj -scheme FinanceCategorizerIOS -destination 'platform=iOS Simulator,name=iPhone 17' build
+
+      - name: Build macOS Application
+        run: xcodebuild -project FinanceCategorizer.xcodeproj -scheme FinanceCategorizerMac build
+
+      - name: Localization Parity Test
+        run: xcodebuild -project FinanceCategorizer.xcodeproj -scheme FinanceCategorizerIOS -destination 'platform=iOS Simulator,name=iPhone 17' test -only-testing:FinanceCategorizerTests/FinanceCategorizerTests/testLocalizedStringFilesHaveTheSameKeys
+
+      - name: Run Unit Tests
+        run: xcodebuild -project FinanceCategorizer.xcodeproj -scheme FinanceCategorizerIOS -destination 'platform=iOS Simulator,name=iPhone 17' test

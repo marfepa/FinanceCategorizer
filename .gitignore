@@ -1,0 +1,37 @@
+# Xcode
+FinanceCategorizer.xcodeproj/
+DerivedData/
+.derived-data/
+build/
+*.xcuserstate
+*.xcuserdata/
+xcuserdata/
+
+# SwiftPM / XcodeGen generated state
+.build/
+
+# User and machine-local files
+.DS_Store
+*.swp
+*.tmp
+*.log
+
+# Local financial data
+*.store
+*.store-shm
+*.store-wal
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.csv
+*.xlsx
+*.xls
+*.pdf
+!Tests/UnitTests/Fixtures/**/*.csv
+!Tests/UnitTests/Fixtures/**/*.xlsx
+!Tests/UnitTests/Fixtures/**/*.pdf
+
+# Node artifacts from legacy tooling
+node_modules/
+node-v*/
+node.tar.gz

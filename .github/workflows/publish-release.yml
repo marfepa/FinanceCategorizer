@@ -1,0 +1,80 @@
+name: Publish Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Versión del release a publicar (ej. 0.3.0-alpha.1 o 0.3.0)'
+        required: true
+        type: string
+
+jobs:
+  publish:
+    name: Validate and Publish Release
+    runs-on: macos-15
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Necesario para historial completo de tags/ramas
+
+      - name: Verify Version Input Matches project.yml
+        run: |
+          PROJECT_VERSION=$(grep -E 'MARKETING_VERSION:' project.yml | head -n 1 | awk '{print $2}' | tr -d '"'\''')
+          INPUT_VERSION="${{ inputs.version }}"
+          if [ "$PROJECT_VERSION" != "$INPUT_VERSION" ]; then
+            echo "ERROR: La versión ingresada ($INPUT_VERSION) no coincide con MARKETING_VERSION en project.yml ($PROJECT_VERSION)"
+            exit 1
+          fi
+          echo "OK: Versión confirmada: $PROJECT_VERSION"
+
+      - name: Make Scripts Executable
+        run: chmod +x scripts/*.sh
+
+      - name: Run Sensitive Files Scanner
+        run: ./scripts/verify_no_sensitive_files.sh
+
+      - name: Run Version Consistency Check
+        run: ./scripts/check_version_consistency.sh
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode Project
+        run: xcodegen generate
+
+      - name: Build iOS Application
+        run: xcodebuild -project FinanceCategorizer.xcodeproj -scheme FinanceCategorizerIOS -destination 'platform=iOS Simulator,name=iPhone 17' build
+
+      - name: Build macOS Application
+        run: xcodebuild -project FinanceCategorizer.xcodeproj -scheme FinanceCategorizerMac build
+
+      - name: Localization Parity Test
+        run: xcodebuild -project FinanceCategorizer.xcodeproj -scheme FinanceCategorizerIOS -destination 'platform=iOS Simulator,name=iPhone 17' test -only-testing:FinanceCategorizerTests/FinanceCategorizerTests/testLocalizedStringFilesHaveTheSameKeys
+
+      - name: Run Unit Tests
+        run: xcodebuild -project FinanceCategorizer.xcodeproj -scheme FinanceCategorizerIOS -destination 'platform=iOS Simulator,name=iPhone 17' test
+
+      - name: Collect Release Evidence
+        run: ./scripts/collect_release_evidence.sh
+
+      - name: Create GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ inputs.version }}"
+          EVIDENCE_FILE="release_evidence_v${VERSION}.md"
+          
+          # Verificar si es pre-release (contiene guion como -alpha, -beta)
+          PRERELEASE_FLAG=""
+          if [[ "$VERSION" == *-* ]]; then
+            PRERELEASE_FLAG="--prerelease"
+            echo "Identificado como Pre-release."
+          fi
+          
+          echo "Creando GitHub Release v$VERSION..."
+          gh release create "v$VERSION" \
+            $PRERELEASE_FLAG \
+            --title "Release v$VERSION" \
+            --notes-file "$EVIDENCE_FILE" \
+            --target "$GITHUB_SHA"
