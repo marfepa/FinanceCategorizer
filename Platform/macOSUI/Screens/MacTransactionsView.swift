@@ -16,6 +16,26 @@ struct MacTransactionsView: View {
             filterBar
                 .padding()
                 .background(.windowBackground)
+
+            DuplicateReviewPanel(
+                groups: viewModel.duplicateGroups,
+                transactions: viewModel.transactions,
+                isScanning: viewModel.isScanningDuplicates,
+                onScan: {
+                    viewModel.scanDuplicates(using: appContainer, language: .currentSelection)
+                },
+                onDismiss: { group in
+                    viewModel.dismissDuplicateGroup(group, using: appContainer, language: .currentSelection)
+                },
+                onRemove: { group in
+                    viewModel.removeDuplicateGroup(group, using: appContainer, language: .currentSelection)
+                },
+                onResolveAll: { groups in
+                    viewModel.resolveAllDuplicateGroups(groups, using: appContainer, language: .currentSelection)
+                }
+            )
+            .padding(.horizontal)
+            .padding(.bottom, AppSpacing.small)
             
             Divider()
 

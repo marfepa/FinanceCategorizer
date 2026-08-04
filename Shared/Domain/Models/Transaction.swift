@@ -26,6 +26,13 @@ final class Transaction {
     var fingerprint: String
     var isRecurringCandidate: Bool
     var recurrenceGroupID: String?
+    var duplicateGroupID: String?
+    var duplicateReviewStatusRaw: String?
+    // Optional so existing SwiftData stores can add the audit metadata through
+    // a lightweight migration without requiring a destructive store reset.
+    var duplicateConfidence: Double?
+    var duplicateReasonKey: String?
+    var duplicateRecommendedKeepID: UUID?
     var createdAt: Date
     var updatedAt: Date
 
@@ -53,6 +60,11 @@ final class Transaction {
         fingerprint: String = "",
         isRecurringCandidate: Bool = false,
         recurrenceGroupID: String? = nil,
+        duplicateGroupID: String? = nil,
+        duplicateReviewStatusRaw: String? = nil,
+        duplicateConfidence: Double? = nil,
+        duplicateReasonKey: String? = nil,
+        duplicateRecommendedKeepID: UUID? = nil,
         createdAt: Date = .now,
         updatedAt: Date = .now
     ) {
@@ -79,6 +91,11 @@ final class Transaction {
         self.fingerprint = fingerprint
         self.isRecurringCandidate = isRecurringCandidate
         self.recurrenceGroupID = recurrenceGroupID
+        self.duplicateGroupID = duplicateGroupID
+        self.duplicateReviewStatusRaw = duplicateReviewStatusRaw
+        self.duplicateConfidence = duplicateConfidence
+        self.duplicateReasonKey = duplicateReasonKey
+        self.duplicateRecommendedKeepID = duplicateRecommendedKeepID
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }

@@ -19,6 +19,7 @@ final class ImportBatchRepository {
     }
 
     func saveBatch(
+        id: UUID = UUID(),
         fileName: String,
         sourceType: String,
         rawRowCount: Int,
@@ -33,6 +34,7 @@ final class ImportBatchRepository {
         let context = makeContext()
         context.insert(
             ImportBatch(
+                id: id,
                 fileName: fileName,
                 sourceType: sourceType,
                 importedAt: .now,

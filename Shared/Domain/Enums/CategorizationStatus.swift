@@ -6,3 +6,9 @@ enum ReviewStatus: String, Codable, CaseIterable {
     case corrected
     case ignored
 }
+
+enum DuplicateReviewStatus: String, Codable, CaseIterable {
+    case pending
+    case dismissed
+    case resolved
+}

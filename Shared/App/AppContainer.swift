@@ -34,6 +34,7 @@ final class AppContainer {
     let dashboardInsightService: DashboardInsightService
     let financialAnalysisService: FinancialAnalysisService
     let insightEngine: InsightEngine
+    let duplicateAuditService: DuplicateAuditService
 
     init(inMemory: Bool = false) {
         modelContainer = ModelContainerFactory.make(inMemory: inMemory)
@@ -114,6 +115,7 @@ final class AppContainer {
         self.dashboardInsightService = dashboardInsightService
         self.financialAnalysisService = financialAnalysisService
         self.insightEngine = insightEngine
+        self.duplicateAuditService = DuplicateAuditService()
         self.importOrchestrator = ImportOrchestrator(
             transactionRepository: transactionRepository,
             categoryRepository: categoryRepository,
