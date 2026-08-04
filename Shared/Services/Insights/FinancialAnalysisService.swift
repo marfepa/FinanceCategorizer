@@ -29,7 +29,6 @@ enum AnalysisTimeRange: String, CaseIterable, Identifiable {
         }
     }
 }
-
 struct CategoryBreakdownItem: Identifiable {
     let id: String
     let categoryName: String
@@ -72,30 +71,36 @@ struct FinancialAnalysisSnapshot {
     let categorizedPercentage: Double
     let pendingReviewCount: Int
     let categoryBreakdown: [CategoryBreakdownItem]
+    let categoryEvolution: [CategoryEvolutionItem]
     let monthlyCashflow: [MonthlyCashflowPoint]
+    let netTrend: FinancialTrendDirection
+    let netDeltaFromPreviousMonth: Decimal?
+    let dataQuality: FinancialDataQuality
     let forecast: ForecastSnapshot
     let recurringExpenses: [RecurringExpenseItem]
 }
 
 struct FinancialAnalysisService {
+    private let classifier = FinancialMovementClassifier()
+
     func analyze(
         transactions: [Transaction],
         categories: [Category],
         range: AnalysisTimeRange
     ) -> FinancialAnalysisSnapshot {
-        let validTransactions = transactions.filter { $0.resolvedKind != .transfer }
+        let validTransactions = transactions.filter(classifier.isIncluded)
         let filteredTransactions = filter(transactions: validTransactions, for: range)
         let previousTransactions = previousWindowTransactions(from: validTransactions, for: range, anchorTransactions: filteredTransactions)
-        let pendingReviewCount = filteredTransactions.filter {
-            $0.categoryID == nil || $0.needsReview || $0.reviewStatusRaw == ReviewStatus.pending.rawValue
-        }.count
+        let filteredSourceTransactions = filter(transactions: transactions, for: range)
+        let dataQuality = classifier.dataQuality(for: filteredSourceTransactions)
+        let pendingReviewCount = dataQuality.pendingReviewCount
 
         let totalIncome = filteredTransactions
-            .filter { NSDecimalNumber(decimal: $0.amount).doubleValue > 0 }
+            .filter(classifier.isIncome)
             .reduce(Decimal.zero) { $0 + $1.amount }
 
         let totalExpenses = filteredTransactions
-            .filter { NSDecimalNumber(decimal: $0.amount).doubleValue < 0 }
+            .filter(classifier.isExpense)
             .reduce(Decimal.zero) { partial, transaction in
                 partial + absolute(transaction.amount)
             }
@@ -113,6 +118,10 @@ struct FinancialAnalysisService {
             totalExpenses: totalExpenses
         )
         let monthlyCashflow = buildMonthlyCashflow(from: filteredTransactions)
+        let categoryEvolution = buildCategoryEvolution(
+            from: filteredTransactions,
+            categoryMap: categoryMap
+        )
         let forecast = buildForecast(from: monthlyCashflow)
         let recurringExpenses = buildRecurringExpenses(from: filteredTransactions)
 
@@ -125,7 +134,11 @@ struct FinancialAnalysisService {
             categorizedPercentage: categorizedPercentage,
             pendingReviewCount: pendingReviewCount,
             categoryBreakdown: categoryBreakdown,
+            categoryEvolution: categoryEvolution,
             monthlyCashflow: monthlyCashflow,
+            netTrend: classifier.trend(for: monthlyCashflow),
+            netDeltaFromPreviousMonth: classifier.deltaFromPreviousMonth(for: monthlyCashflow),
+            dataQuality: dataQuality,
             forecast: forecast,
             recurringExpenses: recurringExpenses
         )
@@ -165,12 +178,12 @@ struct FinancialAnalysisService {
         categoryMap: [UUID: String],
         totalExpenses: Decimal
     ) -> [CategoryBreakdownItem] {
-        let currentExpenses = Dictionary(grouping: transactions.filter { NSDecimalNumber(decimal: $0.amount).doubleValue < 0 }) { transaction in
-            transaction.categoryID.flatMap { categoryMap[$0] } ?? "Sin categorizar"
+        let currentExpenses = Dictionary(grouping: transactions.filter(classifier.isExpense)) { transaction in
+            classifier.categoryName(for: transaction, categoryMap: categoryMap) ?? "Sin categorizar"
         }.mapValues { $0.reduce(Decimal.zero) { $0 + absolute($1.amount) } }
 
-        let previousExpenses = Dictionary(grouping: previousTransactions.filter { NSDecimalNumber(decimal: $0.amount).doubleValue < 0 }) { transaction in
-            transaction.categoryID.flatMap { categoryMap[$0] } ?? "Sin categorizar"
+        let previousExpenses = Dictionary(grouping: previousTransactions.filter(classifier.isExpense)) { transaction in
+            classifier.categoryName(for: transaction, categoryMap: categoryMap) ?? "Sin categorizar"
         }.mapValues { $0.reduce(Decimal.zero) { $0 + absolute($1.amount) } }
 
         return currentExpenses
@@ -188,6 +201,68 @@ struct FinancialAnalysisService {
             .sorted { $0.amount > $1.amount }
     }
 
+    private func buildCategoryEvolution(
+        from transactions: [Transaction],
+        categoryMap: [UUID: String]
+    ) -> [CategoryEvolutionItem] {
+        let expenseTransactions = transactions.filter(classifier.isExpense)
+        guard let firstDate = expenseTransactions.map(\.accountingDate).min(),
+              let lastDate = expenseTransactions.map(\.accountingDate).max() else {
+            return []
+        }
+
+        let firstMonth = startOfMonth(for: firstDate)
+        let lastMonth = startOfMonth(for: lastDate)
+        let months = sequenceOfMonths(from: firstMonth, through: lastMonth)
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM yyyy"
+        formatter.locale = Locale.current
+
+        let monthlyAmounts = Dictionary(grouping: expenseTransactions) {
+            startOfMonth(for: $0.accountingDate)
+        }.mapValues { monthTransactions in
+            Dictionary(grouping: monthTransactions) { transaction in
+                classifier.categoryName(for: transaction, categoryMap: categoryMap) ?? "Sin categorizar"
+            }.mapValues { items in
+                items.reduce(Decimal.zero) { $0 + absolute($1.amount) }
+            }
+        }
+
+        let categoryNames = Set(monthlyAmounts.values.flatMap(\.keys))
+        return categoryNames.map { categoryName in
+            let points = months.map { month in
+                CategoryEvolutionPoint(
+                    id: "\(categoryName)-\(month.timeIntervalSince1970)",
+                    categoryName: categoryName,
+                    monthLabel: formatter.string(from: month),
+                    startDate: month,
+                    amount: monthlyAmounts[month]?[categoryName] ?? .zero
+                )
+            }
+            let latestAmount = points.last?.amount ?? .zero
+            let previousAmount = points.dropLast().last?.amount ?? .zero
+            let delta = latestAmount - previousAmount
+            let deltaPercentage = previousAmount == .zero ? nil : decimalToDouble(delta / previousAmount)
+            let isSpiking = delta > .zero &&
+                ((previousAmount == .zero && latestAmount > .zero) || (deltaPercentage ?? 0) >= 0.25)
+
+            return CategoryEvolutionItem(
+                id: categoryName,
+                categoryName: categoryName,
+                points: points,
+                latestAmount: latestAmount,
+                previousAmount: previousAmount,
+                deltaFromPreviousMonth: delta,
+                deltaPercentage: deltaPercentage,
+                isSpiking: isSpiking
+            )
+        }
+        .sorted {
+            if $0.latestAmount != $1.latestAmount { return $0.latestAmount > $1.latestAmount }
+            return $0.categoryName < $1.categoryName
+        }
+    }
+
     private func buildMonthlyCashflow(from transactions: [Transaction]) -> [MonthlyCashflowPoint] {
         let grouped = Dictionary(grouping: transactions, by: { startOfMonth(for: $0.accountingDate) })
         let formatter = DateFormatter()
@@ -197,10 +272,10 @@ struct FinancialAnalysisService {
         return grouped.keys.sorted().map { month in
             let monthTransactions = grouped[month] ?? []
             let income = monthTransactions
-                .filter { NSDecimalNumber(decimal: $0.amount).doubleValue > 0 }
+                .filter(classifier.isIncome)
                 .reduce(Decimal.zero) { $0 + $1.amount }
             let expense = monthTransactions
-                .filter { NSDecimalNumber(decimal: $0.amount).doubleValue < 0 }
+                .filter(classifier.isExpense)
                 .reduce(Decimal.zero) { $0 + absolute($1.amount) }
 
             return MonthlyCashflowPoint(
@@ -233,7 +308,7 @@ struct FinancialAnalysisService {
     }
 
     private func buildRecurringExpenses(from transactions: [Transaction]) -> [RecurringExpenseItem] {
-        Dictionary(grouping: transactions.filter { NSDecimalNumber(decimal: $0.amount).doubleValue < 0 }, by: \.cleanedDescription)
+        Dictionary(grouping: transactions.filter(classifier.isExpense), by: \.cleanedDescription)
             .compactMap { concept, items in
                 guard items.count >= 2 else { return nil }
                 let averageAmount = items.reduce(Decimal.zero) { $0 + absolute($1.amount) } / Decimal(items.count)
@@ -252,6 +327,17 @@ struct FinancialAnalysisService {
     private func startOfMonth(for date: Date) -> Date {
         let components = Calendar.current.dateComponents([.year, .month], from: date)
         return Calendar.current.date(from: components) ?? date
+    }
+
+    private func sequenceOfMonths(from start: Date, through end: Date) -> [Date] {
+        var months: [Date] = []
+        var current = start
+        while current <= end {
+            months.append(current)
+            guard let next = Calendar.current.date(byAdding: .month, value: 1, to: current) else { break }
+            current = next
+        }
+        return months
     }
 
     private func decimalToDouble(_ decimal: Decimal) -> Double {

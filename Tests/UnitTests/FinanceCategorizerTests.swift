@@ -1593,6 +1593,117 @@ final class FinanceCategorizerTests: XCTestCase {
         XCTAssertEqual(snapshot?.uncategorizedExpenseAmount, Decimal(18))
     }
 
+    func testDashboardReportsNetTrendAndExpenseCoverage() {
+        let groceries = Category(
+            name: "Alimentacion",
+            iconName: "cart",
+            colorHex: "#4CAF50",
+            isIncome: false
+        )
+        let juneIncome = Transaction(
+            bookingDate: date(year: 2026, month: 6, day: 5),
+            rawDescription: "NOMINA JUNIO",
+            cleanedDescription: "NOMINA JUNIO",
+            amount: 100,
+            kindRaw: TransactionKind.income.rawValue,
+            categoryID: groceries.id,
+            needsReview: false,
+            reviewStatusRaw: ReviewStatus.accepted.rawValue
+        )
+        let juneExpense = Transaction(
+            bookingDate: date(year: 2026, month: 6, day: 6),
+            rawDescription: "LIDL",
+            cleanedDescription: "LIDL",
+            amount: -40,
+            kindRaw: TransactionKind.expense.rawValue,
+            categoryID: groceries.id,
+            needsReview: false,
+            reviewStatusRaw: ReviewStatus.accepted.rawValue
+        )
+        let julyIncome = Transaction(
+            bookingDate: date(year: 2026, month: 7, day: 5),
+            rawDescription: "NOMINA JULIO",
+            cleanedDescription: "NOMINA JULIO",
+            amount: 100,
+            kindRaw: TransactionKind.income.rawValue,
+            categoryID: groceries.id,
+            needsReview: false,
+            reviewStatusRaw: ReviewStatus.accepted.rawValue
+        )
+        let julyExpense = Transaction(
+            bookingDate: date(year: 2026, month: 7, day: 6),
+            rawDescription: "LIDL",
+            cleanedDescription: "LIDL",
+            amount: -80,
+            kindRaw: TransactionKind.expense.rawValue,
+            categoryID: groceries.id,
+            needsReview: false,
+            reviewStatusRaw: ReviewStatus.accepted.rawValue
+        )
+        let internalTransfer = Transaction(
+            bookingDate: date(year: 2026, month: 7, day: 7),
+            rawDescription: "TRASPASO ENTRE CUENTAS",
+            cleanedDescription: "TRASPASO ENTRE CUENTAS",
+            amount: 500,
+            kindRaw: TransactionKind.transfer.rawValue,
+            needsReview: true,
+            reviewStatusRaw: ReviewStatus.pending.rawValue
+        )
+
+        let snapshot = DashboardInsightService().buildSnapshot(
+            transactions: [juneIncome, juneExpense, julyIncome, julyExpense, internalTransfer],
+            categories: [groceries],
+            recentImports: [],
+            locale: .current,
+            now: date(year: 2026, month: 8, day: 4)
+        )
+
+        XCTAssertEqual(snapshot?.netBalance, Decimal(20))
+        XCTAssertEqual(snapshot?.netTrend, .decreasing)
+        XCTAssertEqual(snapshot?.netDeltaFromPreviousMonth, Decimal(-40))
+        XCTAssertEqual(snapshot?.dataQuality.expenseCategorizationCoverage, 1)
+        XCTAssertEqual(snapshot?.dataQuality.internalTransferCount, 1)
+        XCTAssertTrue(snapshot?.dataQuality.isReliable == true)
+    }
+
+    func testFinancialAnalysisDetectsCategorySpikesAcrossMonths() {
+        let groceries = Category(
+            name: "Alimentacion",
+            iconName: "cart",
+            colorHex: "#4CAF50",
+            isIncome: false
+        )
+        let shopping = Category(
+            name: "Compras",
+            iconName: "bag",
+            colorHex: "#FF9800",
+            isIncome: false
+        )
+        let transactions = [
+            Transaction(bookingDate: date(year: 2026, month: 1, day: 5), rawDescription: "LIDL", cleanedDescription: "LIDL", amount: -100, kindRaw: TransactionKind.expense.rawValue, categoryID: groceries.id, needsReview: false, reviewStatusRaw: ReviewStatus.accepted.rawValue),
+            Transaction(bookingDate: date(year: 2026, month: 2, day: 5), rawDescription: "LIDL", cleanedDescription: "LIDL", amount: -110, kindRaw: TransactionKind.expense.rawValue, categoryID: groceries.id, needsReview: false, reviewStatusRaw: ReviewStatus.accepted.rawValue),
+            Transaction(bookingDate: date(year: 2026, month: 3, day: 5), rawDescription: "LIDL", cleanedDescription: "LIDL", amount: -180, kindRaw: TransactionKind.expense.rawValue, categoryID: groceries.id, needsReview: false, reviewStatusRaw: ReviewStatus.accepted.rawValue),
+            Transaction(bookingDate: date(year: 2026, month: 3, day: 6), rawDescription: "MANGO", cleanedDescription: "MANGO", amount: -50, kindRaw: TransactionKind.expense.rawValue, categoryID: shopping.id, needsReview: false, reviewStatusRaw: ReviewStatus.accepted.rawValue)
+        ]
+
+        let snapshot = FinancialAnalysisService().analyze(
+            transactions: transactions,
+            categories: [groceries, shopping],
+            range: .all
+        )
+
+        let groceriesEvolution = snapshot.categoryEvolution.first(where: { $0.categoryName == "Alimentacion" })
+        let shoppingEvolution = snapshot.categoryEvolution.first(where: { $0.categoryName == "Compras" })
+
+        XCTAssertEqual(snapshot.netBalance, Decimal(-440))
+        XCTAssertEqual(snapshot.netTrend, .decreasing)
+        XCTAssertEqual(groceriesEvolution?.latestAmount, Decimal(180))
+        XCTAssertEqual(groceriesEvolution?.previousAmount, Decimal(110))
+        XCTAssertTrue(groceriesEvolution?.isSpiking == true)
+        XCTAssertTrue(shoppingEvolution?.isSpiking == true)
+        XCTAssertEqual(snapshot.dataQuality.expenseCategorizationCoverage, 1)
+    }
+
     func testSupermarketSignalsOverrideGenericMerchantMemory() async throws {
         let container = AppContainer(inMemory: true)
         let categories = try container.categoryRepository.fetchAll()
