@@ -1,5 +1,29 @@
 import Foundation
 
+/// High-signal merchant terms used to keep supermarket purchases together.
+/// Single-word brands are matched as complete words so a word such as "dia"
+/// cannot match unrelated descriptions.
+struct CategoryTextSignals {
+    private static let supermarketTerms = [
+        "mercadona", "consum", "carrefour", "aldi", "lidl", "dia",
+        "ahorramas", "alcampo", "eroski", "hipercor", "supercor",
+        "bonarea", "bonpreu", "caprabo", "condis", "coviran", "froiz",
+        "gadis", "hiperber", "masymas", "mas y mas", "simply", "spar",
+        "makro", "costco", "supermercado", "hipermercado"
+    ]
+
+    static func containsSupermarket(in text: String) -> Bool {
+        let normalized = text
+            .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
+            .lowercased()
+        let words = Set(normalized.split { $0 == " " || $0 == "-" || $0 == "_" }.map(String.init))
+
+        return supermarketTerms.contains { term in
+            term.contains(" ") ? normalized.contains(term) : words.contains(term)
+        }
+    }
+}
+
 @MainActor
 protocol TransactionClassifying {
     func predict(_ input: NormalizedTransactionDTO) -> CategorizationDecision?
@@ -200,6 +224,23 @@ final class StatisticalClassifier: TransactionClassifying {
     }
 
     func predict(_ input: NormalizedTransactionDTO) -> CategorizationDecision? {
+        let text = "\(input.merchantCanonicalName ?? "") \(input.cleanedDescription)".lowercased()
+
+        // A high-signal supermarket rule must win over a stale local model
+        // that learned a generic "Compras" label for the merchant.
+        if CategoryTextSignals.containsSupermarket(in: text),
+           let category = try? categoryRepository.fetchOrCreateBaseCategory(named: "Alimentacion", isIncome: false) {
+            return CategorizationDecision(
+                categoryID: category.id,
+                subcategoryID: nil,
+                source: .localML,
+                confidence: 0.90,
+                shouldQueueForReview: false,
+                isRecurringCandidate: false,
+                reason: "Matched a known supermarket merchant signal."
+            )
+        }
+
         if let learnedPrediction = localModelManager.predict(input),
            let category = try? categoryRepository.fetch(categoryID: learnedPrediction.categoryID) {
             return CategorizationDecision(

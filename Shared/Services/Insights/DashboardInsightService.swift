@@ -19,6 +19,11 @@ struct DashboardTrendPoint: Identifiable {
     let net: Decimal
 }
 
+enum DashboardDateBasis {
+    case booking
+    case accounting
+}
+
 struct DashboardSnapshot {
     let monthTitle: String
     let totalIncome: Decimal
@@ -27,6 +32,8 @@ struct DashboardSnapshot {
     let savingsRate: Double
     let categorizedPercentage: Double
     let pendingReviewCount: Int
+    let uncategorizedExpenseCount: Int
+    let uncategorizedExpenseAmount: Decimal
     let dominantCategoryName: String?
     let expenseDeltaFromPreviousMonth: Decimal
     let expenseDeltaPercentage: Double?
@@ -42,37 +49,62 @@ struct DashboardInsightService {
         transactions: [Transaction],
         categories: [Category],
         recentImports: [ImportBatch],
-        locale: Locale
+        locale: Locale,
+        now: Date = .now,
+        dateBasis: DashboardDateBasis = .accounting
     ) -> DashboardSnapshot? {
-        guard let referenceDate = transactions.map(\.accountingDate).max() else {
+        // The dashboard follows the accounting month used by the app's
+        // reporting rules. A payroll booked on 30/07 therefore belongs to
+        // August when the configured payroll cutoff moves it forward.
+        let validTransactions = transactions.filter { $0.resolvedKind != .transfer }
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: now)
+        let nonFutureTransactions = validTransactions.filter {
+            calendar.startOfDay(for: dashboardDate(for: $0, basis: dateBasis)) <= today
+        }
+        guard let latestKnownDate = nonFutureTransactions.map({ dashboardDate(for: $0, basis: dateBasis) }).max() else {
             return nil
         }
 
-        let calendar = Calendar.current
-        let currentMonthStart = startOfMonth(for: referenceDate)
+        let calendarMonthStart = startOfMonth(for: today)
+        let calendarMonthEnd = calendar.date(byAdding: .month, value: 1, to: calendarMonthStart)
+        let currentMonthStart: Date
+        if nonFutureTransactions.contains(where: {
+            let date = dashboardDate(for: $0, basis: dateBasis)
+            return date >= calendarMonthStart &&
+                date < (calendarMonthEnd ?? .distantFuture)
+        }) {
+            currentMonthStart = calendarMonthStart
+        } else {
+            currentMonthStart = startOfMonth(for: latestKnownDate)
+        }
+
         guard let nextMonthStart = calendar.date(byAdding: .month, value: 1, to: currentMonthStart),
               let previousMonthStart = calendar.date(byAdding: .month, value: -1, to: currentMonthStart) else {
             return nil
         }
 
-        let validTransactions = transactions.filter { $0.resolvedKind != .transfer }
         let currentMonthTransactions = validTransactions
             .filter {
-                $0.accountingDate >= currentMonthStart &&
-                $0.accountingDate < nextMonthStart
+                let date = dashboardDate(for: $0, basis: dateBasis)
+                return date >= currentMonthStart &&
+                    date < nextMonthStart &&
+                    calendar.startOfDay(for: date) <= today
             }
-            .sorted { $0.accountingDate < $1.accountingDate }
+            .sorted { dashboardDate(for: $0, basis: dateBasis) < dashboardDate(for: $1, basis: dateBasis) }
         let previousMonthTransactions = validTransactions
             .filter {
-                $0.accountingDate >= previousMonthStart &&
-                $0.accountingDate < currentMonthStart
+                let date = dashboardDate(for: $0, basis: dateBasis)
+                return date >= previousMonthStart &&
+                    date < currentMonthStart &&
+                    calendar.startOfDay(for: date) <= today
             }
 
         let totalIncome = currentMonthTransactions
-            .filter { decimalValue($0.amount) > 0 }
+            .filter(isIncome)
             .reduce(Decimal.zero) { $0 + $1.amount }
         let totalExpenses = currentMonthTransactions
-            .filter { decimalValue($0.amount) < 0 }
+            .filter(isExpense)
             .reduce(Decimal.zero) { $0 + absolute($1.amount) }
         let netBalance = totalIncome - totalExpenses
         let savingsRate = totalIncome == .zero ? 0 : doubleValue(netBalance / totalIncome)
@@ -83,24 +115,29 @@ struct DashboardInsightService {
         }.count
 
         let previousExpenses = previousMonthTransactions
-            .filter { decimalValue($0.amount) < 0 }
+            .filter(isExpense)
             .reduce(Decimal.zero) { $0 + absolute($1.amount) }
         let expenseDelta = totalExpenses - previousExpenses
         let expenseDeltaPercentage = previousExpenses == .zero ? nil : doubleValue(expenseDelta / previousExpenses)
 
         let categoryMap = Dictionary(uniqueKeysWithValues: categories.map { ($0.id, $0.name) })
+        let uncategorizedExpenses = currentMonthTransactions.filter {
+            isExpense($0) && storedCategoryName(for: $0, categoryMap: categoryMap) == nil
+        }
         let categoryItems = buildCategoryItems(
             from: currentMonthTransactions,
             comparedTo: previousMonthTransactions,
             categoryMap: categoryMap,
             totalExpenses: totalExpenses
         )
-        let trend = buildTrend(from: currentMonthTransactions, locale: locale)
+        let trend = buildTrend(from: currentMonthTransactions, locale: locale, dateBasis: dateBasis)
         let monthlyCashflow = buildMonthlyCashflow(
             from: validTransactions,
             currentMonthStart: currentMonthStart,
             nextMonthStart: nextMonthStart,
-            locale: locale
+            locale: locale,
+            dateBasis: dateBasis,
+            today: today
         )
 
         let formatter = DateFormatter()
@@ -115,6 +152,8 @@ struct DashboardInsightService {
             savingsRate: savingsRate,
             categorizedPercentage: categorizedPercentage,
             pendingReviewCount: pendingReviewCount,
+            uncategorizedExpenseCount: uncategorizedExpenses.count,
+            uncategorizedExpenseAmount: uncategorizedExpenses.reduce(Decimal.zero) { $0 + absolute($1.amount) },
             dominantCategoryName: categoryItems.first?.name,
             expenseDeltaFromPreviousMonth: expenseDelta,
             expenseDeltaPercentage: expenseDeltaPercentage,
@@ -153,8 +192,8 @@ struct DashboardInsightService {
     }
 
     private func amountsByCategory(from transactions: [Transaction], categoryMap: [UUID: String]) -> [String: Decimal] {
-        Dictionary(grouping: transactions.filter { decimalValue($0.amount) < 0 }) { transaction in
-            transaction.categoryID.flatMap { categoryMap[$0] } ?? String(localized: "Sin categorizar")
+        Dictionary(grouping: transactions.filter(isExpense)) { transaction in
+            categoryName(for: transaction, categoryMap: categoryMap) ?? String(localized: "Sin categorizar")
         }
         .mapValues { items in
             items.reduce(Decimal.zero) { $0 + absolute($1.amount) }
@@ -168,8 +207,14 @@ struct DashboardInsightService {
         return lhs.amount > rhs.amount
     }
 
-    private func buildTrend(from transactions: [Transaction], locale: Locale) -> [DashboardTrendPoint] {
-        let grouped = Dictionary(grouping: transactions) { Calendar.current.startOfDay(for: $0.accountingDate) }
+    private func buildTrend(
+        from transactions: [Transaction],
+        locale: Locale,
+        dateBasis: DashboardDateBasis
+    ) -> [DashboardTrendPoint] {
+        let grouped = Dictionary(grouping: transactions) {
+            Calendar.current.startOfDay(for: dashboardDate(for: $0, basis: dateBasis))
+        }
         let formatter = DateFormatter()
         formatter.locale = locale
         formatter.dateFormat = "d MMM"
@@ -177,10 +222,10 @@ struct DashboardInsightService {
         return grouped.keys.sorted().map { day in
             let dayTransactions = grouped[day] ?? []
             let income = dayTransactions
-                .filter { decimalValue($0.amount) > 0 }
+                .filter(isIncome)
                 .reduce(Decimal.zero) { $0 + $1.amount }
             let expense = dayTransactions
-                .filter { decimalValue($0.amount) < 0 }
+                .filter(isExpense)
                 .reduce(Decimal.zero) { $0 + absolute($1.amount) }
 
             return DashboardTrendPoint(
@@ -198,7 +243,9 @@ struct DashboardInsightService {
         from transactions: [Transaction],
         currentMonthStart: Date,
         nextMonthStart: Date,
-        locale: Locale
+        locale: Locale,
+        dateBasis: DashboardDateBasis,
+        today: Date
     ) -> [MonthlyCashflowPoint] {
         let calendar = Calendar.current
         guard let historyStart = calendar.date(byAdding: .month, value: -5, to: currentMonthStart) else {
@@ -206,9 +253,14 @@ struct DashboardInsightService {
         }
 
         let historyTransactions = transactions.filter {
-            $0.accountingDate >= historyStart && $0.accountingDate < nextMonthStart
+            let date = dashboardDate(for: $0, basis: dateBasis)
+            return date >= historyStart &&
+                date < nextMonthStart &&
+                Calendar.current.startOfDay(for: date) <= today
         }
-        guard let firstTransactionDate = historyTransactions.map(\.accountingDate).min() else {
+        guard let firstTransactionDate = historyTransactions
+            .map({ dashboardDate(for: $0, basis: dateBasis) })
+            .min() else {
             return []
         }
 
@@ -221,13 +273,14 @@ struct DashboardInsightService {
         return months.map { monthStart in
             let monthEnd = calendar.date(byAdding: .month, value: 1, to: monthStart) ?? monthStart
             let monthTransactions = historyTransactions.filter {
-                $0.accountingDate >= monthStart && $0.accountingDate < monthEnd
+                let date = dashboardDate(for: $0, basis: dateBasis)
+                return date >= monthStart && date < monthEnd
             }
             let income = monthTransactions
-                .filter { decimalValue($0.amount) > 0 }
+                .filter(isIncome)
                 .reduce(Decimal.zero) { $0 + $1.amount }
             let expense = monthTransactions
-                .filter { decimalValue($0.amount) < 0 }
+                .filter(isExpense)
                 .reduce(Decimal.zero) { $0 + absolute($1.amount) }
 
             return MonthlyCashflowPoint(
@@ -261,6 +314,15 @@ struct DashboardInsightService {
         return Calendar.current.date(from: components) ?? date
     }
 
+    private func dashboardDate(for transaction: Transaction, basis: DashboardDateBasis) -> Date {
+        switch basis {
+        case .booking:
+            return transaction.bookingDate
+        case .accounting:
+            return transaction.accountingDate
+        }
+    }
+
     private func decimalValue(_ decimal: Decimal) -> Double {
         NSDecimalNumber(decimal: decimal).doubleValue
     }
@@ -271,5 +333,38 @@ struct DashboardInsightService {
 
     private func absolute(_ decimal: Decimal) -> Decimal {
         decimal < 0 ? -decimal : decimal
+    }
+
+    private func isIncome(_ transaction: Transaction) -> Bool {
+        transaction.resolvedKind == .income && decimalValue(transaction.amount) > 0
+    }
+
+    private func isExpense(_ transaction: Transaction) -> Bool {
+        transaction.resolvedKind == .expense && decimalValue(transaction.amount) < 0
+    }
+
+    private func storedCategoryName(for transaction: Transaction, categoryMap: [UUID: String]) -> String? {
+        guard let categoryID = transaction.categoryID else { return nil }
+        return categoryMap[categoryID]
+    }
+
+    private func categoryName(for transaction: Transaction, categoryMap: [UUID: String]) -> String? {
+        if let storedName = storedCategoryName(for: transaction, categoryMap: categoryMap) {
+            return storedName
+        }
+
+        // Keep legacy supermarket movements visible under Alimentacion while
+        // the confidence card still reports that their stored category needs
+        // confirmation. This avoids silently losing real grocery spend.
+        guard isExpense(transaction),
+              CategoryTextSignals.containsSupermarket(
+                in: "\(transaction.merchantCanonicalName ?? "") \(transaction.cleanedDescription)"
+              ) else {
+            return nil
+        }
+
+        return categoryMap.values.first {
+            $0.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current) == "alimentacion"
+        } ?? "Alimentacion"
     }
 }

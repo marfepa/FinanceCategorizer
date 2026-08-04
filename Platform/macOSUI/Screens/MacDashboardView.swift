@@ -60,6 +60,9 @@ struct MacDashboardView: View {
                         alerts: Array(viewModel.alerts.prefix(2)),
                         actions: Array(viewModel.actions.prefix(2)),
                         pendingReviewCount: snapshot.pendingReviewCount,
+                        uncategorizedExpenseCount: snapshot.uncategorizedExpenseCount,
+                        uncategorizedExpenseAmount: snapshot.uncategorizedExpenseAmount,
+                        renderAmount: renderAmount,
                         isLoading: viewModel.isGeneratingCopilot
                     )
                 }
@@ -520,10 +523,14 @@ private struct DashboardCategoryChangesColumn: View {
 }
 
 private struct DashboardBriefingCard: View {
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.english
     let summary: String?
     let alerts: [String]
     let actions: [String]
     let pendingReviewCount: Int
+    let uncategorizedExpenseCount: Int
+    let uncategorizedExpenseAmount: Decimal
+    let renderAmount: (Decimal) -> String
     let isLoading: Bool
 
     var body: some View {
@@ -555,6 +562,18 @@ private struct DashboardBriefingCard: View {
                 } else {
                     Text(LocalizedStringKey("No additional briefing available yet."))
                         .foregroundStyle(.secondary)
+                }
+
+                if uncategorizedExpenseCount > 0 {
+                Text(
+                    appLanguage.localized(
+                        "dashboard.confidence.uncategorized",
+                        appLanguage.formatInteger(uncategorizedExpenseCount),
+                        renderAmount(uncategorizedExpenseAmount)
+                    )
+                )
+                .font(.footnote)
+                .foregroundStyle(AppColors.warning)
                 }
 
                 HStack(alignment: .top, spacing: AppLayoutMetrics.sectionGap) {

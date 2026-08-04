@@ -28,7 +28,8 @@ final class DashboardViewModel {
                 transactions: transactions,
                 categories: categories,
                 recentImports: recentImports,
-                locale: language.locale
+                locale: language.locale,
+                dateBasis: .accounting
             )
             errorMessage = nil
 
