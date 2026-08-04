@@ -1,5 +1,12 @@
 import Foundation
 
+enum FinancialReportingDateBasis {
+    case booking
+    case accounting
+}
+
+typealias DashboardDateBasis = FinancialReportingDateBasis
+
 enum FinancialTrendDirection: String, Equatable {
     case increasing
     case decreasing
@@ -113,5 +120,97 @@ struct FinancialMovementClassifier {
     func deltaFromPreviousMonth(for points: [MonthlyCashflowPoint]) -> Decimal? {
         guard points.count >= 2 else { return nil }
         return points[points.count - 1].net - points[points.count - 2].net
+    }
+}
+
+/// Shared temporal scope for every financial surface.
+///
+/// Dashboard and Analysis must agree on the accounting month they are showing.
+/// Keeping this decision here prevents a future-dated movement from silently
+/// moving one screen to a different month than the other.
+struct FinancialReportingScope {
+    let now: Date
+    let dateBasis: DashboardDateBasis
+    let calendar: Calendar
+
+    init(
+        now: Date = .now,
+        dateBasis: DashboardDateBasis = .accounting,
+        calendar: Calendar = .current
+    ) {
+        self.now = now
+        self.dateBasis = dateBasis
+        self.calendar = calendar
+    }
+
+    func date(for transaction: Transaction) -> Date {
+        switch dateBasis {
+        case .booking:
+            return transaction.bookingDate
+        case .accounting:
+            return transaction.accountingDate
+        }
+    }
+
+    func isVisible(_ transaction: Transaction) -> Bool {
+        calendar.startOfDay(for: date(for: transaction)) <= calendar.startOfDay(for: now)
+    }
+
+    func eligibleTransactions(
+        from transactions: [Transaction],
+        classifier: FinancialMovementClassifier
+    ) -> [Transaction] {
+        transactions
+            .filter(classifier.isIncluded)
+            .filter(isVisible)
+    }
+
+    func activeMonthStart(
+        from transactions: [Transaction],
+        classifier: FinancialMovementClassifier
+    ) -> Date? {
+        let eligible = eligibleTransactions(from: transactions, classifier: classifier)
+        guard let latestKnownDate = eligible.map({ date(for: $0) }).max() else { return nil }
+
+        let calendarMonthStart = startOfMonth(for: now)
+        let nextCalendarMonth = calendar.date(byAdding: .month, value: 1, to: calendarMonthStart)
+        if eligible.contains(where: { transaction in
+            let date = date(for: transaction)
+            return date >= calendarMonthStart && date < (nextCalendarMonth ?? .distantFuture)
+        }) {
+            return calendarMonthStart
+        }
+
+        return startOfMonth(for: latestKnownDate)
+    }
+
+    func transactions(
+        from transactions: [Transaction],
+        in range: AnalysisTimeRange,
+        anchoredAt anchorMonthStart: Date?
+    ) -> [Transaction] {
+        let visibleTransactions = transactions.filter(isVisible)
+        guard let monthWindow = range.monthWindow,
+              let anchorMonthStart,
+              let startDate = calendar.date(
+                  byAdding: .month,
+                  value: -(monthWindow - 1),
+                  to: anchorMonthStart
+              ),
+              let endDate = calendar.date(byAdding: .month, value: 1, to: anchorMonthStart) else {
+            return visibleTransactions.sorted { date(for: $0) < date(for: $1) }
+        }
+
+        return visibleTransactions
+            .filter { transaction in
+                let date = date(for: transaction)
+                return date >= startDate && date < endDate
+            }
+            .sorted { date(for: $0) < date(for: $1) }
+    }
+
+    func startOfMonth(for date: Date) -> Date {
+        let components = calendar.dateComponents([.year, .month], from: date)
+        return calendar.date(from: components) ?? date
     }
 }

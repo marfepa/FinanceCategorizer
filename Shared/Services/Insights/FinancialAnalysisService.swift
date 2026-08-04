@@ -86,12 +86,35 @@ struct FinancialAnalysisService {
     func analyze(
         transactions: [Transaction],
         categories: [Category],
-        range: AnalysisTimeRange
+        range: AnalysisTimeRange,
+        now: Date = .now,
+        dateBasis: DashboardDateBasis = .accounting
     ) -> FinancialAnalysisSnapshot {
-        let validTransactions = transactions.filter(classifier.isIncluded)
-        let filteredTransactions = filter(transactions: validTransactions, for: range)
-        let previousTransactions = previousWindowTransactions(from: validTransactions, for: range, anchorTransactions: filteredTransactions)
-        let filteredSourceTransactions = filter(transactions: transactions, for: range)
+        let reportingScope = FinancialReportingScope(now: now, dateBasis: dateBasis)
+        let validTransactions = reportingScope.eligibleTransactions(
+            from: transactions,
+            classifier: classifier
+        )
+        let anchorMonthStart = reportingScope.activeMonthStart(
+            from: transactions,
+            classifier: classifier
+        )
+        let filteredTransactions = reportingScope.transactions(
+            from: validTransactions,
+            in: range,
+            anchoredAt: anchorMonthStart
+        )
+        let previousTransactions = previousWindowTransactions(
+            from: validTransactions,
+            for: range,
+            anchorMonthStart: anchorMonthStart,
+            dateBasis: dateBasis
+        )
+        let filteredSourceTransactions = reportingScope.transactions(
+            from: transactions,
+            in: range,
+            anchoredAt: anchorMonthStart
+        )
         let dataQuality = classifier.dataQuality(for: filteredSourceTransactions)
         let pendingReviewCount = dataQuality.pendingReviewCount
 
@@ -144,32 +167,33 @@ struct FinancialAnalysisService {
         )
     }
 
-    private func filter(transactions: [Transaction], for range: AnalysisTimeRange) -> [Transaction] {
-        guard let monthWindow = range.monthWindow,
-              let latestDate = transactions.map(\.accountingDate).max(),
-              let startDate = Calendar.current.date(byAdding: .month, value: -(monthWindow - 1), to: startOfMonth(for: latestDate)) else {
-            return transactions.sorted { $0.accountingDate < $1.accountingDate }
-        }
-
-        return transactions
-            .filter { $0.accountingDate >= startDate }
-            .sorted { $0.accountingDate < $1.accountingDate }
-    }
-
     private func previousWindowTransactions(
         from allTransactions: [Transaction],
         for range: AnalysisTimeRange,
-        anchorTransactions: [Transaction]
+        anchorMonthStart: Date?,
+        dateBasis: DashboardDateBasis
     ) -> [Transaction] {
         guard let monthWindow = range.monthWindow,
-              let latestDate = anchorTransactions.map(\.accountingDate).max(),
-              let currentStart = Calendar.current.date(byAdding: .month, value: -(monthWindow - 1), to: startOfMonth(for: latestDate)),
-              let previousStart = Calendar.current.date(byAdding: .month, value: -monthWindow, to: currentStart),
+              let anchorMonthStart,
+              let currentStart = Calendar.current.date(
+                  byAdding: .month,
+                  value: -(monthWindow - 1),
+                  to: anchorMonthStart
+              ),
+              let previousStart = Calendar.current.date(
+                  byAdding: .month,
+                  value: -monthWindow,
+                  to: currentStart
+              ),
               let previousEnd = Calendar.current.date(byAdding: .day, value: -1, to: currentStart) else {
             return []
         }
 
-        return allTransactions.filter { $0.accountingDate >= previousStart && $0.accountingDate <= previousEnd }
+        let reportingScope = FinancialReportingScope(dateBasis: dateBasis)
+        return allTransactions.filter {
+            let date = reportingScope.date(for: $0)
+            return date >= previousStart && date <= previousEnd
+        }
     }
 
     private func buildCategoryBreakdown(
@@ -324,11 +348,6 @@ struct FinancialAnalysisService {
             .sorted { $0.averageAmount > $1.averageAmount }
     }
 
-    private func startOfMonth(for date: Date) -> Date {
-        let components = Calendar.current.dateComponents([.year, .month], from: date)
-        return Calendar.current.date(from: components) ?? date
-    }
-
     private func sequenceOfMonths(from start: Date, through end: Date) -> [Date] {
         var months: [Date] = []
         var current = start
@@ -338,6 +357,11 @@ struct FinancialAnalysisService {
             current = next
         }
         return months
+    }
+
+    private func startOfMonth(for date: Date) -> Date {
+        let components = Calendar.current.dateComponents([.year, .month], from: date)
+        return Calendar.current.date(from: components) ?? date
     }
 
     private func decimalToDouble(_ decimal: Decimal) -> Double {

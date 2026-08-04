@@ -18,11 +18,6 @@ struct DashboardTrendPoint: Identifiable {
     let net: Decimal
 }
 
-enum DashboardDateBasis {
-    case booking
-    case accounting
-}
-
 struct DashboardSnapshot {
     let monthTitle: String
     let totalIncome: Decimal
@@ -60,27 +55,18 @@ struct DashboardInsightService {
         // The dashboard follows the accounting month used by the app's
         // reporting rules. A payroll booked on 30/07 therefore belongs to
         // August when the configured payroll cutoff moves it forward.
-        let validTransactions = transactions.filter(classifier.isIncluded)
-        let calendar = Calendar.current
+        let reportingScope = FinancialReportingScope(now: now, dateBasis: dateBasis)
+        let validTransactions = reportingScope.eligibleTransactions(
+            from: transactions,
+            classifier: classifier
+        )
+        let calendar = reportingScope.calendar
         let today = calendar.startOfDay(for: now)
-        let nonFutureTransactions = validTransactions.filter {
-            calendar.startOfDay(for: dashboardDate(for: $0, basis: dateBasis)) <= today
-        }
-        guard let latestKnownDate = nonFutureTransactions.map({ dashboardDate(for: $0, basis: dateBasis) }).max() else {
+        guard let currentMonthStart = reportingScope.activeMonthStart(
+            from: transactions,
+            classifier: classifier
+        ) else {
             return nil
-        }
-
-        let calendarMonthStart = startOfMonth(for: today)
-        let calendarMonthEnd = calendar.date(byAdding: .month, value: 1, to: calendarMonthStart)
-        let currentMonthStart: Date
-        if nonFutureTransactions.contains(where: {
-            let date = dashboardDate(for: $0, basis: dateBasis)
-            return date >= calendarMonthStart &&
-                date < (calendarMonthEnd ?? .distantFuture)
-        }) {
-            currentMonthStart = calendarMonthStart
-        } else {
-            currentMonthStart = startOfMonth(for: latestKnownDate)
         }
 
         guard let nextMonthStart = calendar.date(byAdding: .month, value: 1, to: currentMonthStart),
@@ -89,18 +75,16 @@ struct DashboardInsightService {
         }
 
         let currentMonthTransactions = validTransactions
-            .filter {
-                let date = dashboardDate(for: $0, basis: dateBasis)
-                return date >= currentMonthStart &&
-                    date < nextMonthStart &&
-                    calendar.startOfDay(for: date) <= today
+            .filter { transaction in
+                let date = reportingScope.date(for: transaction)
+                return date >= currentMonthStart && date < nextMonthStart
             }
-            .sorted { dashboardDate(for: $0, basis: dateBasis) < dashboardDate(for: $1, basis: dateBasis) }
-        let currentMonthSourceTransactions = transactions.filter {
-            let date = dashboardDate(for: $0, basis: dateBasis)
+            .sorted { reportingScope.date(for: $0) < reportingScope.date(for: $1) }
+        let currentMonthSourceTransactions = transactions.filter { transaction in
+            let date = reportingScope.date(for: transaction)
             return date >= currentMonthStart &&
                 date < nextMonthStart &&
-                calendar.startOfDay(for: date) <= today
+                reportingScope.isVisible(transaction)
         }
         let previousMonthTransactions = validTransactions
             .filter {

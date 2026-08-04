@@ -1704,6 +1704,70 @@ final class FinanceCategorizerTests: XCTestCase {
         XCTAssertEqual(snapshot.dataQuality.expenseCategorizationCoverage, 1)
     }
 
+    func testDashboardAndAnalysisUseTheSameCurrentAccountingMonth() throws {
+        let groceries = Category(
+            name: "Alimentacion",
+            iconName: "cart",
+            colorHex: "#4CAF50",
+            isIncome: false
+        )
+        let now = date(year: 2026, month: 8, day: 4)
+        let transactions = [
+            Transaction(
+                bookingDate: date(year: 2026, month: 8, day: 1),
+                rawDescription: "NOMINA AGOSTO",
+                cleanedDescription: "NOMINA AGOSTO",
+                amount: Decimal(string: "5834.21")!,
+                kindRaw: TransactionKind.income.rawValue,
+                needsReview: false,
+                reviewStatusRaw: ReviewStatus.accepted.rawValue
+            ),
+            Transaction(
+                bookingDate: date(year: 2026, month: 8, day: 2),
+                rawDescription: "MERCADONA",
+                cleanedDescription: "MERCADONA",
+                amount: Decimal(string: "-1707.21")!,
+                kindRaw: TransactionKind.expense.rawValue,
+                categoryID: groceries.id,
+                needsReview: false,
+                reviewStatusRaw: ReviewStatus.accepted.rawValue
+            ),
+            Transaction(
+                bookingDate: date(year: 2026, month: 9, day: 1),
+                rawDescription: "FUTURE MOVEMENT",
+                cleanedDescription: "FUTURE MOVEMENT",
+                amount: Decimal(string: "-660.15")!,
+                kindRaw: TransactionKind.expense.rawValue,
+                categoryID: groceries.id,
+                needsReview: false,
+                reviewStatusRaw: ReviewStatus.accepted.rawValue
+            )
+        ]
+
+        let dashboard = try XCTUnwrap(
+            DashboardInsightService().buildSnapshot(
+                transactions: transactions,
+                categories: [groceries],
+                recentImports: [],
+                locale: Locale(identifier: "es"),
+                now: now
+            )
+        )
+        let analysis = FinancialAnalysisService().analyze(
+            transactions: transactions,
+            categories: [groceries],
+            range: .month,
+            now: now
+        )
+
+        XCTAssertEqual(dashboard.totalIncome, analysis.totalIncome)
+        XCTAssertEqual(dashboard.totalExpenses, analysis.totalExpenses)
+        XCTAssertEqual(dashboard.netBalance, analysis.netBalance)
+        XCTAssertEqual(analysis.totalIncome, Decimal(string: "5834.21")!)
+        XCTAssertEqual(analysis.totalExpenses, Decimal(string: "1707.21")!)
+        XCTAssertFalse(analysis.monthlyCashflow.contains { $0.monthLabel.lowercased().contains("sep") })
+    }
+
     func testSupermarketSignalsOverrideGenericMerchantMemory() async throws {
         let container = AppContainer(inMemory: true)
         let categories = try container.categoryRepository.fetchAll()
