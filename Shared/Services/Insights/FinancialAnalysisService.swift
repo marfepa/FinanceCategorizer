@@ -81,12 +81,14 @@ struct FinancialAnalysisService {
     func analyze(
         transactions: [Transaction],
         categories: [Category],
-        pendingReviewCount: Int,
         range: AnalysisTimeRange
     ) -> FinancialAnalysisSnapshot {
         let validTransactions = transactions.filter { $0.resolvedKind != .transfer }
         let filteredTransactions = filter(transactions: validTransactions, for: range)
         let previousTransactions = previousWindowTransactions(from: validTransactions, for: range, anchorTransactions: filteredTransactions)
+        let pendingReviewCount = filteredTransactions.filter {
+            $0.categoryID == nil || $0.needsReview || $0.reviewStatusRaw == ReviewStatus.pending.rawValue
+        }.count
 
         let totalIncome = filteredTransactions
             .filter { NSDecimalNumber(decimal: $0.amount).doubleValue > 0 }

@@ -5,12 +5,13 @@ struct OpenbankPDFStrategy: PDFBankStrategy {
     
     // MARK: - Regex Patterns
 
-    private let dateStartRegex = try! NSRegularExpression(
-        pattern: #"^(\d{2}[/-]\d{2}[/-]\d{4})"#
-    )
-    private let spanishAmountRegex = try! NSRegularExpression(
-        pattern: #"-?\d{1,3}(?:\.\d{3})*,\d{2}"#
-    )
+    private let dateStartRegex: NSRegularExpression?
+    private let spanishAmountRegex: NSRegularExpression?
+
+    init() {
+        dateStartRegex = try? NSRegularExpression(pattern: #"^(\d{2}[/-]\d{2}[/-]\d{4})"#)
+        spanishAmountRegex = try? NSRegularExpression(pattern: #"-?\d{1,3}(?:\.\d{3})*,\d{2}"#)
+    }
     
     func matches(fullText: String) -> Double {
         let textMatch = fullText.lowercased()
@@ -21,11 +22,13 @@ struct OpenbankPDFStrategy: PDFBankStrategy {
     }
     
     private func lineStartsWithDate(_ line: String) -> Bool {
+        guard let dateStartRegex else { return false }
         let range = NSRange(location: 0, length: line.utf16.count)
         return dateStartRegex.firstMatch(in: line, range: range) != nil
     }
 
     private func lineContainsAmount(_ line: String) -> Bool {
+        guard let spanishAmountRegex else { return false }
         let range = NSRange(location: 0, length: line.utf16.count)
         return spanishAmountRegex.firstMatch(in: line, range: range) != nil
     }
@@ -88,7 +91,7 @@ struct OpenbankPDFStrategy: PDFBankStrategy {
     }
 
     private func buildTransaction(from lines: [String]) -> RawPDFTransaction? {
-        guard !lines.isEmpty else { return nil }
+        guard !lines.isEmpty, let dateStartRegex else { return nil }
 
         var allDates: [String] = []
         var allAmounts: [String] = []
@@ -148,6 +151,7 @@ struct OpenbankPDFStrategy: PDFBankStrategy {
     }
 
     private func separateTrailingAmounts(from text: String) -> (String, [String]) {
+        guard let spanishAmountRegex else { return (text, []) }
         let nsText = text as NSString
         let fullRange = NSRange(location: 0, length: nsText.length)
         let matches = spanishAmountRegex.matches(in: text, range: fullRange)

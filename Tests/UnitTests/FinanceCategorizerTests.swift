@@ -21,34 +21,7 @@ final class FinanceCategorizerTests: XCTestCase {
     func testLocalizedStringFilesHaveTheSameKeys() throws {
         let englishKeys = try localizationKeys(in: projectRootURL().appendingPathComponent("Resources/en.lproj/Localizable.strings"))
         let spanishKeys = try localizationKeys(in: projectRootURL().appendingPathComponent("Resources/es.lproj/Localizable.strings"))
-        let trackedKeys = [
-            "import.error.chooseSource",
-            "import.status.imported",
-            "import.error.duplicateFile",
-            "settings.ml.ready.title",
-            "settings.ml.learning.detail",
-            "localModel.profileSummary.updated",
-            "review.status.aiSuggests",
-            "review.status.mlRerun",
-            "dashboard.copilot.summaryPositive",
-            "dashboard.confidence.coverage",
-            "appleAI.intent.monthlyBriefing.title",
-            "appleAI.intent.learningReadiness.subtitle",
-            "appleAI.currentScreen",
-            "appleAI.regenerate",
-            "recentImports.rows",
-            "importSummary.openImportedTransactions",
-            "ruleEditor.assignCategory",
-            "importDropZone.dropHere",
-            "transactions.recategorizeSelectedType",
-            "categories.groupCount",
-            "insights.pendingCount"
-        ]
-
-        for key in trackedKeys {
-            XCTAssertTrue(englishKeys.contains(key), "Missing English key: \(key)")
-            XCTAssertTrue(spanishKeys.contains(key), "Missing Spanish key: \(key)")
-        }
+        XCTAssertEqual(englishKeys, spanishKeys, "English and Spanish localization catalogs must contain the same keys")
     }
 
     func testTransactionNormalizerCleansNoiseAndBuildsFingerprint() {
@@ -488,7 +461,7 @@ final class FinanceCategorizerTests: XCTestCase {
             rawDescription: "COMPRA MERCADONA RUZAFA",
             cleanedDescription: "MERCADONA RUZAFA",
             merchantDisplayName: "Mercadona",
-            merchantCanonicalName: "Mercadona",
+            merchantCanonicalName: nil,
             amount: Decimal(-22.50),
             currencyCode: "EUR",
             kindRaw: TransactionKind.expense.rawValue,
@@ -509,7 +482,7 @@ final class FinanceCategorizerTests: XCTestCase {
             rawDescription: "COMPRA MERCADONA COLON",
             cleanedDescription: "MERCADONA COLON",
             merchantDisplayName: "Mercadona",
-            merchantCanonicalName: "Mercadona",
+            merchantCanonicalName: nil,
             amount: Decimal(-31.20),
             currencyCode: "EUR",
             kindRaw: TransactionKind.expense.rawValue,
@@ -535,7 +508,7 @@ final class FinanceCategorizerTests: XCTestCase {
             rawDescription: "COMPRA TARJ MERCADONA CAMPANAR",
             cleanedDescription: "MERCADONA CAMPANAR",
             merchantDisplayName: "Mercadona",
-            merchantCanonicalName: "Mercadona",
+            merchantCanonicalName: nil,
             amount: Decimal(-18.45),
             currencyCode: "EUR",
             accountName: "Cuenta",
@@ -859,6 +832,169 @@ final class FinanceCategorizerTests: XCTestCase {
 
         XCTAssertFalse(result.summary.isEmpty)
         XCTAssertGreaterThanOrEqual(result.bullets.count, 3)
+    }
+
+    func testCajamarCSVFixtureBuildsPreviewAndImports() throws {
+        let url = unitTestFixtureURL("cajamar/cajamar_basic.csv")
+        let csv = try String(contentsOf: url, encoding: .utf8)
+
+        let preview = try CSVParsingService().preview(text: csv)
+
+        XCTAssertEqual(preview.diagnostics.rawRowCount, 4)
+        XCTAssertEqual(preview.rows.count, 3)
+        XCTAssertNotNil(preview.mapping)
+        XCTAssertFalse(preview.requiresManualMapping)
+
+        let firstRow = try XCTUnwrap(preview.rows.first)
+        XCTAssertEqual(firstRow.amount, Decimal(string: "-42.60"))
+        XCTAssertEqual(firstRow.concept, "COMPRA TARJ MERCADONA TEST")
+    }
+
+    func testAbancaCSVFixtureBuildsPreviewAndImports() throws {
+        let url = unitTestFixtureURL("abanca/abanca_basic.csv")
+        let csv = try String(contentsOf: url, encoding: .utf8)
+
+        let preview = try CSVParsingService().preview(text: csv)
+
+        XCTAssertEqual(preview.diagnostics.rawRowCount, 4)
+        XCTAssertEqual(preview.rows.count, 3)
+        XCTAssertNotNil(preview.mapping)
+        XCTAssertFalse(preview.requiresManualMapping)
+
+        let firstRow = try XCTUnwrap(preview.rows.first)
+        XCTAssertEqual(firstRow.amount, Decimal(string: "-42.60"))
+        XCTAssertEqual(firstRow.concept, "COMPRA TARJ MERCADONA TEST")
+    }
+
+    func testSingleRowCSVDoesNotRequireManualMapping() throws {
+        let csv = """
+        Date,Description,Amount
+        2026-01-02,Single movement,-12.50
+        """
+
+        let preview = try CSVParsingService().preview(text: csv)
+
+        XCTAssertEqual(preview.rows.count, 1)
+        XCTAssertFalse(preview.requiresManualMapping)
+    }
+
+    func testDashboardExcludesTransfersFromCashflow() {
+        let date = Date()
+        let categoryID = UUID()
+        let income = Transaction(
+            bookingDate: date,
+            rawDescription: "Salary",
+            cleanedDescription: "Salary",
+            amount: 100,
+            kindRaw: TransactionKind.income.rawValue,
+            categoryID: categoryID,
+            needsReview: false,
+            reviewStatusRaw: ReviewStatus.accepted.rawValue
+        )
+        let expense = Transaction(
+            bookingDate: date,
+            rawDescription: "Groceries",
+            cleanedDescription: "Groceries",
+            amount: -40,
+            kindRaw: TransactionKind.expense.rawValue,
+            categoryID: categoryID,
+            needsReview: false,
+            reviewStatusRaw: ReviewStatus.accepted.rawValue
+        )
+        let transfer = Transaction(
+            bookingDate: date,
+            rawDescription: "Internal transfer",
+            cleanedDescription: "Internal transfer",
+            amount: 500,
+            kindRaw: TransactionKind.transfer.rawValue,
+            needsReview: true,
+            reviewStatusRaw: ReviewStatus.pending.rawValue
+        )
+
+        let snapshot = DashboardInsightService().buildSnapshot(
+            transactions: [income, expense, transfer],
+            categories: [],
+            recentImports: [],
+            locale: .current
+        )
+
+        XCTAssertEqual(snapshot?.totalIncome, Decimal(100))
+        XCTAssertEqual(snapshot?.totalExpenses, Decimal(40))
+        XCTAssertEqual(snapshot?.netBalance, Decimal(60))
+        XCTAssertEqual(snapshot?.pendingReviewCount, 0)
+    }
+
+    func testTransferIsRemovedFromReviewQueue() throws {
+        let container = AppContainer(inMemory: true)
+        let transfer = Transaction(
+            bookingDate: .now,
+            rawDescription: "Internal transfer",
+            cleanedDescription: "Internal transfer",
+            amount: -500,
+            kindRaw: TransactionKind.transfer.rawValue,
+            needsReview: true,
+            reviewStatusRaw: ReviewStatus.pending.rawValue
+        )
+
+        try container.transactionRepository.insert(transfer)
+
+        XCTAssertTrue(try container.transactionRepository.fetchPendingReview().isEmpty)
+    }
+
+    func testRuleUpdatePersistsChangedFields() throws {
+        let container = AppContainer(inMemory: true)
+        try container.categoryRepository.ensureBaseCategories()
+        let category = try XCTUnwrap(try container.categoryRepository.fetchAll().first)
+
+        try container.ruleRepository.createRule(
+            name: "Original",
+            merchantContains: "merchant",
+            targetCategoryID: category.id,
+            createdFromUserCorrection: false
+        )
+        let rule = try XCTUnwrap(try container.ruleRepository.fetchAll().first)
+        rule.name = "Updated"
+        rule.amountMin = Decimal(12.50)
+
+        try container.ruleRepository.update(rule)
+
+        let saved = try XCTUnwrap(try container.ruleRepository.fetchAll().first)
+        XCTAssertEqual(saved.name, "Updated")
+        XCTAssertEqual(saved.amountMin, Decimal(12.50))
+    }
+
+    func testBudgetRepositoryRejectsInvalidAndDuplicateBudgets() throws {
+        let container = AppContainer(inMemory: true)
+        let categoryID = UUID()
+        let monthYear = "2026-08"
+
+        XCTAssertThrowsError(try container.budgetRepository.save(
+            Budget(categoryID: categoryID, monthYear: monthYear, limitAmount: .zero)
+        ))
+
+        try container.budgetRepository.save(
+            Budget(categoryID: categoryID, monthYear: monthYear, limitAmount: Decimal(100))
+        )
+
+        XCTAssertThrowsError(try container.budgetRepository.save(
+            Budget(categoryID: categoryID, monthYear: monthYear, limitAmount: Decimal(200))
+        ))
+    }
+
+    func testAISettingsPersistFeatureFlags() {
+        let originalAI = FeatureFlags.aiSuggestionsEnabled
+        let originalFoundationModels = FeatureFlags.foundationModelsEnabled
+        defer {
+            FeatureFlags.aiSuggestionsEnabled = originalAI
+            FeatureFlags.foundationModelsEnabled = originalFoundationModels
+        }
+
+        let viewModel = SettingsViewModel()
+        viewModel.aiEnabled = !originalAI
+        viewModel.foundationModelsEnabled = !originalFoundationModels
+
+        XCTAssertEqual(FeatureFlags.aiSuggestionsEnabled, !originalAI)
+        XCTAssertEqual(FeatureFlags.foundationModelsEnabled, !originalFoundationModels)
     }
 
     private func date(year: Int, month: Int, day: Int) -> Date {

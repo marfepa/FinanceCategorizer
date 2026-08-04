@@ -236,17 +236,22 @@ struct AppleAIGlobalActionService {
     ) async -> AppleAIActionResult {
         let facts = loadFacts(using: container, context: context, language: language)
 
+        guard FeatureFlags.aiSuggestionsEnabled else {
+            return deterministicResult(for: intent, facts: facts, language: language)
+        }
+
         #if canImport(FoundationModels)
         if availabilityService.isAvailable() {
             if #available(macOS 26.0, iOS 26.0, *) {
                 do {
                     let session = LanguageModelSession(
                         instructions: """
-                        Eres un copiloto financiero local para una app de finanzas personales.
-                        Usa solo los hechos recibidos.
-                        Sé concreto, prudente y accionable.
-                        Devuelve un título corto, un resumen útil y entre 3 y 5 bullets.
-                        No inventes números ni categorías.
+                        You are a local finance copilot for a personal finance app.
+                        Use only the facts received.
+                        Be concise, cautious and actionable.
+                        Return a short title, a useful summary and 3 to 5 bullets.
+                        Do not invent numbers or categories.
+                        Respond entirely in \(language.title).
                         """
                     )
 
@@ -299,7 +304,6 @@ struct AppleAIGlobalActionService {
         let analysisSnapshot = container.financialAnalysisService.analyze(
             transactions: transactions,
             categories: categories,
-            pendingReviewCount: pendingReview.count,
             range: .sixMonths
         )
 

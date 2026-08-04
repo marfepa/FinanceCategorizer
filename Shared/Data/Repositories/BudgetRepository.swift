@@ -1,6 +1,21 @@
 import Foundation
 import SwiftData
 
+enum BudgetRepositoryError: LocalizedError {
+    case invalidLimitAmount
+    case duplicateBudget
+
+    var errorDescription: String? {
+        let language = AppLanguage.currentSelection
+        switch self {
+        case .invalidLimitAmount:
+            return language.localized("budget.error.invalidLimit")
+        case .duplicateBudget:
+            return language.localized("budget.error.duplicate")
+        }
+    }
+}
+
 @MainActor
 final class BudgetRepository {
     private let modelContainer: ModelContainer
@@ -14,7 +29,20 @@ final class BudgetRepository {
     }
 
     func save(_ budget: Budget) throws {
+        guard budget.limitAmount > .zero else {
+            throw BudgetRepositoryError.invalidLimitAmount
+        }
+
         let context = makeContext()
+        let categoryID = budget.categoryID
+        let monthYear = budget.monthYear
+        let descriptor = FetchDescriptor<Budget>(predicate: #Predicate {
+            $0.categoryID == categoryID && $0.monthYear == monthYear
+        })
+        if try !context.fetch(descriptor).isEmpty {
+            throw BudgetRepositoryError.duplicateBudget
+        }
+
         context.insert(budget)
         try context.save()
     }

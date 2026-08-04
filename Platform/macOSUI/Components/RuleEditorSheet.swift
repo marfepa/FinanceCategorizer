@@ -84,8 +84,8 @@ struct RuleEditorSheet: View {
     
     private func save() {
         do {
-            let mMin = Decimal(string: amountMin)
-            let mMax = Decimal(string: amountMax)
+            let mMin = ImportValueParser.parseAmount(amountMin)
+            let mMax = ImportValueParser.parseAmount(amountMax)
             
             if let existing = rule {
                 existing.name = name

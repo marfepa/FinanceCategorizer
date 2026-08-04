@@ -170,7 +170,7 @@ final class ReviewQueueViewModel {
     func approveSelected(using container: AppContainer) {
         let language = AppLanguage.currentSelection
         guard let transaction = selectedTransaction,
-              let categoryID = transaction.categoryID ?? selectedCategoryID else {
+              let categoryID = selectedCategoryID ?? transaction.categoryID else {
             errorMessage = language.localized("review.error.selectTransactionWithCategory")
             return
         }

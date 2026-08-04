@@ -36,13 +36,21 @@ final class BudgetsViewModel {
         }
     }
 
-    func addBudget(categoryID: UUID, amount: Decimal, using container: AppContainer) {
+    @discardableResult
+    func addBudget(categoryID: UUID, amount: Decimal, using container: AppContainer) -> Bool {
+        guard amount > .zero else {
+            errorMessage = AppLanguage.currentSelection.localized("budget.error.invalidLimit")
+            return false
+        }
+
         let budget = Budget(categoryID: categoryID, monthYear: currentMonthYear, limitAmount: amount)
         do {
             try container.budgetRepository.save(budget)
             load(using: container)
+            return true
         } catch {
             errorMessage = error.localizedDescription
+            return false
         }
     }
 
@@ -66,6 +74,8 @@ struct MacBudgetsView: View {
     @Environment(\.appContainer) private var appContainer
     @State private var viewModel = BudgetsViewModel()
     @State private var showNewBudgetSheet = false
+    @AppStorage("isPrivacyModeEnabled") private var isPrivacyModeEnabled = false
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.english
 
     var body: some View {
         ScrollView {
@@ -117,8 +127,10 @@ struct MacBudgetsView: View {
     
     private func budgetCard(_ budget: Budget) -> some View {
         let spent = viewModel.spent(for: budget.categoryID)
-        let progress = min(1.0, Double(truncating: NSDecimalNumber(decimal: spent / budget.limitAmount)))
-        let isOverLimit = spent >= budget.limitAmount
+        let progress = budget.limitAmount > .zero
+            ? min(1.0, Double(truncating: NSDecimalNumber(decimal: spent / budget.limitAmount)))
+            : 0
+        let isOverLimit = budget.limitAmount > .zero && spent >= budget.limitAmount
         let isNearLimit = progress >= budget.alertThreshold
         
         // Find category name
@@ -139,10 +151,10 @@ struct MacBudgetsView: View {
             }
             
             HStack(alignment: .lastTextBaseline) {
-                Text(spent.formatted(.currency(code: "EUR")))
+                Text(spent.privacyFormatted(hidden: isPrivacyModeEnabled, language: appLanguage))
                     .font(AppTypography.heroNumber.monospacedDigit())
                     .foregroundStyle(isOverLimit ? AppColors.expense : .primary)
-                Text(String(localized: "of \(budget.limitAmount.formatted(.currency(code: "EUR")))"))
+                Text(appLanguage.localized("of %@", budget.limitAmount.privacyFormatted(hidden: isPrivacyModeEnabled, language: appLanguage)))
                     .font(.body)
                     .foregroundStyle(.secondary)
             }
@@ -180,6 +192,14 @@ private struct NewBudgetSheet: View {
     @State private var selectedCategoryID: UUID?
     @State private var limitAmountText: String = ""
 
+    private var parsedLimitAmount: Decimal? {
+        ImportValueParser.parseAmount(limitAmountText)
+    }
+
+    private var canSave: Bool {
+        selectedCategoryID != nil && (parsedLimitAmount ?? .zero) > .zero
+    }
+
     var body: some View {
         VStack(spacing: AppSpacing.large) {
             Text(LocalizedStringKey("Create Budget"))
@@ -207,12 +227,12 @@ private struct NewBudgetSheet: View {
                 Spacer()
                 
                 PrimaryButton(title: LocalizedStringKey("Save Budget")) {
-                    if let id = selectedCategoryID, let amount = Decimal(string: limitAmountText) {
-                        viewModel.addBudget(categoryID: id, amount: amount, using: appContainer)
+                    if let id = selectedCategoryID, let amount = parsedLimitAmount,
+                       viewModel.addBudget(categoryID: id, amount: amount, using: appContainer) {
                         isPresented = false
                     }
                 }
-                .disabled(selectedCategoryID == nil || Double(limitAmountText) == nil)
+                .disabled(!canSave)
             }
         }
         .padding(AppSpacing.large)

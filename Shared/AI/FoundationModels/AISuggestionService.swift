@@ -95,7 +95,8 @@ final class FoundationModelsResolver {
         let confidenceText = lines.first(where: { $0.uppercased().hasPrefix("CONFIDENCE:") })?
             .split(separator: ":", maxSplits: 1).last.map(String.init)?
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        let confidence = confidenceText.flatMap { Double($0) } ?? 0.0
+        let rawConfidence = confidenceText.flatMap { Double($0) } ?? 0.0
+        let confidence = rawConfidence.isFinite ? min(max(rawConfidence, 0), 1) : 0
         let recurring = lines.first(where: { $0.uppercased().hasPrefix("RECURRING:") })?
             .split(separator: ":", maxSplits: 1).last.map(String.init)?
             .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -136,6 +137,8 @@ struct AISuggestionService {
     }
 
     func suggest(for transaction: Transaction, categories: [Category]) -> AIStructuredOutput? {
+        guard FeatureFlags.aiSuggestionsEnabled else { return nil }
+
         let text = "\(transaction.merchantCanonicalName ?? "") \(transaction.cleanedDescription)".lowercased()
         let categoryName: String?
 
@@ -156,6 +159,8 @@ struct AISuggestionService {
     }
 
     func suggestWithFoundationModel(for transaction: Transaction, categories: [Category]) async -> AIStructuredOutput? {
+        guard FeatureFlags.aiSuggestionsEnabled else { return nil }
+
         guard availabilityService.isAvailable() else {
             return suggest(for: transaction, categories: categories)
         }

@@ -24,11 +24,12 @@ final class RuleEngine {
                 continue
             }
 
-            if let amountMin = rule.amountMin, input.amount < amountMin {
+            let comparableAmount = abs(input.amount)
+            if let amountMin = rule.amountMin, comparableAmount < abs(amountMin) {
                 continue
             }
 
-            if let amountMax = rule.amountMax, input.amount > amountMax {
+            if let amountMax = rule.amountMax, comparableAmount > abs(amountMax) {
                 continue
             }
 

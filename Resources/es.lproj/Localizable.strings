@@ -403,7 +403,7 @@
 "appleAI.deterministic.importHealth.title" = "Estado de importaciones";
 "appleAI.deterministic.importHealth.summary" = "Las últimas %lld importaciones suman %lld filas importadas y %lld elementos enviados a revisión. Eso ya da una señal útil sobre la calidad de entrada y carga manual posterior.";
 "appleAI.deterministic.importHealth.noHistory" = "Todavía no hay importaciones recientes registradas, por lo que la app no tiene un flujo de importación estable que evaluar.";
-"appleAI.deterministic.importHealth.bullet1" = "Última importación: %@ con %lld filas.";
+"appleAI.deterministic.importHealth.bullet1" = "Última importación: %@.";
 "appleAI.deterministic.importHealth.bullet1.empty" = "Haz una primera importación para activar el circuito completo.";
 "appleAI.deterministic.importHealth.bullet2" = "Conviene revisar rápido los pendientes que dejan las importaciones recientes.";
 "appleAI.deterministic.importHealth.bullet2.empty" = "Las últimas importaciones no están dejando una cola grande de revisión.";
@@ -515,14 +515,14 @@
 "appleAI.deterministic.aiDiagnostics.summary" = "Foundation Models está disponible y la app puede usar generación estructurada para acciones globales.";
 "appleAI.deterministic.aiDiagnostics.summary.unavailable" = "Foundation Models no está disponible ahora mismo, por lo que la app usa lógica determinista basada en datos locales.";
 "appleAI.deterministic.aiDiagnostics.bullet1" = "Foundation Models disponible: %@.";
-"appleAI.deterministic.aiDiagnostics.bullet2" = "Total movimientos en base local: %lld.";
-"appleAI.deterministic.aiDiagnostics.bullet3" = "Cobertura categorizada: %lld/%lld.";
-"appleAI.deterministic.aiDiagnostics.bullet4" = "Pendientes de revisión: %lld.";
+"appleAI.deterministic.aiDiagnostics.bullet2" = "Total movimientos en base local: %@.";
+"appleAI.deterministic.aiDiagnostics.bullet3" = "Cobertura categorizada: %@.";
+"appleAI.deterministic.aiDiagnostics.bullet4" = "Pendientes de revisión: %@.";
 
 "appleAI.deterministic.learningReadiness.title" = "Madurez del aprendizaje";
 "appleAI.deterministic.learningReadiness.summary" = "La automatización mejora cuando sube la cobertura categorizada, baja la cola pendiente y aparecen comercios repetidos con decisiones consistentes.";
 "appleAI.deterministic.learningReadiness.bullet1" = "Cobertura actual: %@.";
-"appleAI.deterministic.learningReadiness.bullet2" = "Pendientes actuales: %lld.";
+"appleAI.deterministic.learningReadiness.bullet2" = "Pendientes actuales: %@.";
 "appleAI.deterministic.learningReadiness.bullet3" = "Próxima palanca clara: %@.";
 "appleAI.deterministic.learningReadiness.bullet3.empty" = "La siguiente palanca es seguir corrigiendo comercios repetidos.";
 "appleAI.deterministic.learningReadiness.bullet4" = "Con más datos consistentes, las sugerencias y reglas serán más fiables.";
@@ -545,3 +545,7 @@
 "transactions.recategorizeSelectedType" = "Recategorizar el tipo seleccionado";
 "categories.groupCount" = "%@ • %@ transacciones";
 "insights.pendingCount" = "%@ pendientes";
+
+"Detected accounts" = "Cuentas detectadas";
+"budget.error.invalidLimit" = "El límite del presupuesto debe ser mayor que cero.";
+"budget.error.duplicate" = "Ya existe un presupuesto para esta categoría y mes.";

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MacAppRootView: View {
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.english
+    @AppStorage("isPrivacyModeEnabled") private var isPrivacyModeEnabled = false
     @State private var selectedSection: MacSection? = .dashboard
     @State private var isShowingAppleAISheet = false
 
@@ -54,6 +55,7 @@ struct MacAppRootView: View {
             AppleAIContextSheet(surface: aiSurface(for: selectedSection ?? .dashboard))
         }
         .environment(\.locale, appLanguage.locale)
+        .environment(\.isPrivacyModeEnabled, isPrivacyModeEnabled)
     }
 
     private func aiSurface(for section: MacSection) -> AppleAISurface {

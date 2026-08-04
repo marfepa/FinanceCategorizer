@@ -52,7 +52,25 @@ final class RuleRepository {
 
     func update(_ rule: Rule) throws {
         let context = makeContext()
-        try context.save() // SwiftData objects are live, so we just save the context.
+        let ruleID = rule.id
+        let descriptor = FetchDescriptor<Rule>(predicate: #Predicate { $0.id == ruleID })
+        guard let existing = try context.fetch(descriptor).first else {
+            return
+        }
+
+        existing.name = rule.name
+        existing.isEnabled = rule.isEnabled
+        existing.merchantContains = rule.merchantContains
+        existing.descriptionContains = rule.descriptionContains
+        existing.amountMin = rule.amountMin
+        existing.amountMax = rule.amountMax
+        existing.amountSign = rule.amountSign
+        existing.targetCategoryID = rule.targetCategoryID
+        existing.targetSubcategoryID = rule.targetSubcategoryID
+        existing.priority = rule.priority
+        existing.createdFromUserCorrection = rule.createdFromUserCorrection
+        existing.hitCount = rule.hitCount
+        try context.save()
     }
 
     func createRule(

@@ -68,7 +68,7 @@ struct ImportPreviewBuilder {
             }
         }
 
-        let hasTooFewValidRows = validRows.count < 2 && !table.rows.isEmpty
+        let hasTooFewValidRows = validRows.isEmpty && !table.rows.isEmpty
 
         return ImportPreviewResult(
             rows: validRows,
@@ -137,7 +137,8 @@ struct ImportPreviewBuilder {
         let concept = rawConcept.isEmpty ? "Movimiento bancario" : rawConcept
         let valueDate = valueDateText.flatMap(ImportValueParser.parseDate)
         let balance = balanceText.flatMap(ImportValueParser.parseAmount)
-        let currency = currencyText?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false ? currencyText?.uppercased() : nil
+        let normalizedCurrency = currencyText?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let currency = normalizedCurrency?.isEmpty == false ? normalizedCurrency?.uppercased() : nil
         let status: ImportRowStatus = rawConcept.isEmpty ? .warning : .ok
 
         return .success(
