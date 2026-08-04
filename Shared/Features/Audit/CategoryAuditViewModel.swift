@@ -88,6 +88,9 @@ final class CategoryAuditViewModel {
                 transactions.first(where: { $0.id == selected.id })
             }
             selectedTransactionIDs = selectedTransactionIDs.intersection(Set(transactions.map(\.id)))
+            if selectedTransactionIDs.count != 1 {
+                selectedTransaction = nil
+            }
             errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
@@ -208,10 +211,14 @@ final class CategoryAuditViewModel {
 
     func selectAllVisible() {
         selectedTransactionIDs.formUnion(visibleTransactions.map(\.id))
+        selectedTransaction = selectedTransactionIDs.count == 1
+            ? transactions.first(where: { selectedTransactionIDs.contains($0.id) })
+            : nil
     }
 
     func clearSelection() {
         selectedTransactionIDs.removeAll()
+        selectedTransaction = nil
     }
 
     func toggleSelection(for transaction: Transaction) {

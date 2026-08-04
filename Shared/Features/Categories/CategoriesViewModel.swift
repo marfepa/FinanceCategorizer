@@ -6,6 +6,7 @@ struct CategoryListItem: Identifiable {
     let name: String
     let group: String
     let transactionCount: Int
+    let activityShare: Double
     let isSystem: Bool
 }
 
@@ -23,13 +24,18 @@ final class CategoriesViewModel {
             let transactions = try container.transactionRepository.fetchAll()
             let counts = Dictionary(grouping: transactions, by: \.categoryID)
                 .mapValues(\.count)
+            let categorizedMovementCount = transactions.count(where: { $0.categoryID != nil })
 
             self.categories = categories.map { category in
-                CategoryListItem(
+                let transactionCount = counts[category.id] ?? 0
+                return CategoryListItem(
                     id: category.id,
                     name: category.name,
                     group: category.isIncome ? "Income" : (category.parentID == nil ? "Primary" : "Subcategory"),
-                    transactionCount: counts[category.id] ?? 0,
+                    transactionCount: transactionCount,
+                    activityShare: categorizedMovementCount == 0
+                        ? 0
+                        : Double(transactionCount) / Double(categorizedMovementCount),
                     isSystem: category.isSystem
                 )
             }

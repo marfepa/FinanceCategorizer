@@ -130,7 +130,7 @@ struct MacInsightsView: View {
             )
         ) {
             ForEach(AnalysisTimeRange.allCases) { range in
-                Text(range.title)
+                Text(appLanguage.localized(range.title))
                     .tag(range)
             }
         }
@@ -203,6 +203,23 @@ struct MacInsightsView: View {
                             value: appLanguage.formatPercent(snapshot.dataQuality.expenseCategorizationCoverage),
                             color: snapshot.dataQuality.isReliable ? AppColors.income : AppColors.warning
                         )
+                    }
+
+                    Text(appLanguage.localized(
+                        "insights.scopeSummary",
+                        scopeTitle(for: snapshot.range),
+                        appLanguage.formatInteger(snapshot.pendingReviewCount)
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                    if snapshot.dataQuality.internalTransferCount > 0 {
+                        Text(appLanguage.localized(
+                            "insights.transferExclusion",
+                            appLanguage.formatInteger(snapshot.dataQuality.internalTransferCount)
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -329,7 +346,7 @@ struct MacInsightsView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
-        .liquidGlassGrouped(tint: AppColors.neutral)
+        .contentCard(padding: AppLayoutMetrics.contentGap, radius: AppRadius.panelGroup)
     }
 
     private var aiNarrativeSection: some View {
@@ -353,7 +370,7 @@ struct MacInsightsView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
-        .liquidGlassGrouped(tint: AppColors.warning)
+        .contentCard(padding: AppLayoutMetrics.contentGap, radius: AppRadius.panelGroup)
     }
 
     private func primaryAnalyticsColumn(_ snapshot: FinancialAnalysisSnapshot) -> some View {
@@ -364,7 +381,7 @@ struct MacInsightsView: View {
             sectionSeparator
             categoryEvolutionSection(snapshot)
         }
-        .liquidGlassGrouped(tint: AppColors.neutral)
+        .contentCard(padding: AppLayoutMetrics.contentGap, radius: AppRadius.panelGroup)
     }
 
     private func secondaryAnalyticsColumn(_ snapshot: FinancialAnalysisSnapshot) -> some View {
@@ -375,7 +392,7 @@ struct MacInsightsView: View {
             sectionSeparator
             reviewImpactSection(snapshot)
         }
-        .liquidGlassGrouped(tint: AppColors.warning)
+        .contentCard(padding: AppLayoutMetrics.contentGap, radius: AppRadius.panelGroup)
     }
 
     private var sectionSeparator: some View {
@@ -730,15 +747,26 @@ struct MacInsightsView: View {
                 tint: AppColors.neutral
             )
 
+            Text(appLanguage.localized(
+                "forecast.basedOnMonths",
+                appLanguage.formatInteger(snapshot.forecast.sourceMonthCount)
+            ))
+            .font(.caption)
+            .foregroundStyle(.secondary)
+
             HStack(spacing: AppSpacing.small) {
                 projectionCard(title: "3M", value: snapshot.forecast.projectedDelta3Months, tint: .teal)
                 projectionCard(title: "6M", value: snapshot.forecast.projectedDelta6Months, tint: AppColors.neutral)
                 projectionCard(title: "12M", value: snapshot.forecast.projectedDelta12Months, tint: snapshot.forecast.projectedDelta12Months >= 0 ? AppColors.income : AppColors.expense)
             }
 
-            Text(snapshot.forecast.isNegativeTrend ? LocalizedStringKey("Warning: current pace could deteriorate household liquidity over the coming months.") : LocalizedStringKey("Current pace remains resilient over the medium term."))
+            Text(snapshot.forecast.hasLimitedHistory
+                ? LocalizedStringKey("forecast.limitedHistory")
+                : (snapshot.forecast.isNegativeTrend
+                    ? LocalizedStringKey("Warning: current pace could deteriorate household liquidity over the coming months.")
+                    : LocalizedStringKey("Current pace remains resilient over the medium term.")))
                 .font(.footnote)
-                .foregroundStyle(snapshot.forecast.isNegativeTrend ? AppColors.warning : .secondary)
+                .foregroundStyle(snapshot.forecast.hasLimitedHistory || snapshot.forecast.isNegativeTrend ? AppColors.warning : .secondary)
         }
     }
 
@@ -764,7 +792,7 @@ struct MacInsightsView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(item.concept)
                                 .lineLimit(1)
-                            Text(String(localized: "\(item.occurrences) occurrences"))
+                            Text(appLanguage.localized("insights.occurrences", appLanguage.formatInteger(item.occurrences)))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -786,14 +814,13 @@ struct MacInsightsView: View {
                 tint: AppColors.warning
             )
 
-            Text(LocalizedStringKey("\(snapshot.pendingReviewCount) transactions still need review, so some category totals and forward projections may move once they are confirmed."))
+            Text(appLanguage.localized(
+                "insights.reviewImpact",
+                appLanguage.formatInteger(snapshot.pendingReviewCount),
+                scopeTitle(for: snapshot.range)
+            ))
                 .foregroundStyle(.secondary)
 
-            if snapshot.pendingReviewCount > 0 {
-                ProgressView(value: min(Double(snapshot.pendingReviewCount) / 25.0, 1.0))
-                    .tint(AppColors.warning)
-                    .liquidGlassPill(padding: 12, tint: AppColors.warning)
-            }
         }
     }
 
@@ -889,6 +916,16 @@ struct MacInsightsView: View {
         case .decreasing: return "Net trend decreasing"
         case .stable: return "Net trend stable"
         case .insufficientData: return "Not enough data for net trend"
+        }
+    }
+
+    private func scopeTitle(for range: AnalysisTimeRange) -> String {
+        switch range {
+        case .month: return appLanguage.localized("1M")
+        case .threeMonths: return appLanguage.localized("3M")
+        case .sixMonths: return appLanguage.localized("6M")
+        case .year: return appLanguage.localized("12M")
+        case .all: return appLanguage.localized("All")
         }
     }
 

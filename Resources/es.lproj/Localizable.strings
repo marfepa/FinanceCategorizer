@@ -82,6 +82,8 @@
 "dashboard.category.new" = "Nueva este mes";
 "dashboard.category.amountUp" = "%@ más que el mes pasado";
 "dashboard.category.percentUp" = "%@ más que el mes pasado";
+"dashboard.netTrend.explanation" = "La tendencia neta también refleja los cambios en los ingresos.";
+"dashboard.transferExclusion" = "%@ transferencias internas se excluyen de los totales de flujo de caja.";
 
 /* Dashboard Hero */
 "Expenses are up %lld versus the previous month." = "Los gastos han subido un %lld respecto al mes anterior.";
@@ -466,6 +468,7 @@
 "analysis.summary.pendingReview" = "- Hay %lld transacciones aún pendientes de revisión que pueden afectar a la imagen final.";
 "analysis.summary.riskNegative" = "Atención: la tendencia actual es negativa.";
 "analysis.summary.riskSustainable" = "La tendencia actual se mantiene sostenible.";
+"analysis.summary.riskLimited" = "El historial es limitado, así que esto es solo un escenario según el ritmo actual.";
 
 /* Apple AI Deterministic Results */
 "appleAI.deterministic.monthlyBriefing.title" = "Pulso del mes";
@@ -702,3 +705,77 @@
 "audit.inspector.reason" = "Por qué se propone";
 "audit.inspector.emptyTitle" = "Selecciona un movimiento";
 "audit.inspector.emptyMessage" = "Selecciona una fila para revisar su categoría, confianza y evidencias.";
+
+/* Claridad de análisis y categorías */
+"Financial Explorer" = "Explorador financiero";
+"A visual overview of household cashflow, category pressure, recurring charges and medium-term projection." = "Una vista visual del flujo familiar, la presión por categorías, los cargos recurrentes y la proyección a medio plazo.";
+"Net household position" = "Posición neta familiar";
+"A single reading of the selected financial horizon." = "Una lectura única del periodo seleccionado.";
+"Cashflow remains resilient over the selected period." = "El flujo de caja se mantiene sólido en el periodo seleccionado.";
+"Spending pressure is starting to outweigh incoming cashflow." = "La presión del gasto empieza a superar al dinero que entra.";
+"Category concentration" = "Concentración por categoría";
+"Signal deck" = "Panel de señales";
+"Categorized" = "Categorizado";
+"Coverage of the imported base" = "Cobertura de la base importada";
+"Net over income" = "Neto sobre ingresos";
+"Recurring Charges" = "Cargos recurrentes";
+"Patterns detected" = "Patrones detectados";
+"Forecast 12M" = "Escenario a 12 meses";
+"Deterministic projection" = "Escenario según el ritmo actual";
+"Forecast" = "Escenario";
+"Monthly Cashflow" = "Flujo de caja mensual";
+"Expenses by Category" = "Gastos por categoría";
+"Category evolution" = "Evolución por categoría";
+"Compare the latest months and spot categories whose spending is accelerating." = "Compara los últimos meses y detecta las categorías cuyo gasto se está acelerando.";
+"AI Copilot Summary" = "Resumen del Copiloto IA";
+"Generating summary..." = "Generando resumen…";
+"No category data available yet." = "Todavía no hay datos por categoría.";
+"No category evolution available yet." = "Todavía no hay evolución por categoría.";
+"Not enough monthly history to visualize cashflow." = "No hay suficiente historial mensual para visualizar el flujo de caja.";
+"No Financial Analysis Yet" = "Todavía no hay análisis financiero";
+"Import real bank movements to unlock cashflow charts, category trends and forward-looking forecasts." = "Importa movimientos bancarios para desbloquear gráficos de flujo, tendencias por categoría y escenarios futuros.";
+"No recurring expenses detected yet." = "Todavía no se han detectado gastos recurrentes.";
+"Current pace remains resilient over the medium term." = "El ritmo actual se mantiene sólido a medio plazo.";
+"Warning: current pace could deteriorate household liquidity over the coming months." = "Aviso: el ritmo actual podría reducir la liquidez familiar en los próximos meses.";
+"Best month" = "Mejor mes";
+"Worst month" = "Peor mes";
+"Avg. monthly net" = "Neto mensual medio";
+"All" = "Todo";
+"Primary" = "Principal";
+"Subcategory" = "Subcategoría";
+"Last month" = "Último mes";
+"Visible months" = "Meses visibles";
+"Range total" = "Total del periodo";
+"Suggestion confidence" = "Confianza de la propuesta";
+"Categorization confidence" = "Confianza de categorización";
+"insights.scopeSummary" = "%@ · %@ pendientes en este periodo";
+"insights.transferExclusion" = "%@ transferencias internas se excluyen de este análisis.";
+"insights.reviewImpact" = "%@ movimientos necesitan revisión en %@. Los totales y escenarios pueden cambiar al confirmarlos.";
+"insights.occurrences" = "%@ apariciones";
+"forecast.basedOnMonths" = "Escenario basado en %@ mes(es) de historial importado.";
+"forecast.limitedHistory" = "Historial limitado: trátalo como un escenario según el ritmo actual, no como una previsión de tendencia.";
+"review.pendingCount" = "%@ pendientes en toda la base importada";
+"review.similarPendingCount" = "%@ movimientos pendientes similares";
+"audit.inspector.multipleTitle" = "Varios movimientos seleccionados";
+"audit.inspector.multipleMessage" = "Hay %@ movimientos seleccionados. Usa las acciones de auditoría para aplicar o descartar propuestas en lote.";
+"categories.subtitle" = "Un catálogo claro con el peso de actividad de cada categoría.";
+"categories.empty.title" = "Todavía no hay categorías";
+"categories.empty.message" = "Importa movimientos para generar el catálogo base y ver cómo se distribuye la actividad.";
+"categories.monthlyTrend.title" = "Evolución mensual";
+"categories.monthlyTrend.subtitle" = "Observa cómo cambia %@ en el rango seleccionado.";
+"categories.monthlyTrend.empty.title" = "No hay gasto en este rango";
+"categories.monthlyTrend.empty.message" = "Prueba con un periodo más amplio para ver la evolución mensual de esta categoría.";
+"categories.emptyDetail.message" = "Los movimientos asignados a %@ aparecerán aquí con un inspector listo para editar categoría y tipo.";
+"categories.associatedMovement.one" = "1 movimiento asociado";
+"categories.associatedMovement.many" = "%@ movimientos asociados";
+"categories.shareOfMovements" = "%@ de los movimientos categorizados";
+"categories.detail.period" = "Periodo";
+"categories.detail.range.month" = "1 mes";
+"categories.detail.range.threeMonths" = "3 meses";
+"categories.detail.range.sixMonths" = "6 meses";
+"categories.detail.range.year" = "12 meses";
+"categories.detail.range.all" = "Todo";
+"categories.detail.total" = "Gasto total";
+"categories.detail.average" = "Media mensual";
+"categories.detail.peak" = "Mes máximo";
+"categories.detail.months" = "Meses visibles";

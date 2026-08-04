@@ -29,7 +29,8 @@ struct MacDashboardView: View {
                         snapshot: snapshot,
                         renderAmount: renderAmount,
                         renderPercent: { appLanguage.formatPercent($0) },
-                        expenseSummary: expenseSummary(for: snapshot)
+                        expenseSummary: expenseSummary(for: snapshot),
+                        appLanguage: appLanguage
                     )
 
                     DashboardActionBar(
@@ -144,6 +145,7 @@ private struct DashboardHeroPanel: View {
     let renderAmount: (Decimal) -> String
     let renderPercent: (Double) -> String
     let expenseSummary: String
+    let appLanguage: AppLanguage
 
     var body: some View {
         HStack(alignment: .top, spacing: AppLayoutMetrics.sectionGap) {
@@ -200,6 +202,14 @@ private struct DashboardHeroPanel: View {
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(netTrendColor)
 
+                if snapshot.expenseDeltaPercentage != nil,
+                   snapshot.expenseDeltaFromPreviousMonth < .zero,
+                   snapshot.netTrend == .decreasing {
+                    Text(LocalizedStringKey("dashboard.netTrend.explanation"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
                 if let netDelta = snapshot.netDeltaFromPreviousMonth {
                     HStack(spacing: 4) {
                         Text(LocalizedStringKey("Net change"))
@@ -215,6 +225,15 @@ private struct DashboardHeroPanel: View {
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)
+
+                if snapshot.dataQuality.internalTransferCount > 0 {
+                    Text(appLanguage.localized(
+                        "dashboard.transferExclusion",
+                        appLanguage.formatInteger(snapshot.dataQuality.internalTransferCount)
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
 
                 if snapshot.pendingReviewCount > 0 {
                     Label(

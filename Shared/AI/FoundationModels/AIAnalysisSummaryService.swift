@@ -33,6 +33,7 @@ struct AIAnalysisSummaryService {
             Categorized percentage: \(snapshot.categorizedPercentage)
             Pending review: \(snapshot.pendingReviewCount)
             Average monthly net: \(snapshot.forecast.averageMonthlyNet)
+            Forecast history months: \(snapshot.forecast.sourceMonthCount)
             Forecast 3 months: \(snapshot.forecast.projectedDelta3Months)
             Forecast 6 months: \(snapshot.forecast.projectedDelta6Months)
             Forecast 12 months: \(snapshot.forecast.projectedDelta12Months)
@@ -61,7 +62,14 @@ struct AIAnalysisSummaryService {
         
         let pendingLine = language.localized("analysis.summary.pendingReview", Int64(snapshot.pendingReviewCount))
         
-        let riskKey = snapshot.forecast.isNegativeTrend ? "analysis.summary.riskNegative" : "analysis.summary.riskSustainable"
+        let riskKey: String
+        if snapshot.forecast.hasLimitedHistory {
+            riskKey = "analysis.summary.riskLimited"
+        } else {
+            riskKey = snapshot.forecast.isNegativeTrend
+                ? "analysis.summary.riskNegative"
+                : "analysis.summary.riskSustainable"
+        }
         let riskLine = "- \(language.localized(riskKey))"
         
         return """
