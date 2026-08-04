@@ -142,6 +142,23 @@ private struct IOSDashboardHero: View {
                 Spacer()
             }
             .foregroundStyle(.primary)
+
+            HStack(alignment: .center, spacing: AppSpacing.small) {
+                Image(systemName: netTrendIcon)
+                    .foregroundStyle(netTrendColor)
+                Text(netTrendTitle)
+                    .font(.subheadline.weight(.semibold))
+                if let netDelta = snapshot.netDeltaFromPreviousMonth {
+                    Text(renderAmount(netDelta))
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
+
+            Text(appLanguage.localized("Expense coverage: %@", appLanguage.formatPercent(snapshot.dataQuality.expenseCategorizationCoverage)))
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentCard(padding: AppSpacing.large, radius: AppRadius.hero)
@@ -158,6 +175,32 @@ private struct IOSDashboardHero: View {
             return appLanguage.localized("dashboard.expenses.down", appLanguage.formatPercent(abs(delta)))
         }
         return appLanguage.localized("dashboard.expenses.same")
+    }
+
+    private var netTrendTitle: String {
+        switch snapshot.netTrend {
+        case .increasing: return appLanguage.localized("Net trend increasing")
+        case .decreasing: return appLanguage.localized("Net trend decreasing")
+        case .stable: return appLanguage.localized("Net trend stable")
+        case .insufficientData: return appLanguage.localized("Not enough data for net trend")
+        }
+    }
+
+    private var netTrendIcon: String {
+        switch snapshot.netTrend {
+        case .increasing: return "arrow.up.right"
+        case .decreasing: return "arrow.down.right"
+        case .stable: return "equal"
+        case .insufficientData: return "questionmark"
+        }
+    }
+
+    private var netTrendColor: Color {
+        switch snapshot.netTrend {
+        case .increasing: return AppColors.income
+        case .decreasing: return AppColors.warning
+        case .stable, .insufficientData: return AppColors.neutral
+        }
     }
 }
 
@@ -219,6 +262,7 @@ private struct IOSCashflowCard: View {
     let snapshot: DashboardSnapshot
     let renderAmount: (Decimal) -> String
     let appLanguage: AppLanguage
+    @State private var selectedMonthLabel: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: AppSpacing.medium) {
@@ -267,6 +311,39 @@ private struct IOSCashflowCard: View {
                     AxisMarks(position: .leading)
                 }
                 .chartLegend(position: .bottom, alignment: .leading, spacing: AppSpacing.small)
+                .chartOverlay { proxy in
+                    GeometryReader { geometry in
+                        Rectangle()
+                            .fill(.clear)
+                            .contentShape(Rectangle())
+                            .gesture(
+                                DragGesture(minimumDistance: 0)
+                                    .onEnded { value in
+                                        guard let plotFrameAnchor = proxy.plotFrame else { return }
+                                        let plotFrame = geometry[plotFrameAnchor]
+                                        let xPosition = value.location.x - plotFrame.origin.x
+                                        guard xPosition >= 0,
+                                              xPosition <= plotFrame.size.width,
+                                              let label: String = proxy.value(atX: xPosition, as: String.self) else {
+                                            return
+                                        }
+                                        selectedMonthLabel = label
+                                    }
+                            )
+                    }
+                }
+
+                if let selectedMonthLabel,
+                   let selectedPoint = snapshot.monthlyCashflow.first(where: { $0.monthLabel == selectedMonthLabel }) {
+                    InteractiveChartReadout(
+                        title: selectedPoint.monthLabel,
+                        values: [
+                            (appLanguage.localized("Income"), renderAmount(selectedPoint.income)),
+                            (appLanguage.localized("Expenses"), renderAmount(selectedPoint.expense)),
+                            (appLanguage.localized("Net"), renderAmount(selectedPoint.net))
+                        ]
+                    )
+                }
             }
 
             if let latest = snapshot.monthlyCashflow.last {

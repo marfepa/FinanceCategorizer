@@ -22,6 +22,8 @@ struct MacAppRootView: View {
                         openTransactions: { selectedSection = .transactions },
                         openReview: { selectedSection = .review }
                     )
+                case .analysis:
+                    MacInsightsView()
                 case .imports:
                     MacImportsView(openTransactions: { selectedSection = .transactions })
                 case .transactions:
@@ -61,6 +63,8 @@ struct MacAppRootView: View {
         switch section {
         case .dashboard:
             return .dashboard
+        case .analysis:
+            return .analysis
         case .imports:
             return .imports
         case .transactions:
@@ -81,6 +85,7 @@ struct MacAppRootView: View {
 
 private enum MacSection: String, CaseIterable, Identifiable {
     case dashboard
+    case analysis
     case imports
     case transactions
     case review
@@ -94,6 +99,7 @@ private enum MacSection: String, CaseIterable, Identifiable {
     var title: LocalizedStringKey {
         switch self {
         case .dashboard: return "Dashboard"
+        case .analysis: return "Analysis"
         case .imports: return "Import"
         case .transactions: return "Transactions"
         case .review: return "Review"
@@ -107,6 +113,7 @@ private enum MacSection: String, CaseIterable, Identifiable {
     var systemImage: String {
         switch self {
         case .dashboard: return "chart.bar"
+        case .analysis: return "chart.xyaxis.line"
         case .imports: return "square.and.arrow.down"
         case .transactions: return "tablecells"
         case .review: return "checklist"
