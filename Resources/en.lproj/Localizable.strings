@@ -755,3 +755,13 @@
 "categories.associatedMovement.one" = "1 associated movement";
 "categories.associatedMovement.many" = "%@ associated movements";
 "categories.shareOfMovements" = "%@ of categorized movements";
+"categories.detail.period" = "Period";
+"categories.detail.range.month" = "1 month";
+"categories.detail.range.threeMonths" = "3 months";
+"categories.detail.range.sixMonths" = "6 months";
+"categories.detail.range.year" = "12 months";
+"categories.detail.range.all" = "All time";
+"categories.detail.total" = "Total spend";
+"categories.detail.average" = "Monthly average";
+"categories.detail.peak" = "Peak month";
+"categories.detail.months" = "Months shown";

@@ -236,7 +236,9 @@ struct MacCategoriesView: View {
 
             detailRangePicker
 
-            if detailMonthlySpendPoints(for: category).isEmpty {
+            let points = detailMonthlySpendPoints(for: category)
+
+            if points.isEmpty {
                 HStack(spacing: AppSpacing.medium) {
                     Image(systemName: "chart.line.uptrend.xyaxis")
                         .font(.system(size: 20, weight: .semibold))
@@ -258,7 +260,7 @@ struct MacCategoriesView: View {
                 .padding(AppSpacing.medium)
                 .background(AppColors.cardBackground.opacity(0.55), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
             } else {
-                Chart(detailMonthlySpendPoints(for: category)) { point in
+                Chart(points) { point in
                     AreaMark(
                         x: .value("Mes", point.startDate),
                         y: .value("Gasto", decimalValue(point.amount))
@@ -283,7 +285,7 @@ struct MacCategoriesView: View {
                     AxisMarks(position: .leading)
                 }
                 .chartXAxis {
-                    AxisMarks(values: .stride(by: .month)) { value in
+                    AxisMarks(values: .stride(by: .month, count: xAxisStride(for: points.count))) { value in
                         AxisGridLine()
                         AxisTick()
                         AxisValueLabel(format: .dateTime.month(.abbreviated), centered: true)
@@ -312,7 +314,7 @@ struct MacCategoriesView: View {
                 }
 
                 if let selectedDetailDate,
-                   let selectedPoint = detailMonthlySpendPoints(for: category).min(by: {
+                   let selectedPoint = points.min(by: {
                        abs($0.startDate.timeIntervalSince(selectedDetailDate)) < abs($1.startDate.timeIntervalSince(selectedDetailDate))
                    }) {
                     InteractiveChartReadout(
@@ -321,36 +323,69 @@ struct MacCategoriesView: View {
                     )
                 }
 
-                HStack(spacing: AppSpacing.medium) {
-                    if let latest = detailMonthlySpendPoints(for: category).last {
-                        detailMetric(title: LocalizedStringKey("Last month"), value: formattedAmount(latest.amount))
-                    }
-
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: AppSpacing.small)], spacing: AppSpacing.small) {
                     detailMetric(
-                        title: LocalizedStringKey("Visible months"),
-                        value: appLanguage.formatInteger(detailMonthlySpendPoints(for: category).count)
+                        title: LocalizedStringKey("categories.detail.total"),
+                        value: formattedAmount(points.reduce(.zero) { $0 + $1.amount })
                     )
 
                     detailMetric(
-                        title: LocalizedStringKey("Range total"),
-                        value: formattedAmount(detailMonthlySpendPoints(for: category).reduce(.zero) { $0 + $1.amount })
+                        title: LocalizedStringKey("categories.detail.average"),
+                        value: formattedAmount(points.reduce(.zero) { $0 + $1.amount } / Decimal(points.count))
+                    )
+
+                    if let peak = points.max(by: { $0.amount < $1.amount }) {
+                        detailMetric(
+                            title: LocalizedStringKey("categories.detail.peak"),
+                            value: formattedAmount(peak.amount),
+                            detail: peak.monthLabel
+                        )
+                    }
+
+                    detailMetric(
+                        title: LocalizedStringKey("categories.detail.months"),
+                        value: appLanguage.formatInteger(points.count)
                     )
                 }
             }
         }
+        .padding(AppSpacing.medium)
+        .glassCard(material: AppMaterials.groupedGlass)
+        .onChange(of: selectedDetailRange) { _, _ in
+            selectedDetailDate = nil
+        }
     }
 
     private var detailRangePicker: some View {
-        HStack {
-            FloatingGlassSegmentedBar(
-                options: AnalysisTimeRange.allCases,
-                title: { appLanguage.localized($0.title) },
-                selection: $selectedDetailRange
-            )
-            .frame(maxWidth: 420, alignment: .leading)
-            .compositingGroup()
+        HStack(alignment: .center, spacing: AppSpacing.medium) {
+            Label(LocalizedStringKey("categories.detail.period"), systemImage: "calendar")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            Picker(LocalizedStringKey("categories.detail.period"), selection: $selectedDetailRange) {
+                ForEach(AnalysisTimeRange.allCases) { range in
+                    Text(rangeLabel(range)).tag(range)
+                }
+            }
+            .pickerStyle(.segmented)
+            .controlSize(.large)
+            .labelsHidden()
+            .frame(maxWidth: 520)
 
             Spacer(minLength: 0)
+        }
+        .padding(.horizontal, AppSpacing.small)
+        .padding(.vertical, AppSpacing.xSmall)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    private func rangeLabel(_ range: AnalysisTimeRange) -> String {
+        switch range {
+        case .month: return appLanguage.localized("categories.detail.range.month")
+        case .threeMonths: return appLanguage.localized("categories.detail.range.threeMonths")
+        case .sixMonths: return appLanguage.localized("categories.detail.range.sixMonths")
+        case .year: return appLanguage.localized("categories.detail.range.year")
+        case .all: return appLanguage.localized("categories.detail.range.all")
         }
     }
 
@@ -491,12 +526,27 @@ struct MacCategoriesView: View {
             .filter { $0.resolvedKind != .transfer && NSDecimalNumber(decimal: $0.amount).doubleValue < 0 }
 
         let filtered = filterTransactions(transactions, for: selectedDetailRange)
+        guard let latestDate = transactions.map(\.accountingDate).max() else { return [] }
+        let endMonth = startOfMonth(for: latestDate)
+        let startMonth: Date = if let monthWindow = selectedDetailRange.monthWindow {
+            Calendar.current.date(byAdding: .month, value: -(monthWindow - 1), to: endMonth) ?? endMonth
+        } else {
+            transactions.map(\.accountingDate).min().map(startOfMonth(for:)) ?? endMonth
+        }
         let grouped = Dictionary(grouping: filtered, by: { startOfMonth(for: $0.accountingDate) })
         let formatter = DateFormatter()
-        formatter.dateFormat = "MMM"
+        formatter.setLocalizedDateFormatFromTemplate("MMM")
         formatter.locale = Locale.current
 
-        return grouped.keys.sorted().map { month in
+        var months: [Date] = []
+        var month = startMonth
+        while month <= endMonth {
+            months.append(month)
+            guard let nextMonth = Calendar.current.date(byAdding: .month, value: 1, to: month) else { break }
+            month = nextMonth
+        }
+
+        return months.map { month in
             let items = grouped[month] ?? []
             let amount = items.reduce(Decimal.zero) { partial, transaction in
                 partial + absolute(transaction.amount)
@@ -523,6 +573,14 @@ struct MacCategoriesView: View {
             .sorted { $0.accountingDate < $1.accountingDate }
     }
 
+    private func xAxisStride(for pointCount: Int) -> Int {
+        switch pointCount {
+        case 0...6: return 1
+        case 7...12: return 2
+        default: return 3
+        }
+    }
+
     private func startOfMonth(for date: Date) -> Date {
         Calendar.current.date(from: Calendar.current.dateComponents([.year, .month], from: date)) ?? date
     }
@@ -539,7 +597,7 @@ struct MacCategoriesView: View {
         value.privacyFormatted(hidden: isPrivacyModeEnabled, currencyCode: AppConfig.defaultCurrencyCode)
     }
 
-    private func detailMetric(title: LocalizedStringKey, value: String) -> some View {
+    private func detailMetric(title: LocalizedStringKey, value: String, detail: String? = nil) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
                 .font(.caption.weight(.medium))
@@ -547,6 +605,12 @@ struct MacCategoriesView: View {
 
             Text(value)
                 .font(.subheadline.monospacedDigit().weight(.semibold))
+
+            if let detail {
+                Text(detail)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(AppSpacing.medium)
