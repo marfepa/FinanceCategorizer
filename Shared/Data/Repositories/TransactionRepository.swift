@@ -77,13 +77,24 @@ final class TransactionRepository {
         try fetchAll()
             .filter {
                 $0.resolvedKind != .transfer &&
-                ($0.needsReview || $0.categoryID == nil || $0.reviewStatusRaw == ReviewStatus.pending.rawValue)
+                ($0.needsReview ||
+                 $0.categoryID == nil ||
+                 $0.reviewStatusRaw == ReviewStatus.pending.rawValue ||
+                 $0.hasRecategorizationSuggestion)
             }
             .sorted {
                 if $0.confidence == $1.confidence {
                     return $0.bookingDate > $1.bookingDate
                 }
                 return $0.confidence < $1.confidence
+            }
+    }
+
+    func fetchRecategorizationCandidates() throws -> [Transaction] {
+        try fetchAll()
+            .filter {
+                $0.resolvedKind != .transfer &&
+                $0.categorizationSourceRaw != CategorizationSource.manual.rawValue
             }
     }
 
@@ -129,12 +140,54 @@ final class TransactionRepository {
 
         transaction.categoryID = categoryID
         transaction.subcategoryID = subcategoryID
+        clearRecategorizationSuggestion(on: transaction)
         transaction.categorizationSourceRaw = source.rawValue
         transaction.confidence = confidence
         transaction.needsReview = needsReview
         transaction.reviewStatusRaw = reviewStatus.rawValue
         transaction.categorizationReason = reason
         transaction.isRecurringCandidate = isRecurringCandidate
+        transaction.updatedAt = .now
+        try context.save()
+    }
+
+    func saveRecategorizationSuggestion(
+        transactionID: UUID,
+        categoryID: UUID,
+        subcategoryID: UUID? = nil,
+        source: CategorizationSource,
+        confidence: Double,
+        reason: String?
+    ) throws {
+        let context = makeContext()
+        let descriptor = FetchDescriptor<Transaction>(predicate: #Predicate { $0.id == transactionID })
+        guard let transaction = try context.fetch(descriptor).first else {
+            return
+        }
+
+        guard transaction.categoryID != categoryID else {
+            clearRecategorizationSuggestion(on: transaction)
+            try context.save()
+            return
+        }
+
+        transaction.suggestedCategoryID = categoryID
+        transaction.suggestedSubcategoryID = subcategoryID
+        transaction.suggestedConfidence = confidence
+        transaction.suggestedSourceRaw = source.rawValue
+        transaction.suggestedReason = reason
+        transaction.updatedAt = .now
+        try context.save()
+    }
+
+    func clearRecategorizationSuggestion(transactionID: UUID) throws {
+        let context = makeContext()
+        let descriptor = FetchDescriptor<Transaction>(predicate: #Predicate { $0.id == transactionID })
+        guard let transaction = try context.fetch(descriptor).first else {
+            return
+        }
+
+        clearRecategorizationSuggestion(on: transaction)
         transaction.updatedAt = .now
         try context.save()
     }
@@ -162,6 +215,7 @@ final class TransactionRepository {
         if kind == .transfer {
             transaction.categoryID = nil
             transaction.subcategoryID = nil
+            clearRecategorizationSuggestion(on: transaction)
             transaction.categorizationSourceRaw = CategorizationSource.manual.rawValue
             transaction.confidence = 1
             transaction.needsReview = false
@@ -271,5 +325,13 @@ final class TransactionRepository {
         transaction.duplicateConfidence = nil
         transaction.duplicateReasonKey = nil
         transaction.duplicateRecommendedKeepID = nil
+    }
+
+    private func clearRecategorizationSuggestion(on transaction: Transaction) {
+        transaction.suggestedCategoryID = nil
+        transaction.suggestedSubcategoryID = nil
+        transaction.suggestedConfidence = nil
+        transaction.suggestedSourceRaw = nil
+        transaction.suggestedReason = nil
     }
 }

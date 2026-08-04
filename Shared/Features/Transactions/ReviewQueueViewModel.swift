@@ -12,6 +12,7 @@ enum ReviewListFilter: String, CaseIterable, Identifiable {
     case all
     case lowConfidence
     case uncategorized
+    case suggestions
     case similar
 
     var id: String { rawValue }
@@ -22,6 +23,7 @@ enum ReviewListFilter: String, CaseIterable, Identifiable {
         case .all: return language.localized("review.filter.all")
         case .lowConfidence: return language.localized("review.filter.lowConfidence")
         case .uncategorized: return language.localized("review.filter.uncategorized")
+        case .suggestions: return language.localized("review.filter.suggestions")
         case .similar: return language.localized("review.filter.similar")
         }
     }
@@ -55,6 +57,8 @@ final class ReviewQueueViewModel {
             return transactions.filter { $0.confidence < AppConfig.softAutoCategorizationThreshold }
         case .uncategorized:
             return transactions.filter { $0.categoryID == nil }
+        case .suggestions:
+            return transactions.filter(\.hasRecategorizationSuggestion)
         case .similar:
             let ids = Set(suggestedGroups.map { $0.representativeTransactionID })
             return transactions.filter { t in
@@ -76,10 +80,10 @@ final class ReviewQueueViewModel {
             if let selectedTransaction,
                let refreshed = transactions.first(where: { $0.id == selectedTransaction.id }) {
                 self.selectedTransaction = refreshed
-                selectedCategoryID = refreshed.categoryID
+                selectedCategoryID = refreshed.suggestedCategoryID ?? refreshed.categoryID
             } else {
                 selectedTransaction = transactions.first
-                selectedCategoryID = transactions.first?.categoryID
+                selectedCategoryID = transactions.first?.suggestedCategoryID ?? transactions.first?.categoryID
             }
             selectedKind = selectedTransaction?.resolvedKind ?? .expense
             newCategoryIsIncome = (selectedTransaction?.amount ?? 0) > 0
@@ -93,7 +97,7 @@ final class ReviewQueueViewModel {
 
     func select(_ transaction: Transaction) {
         selectedTransaction = transaction
-        selectedCategoryID = transaction.categoryID
+        selectedCategoryID = transaction.suggestedCategoryID ?? transaction.categoryID
         selectedKind = transaction.resolvedKind
         newCategoryIsIncome = transaction.amount > 0
         statusMessage = nil
@@ -195,6 +199,79 @@ final class ReviewQueueViewModel {
         }
     }
 
+    func acceptSuggestedCategory(using container: AppContainer) {
+        let language = AppLanguage.currentSelection
+        guard let transaction = selectedTransaction,
+              let suggestedCategoryID = transaction.suggestedCategoryID else {
+            errorMessage = language.localized("review.error.noCategorySuggestion")
+            return
+        }
+
+        do {
+            try container.correctionLearningService.applyCorrection(
+                for: transaction,
+                categoryID: suggestedCategoryID,
+                subcategoryID: transaction.suggestedSubcategoryID,
+                applyToFuture: createRuleFromCorrection
+            )
+            statusMessage = language.localized("review.status.suggestionAccepted")
+            errorMessage = nil
+            load(using: container)
+            NotificationCenter.default.post(name: AppContainer.importDidFinishNotification, object: nil)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func dismissSuggestedCategory(using container: AppContainer) {
+        let language = AppLanguage.currentSelection
+        guard let transaction = selectedTransaction,
+              transaction.hasRecategorizationSuggestion else {
+            errorMessage = language.localized("review.error.noCategorySuggestion")
+            return
+        }
+
+        do {
+            try container.transactionRepository.clearRecategorizationSuggestion(transactionID: transaction.id)
+            statusMessage = language.localized("review.status.suggestionDismissed")
+            errorMessage = nil
+            load(using: container)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func acceptAllHighConfidenceSuggestions(using container: AppContainer) {
+        let language = AppLanguage.currentSelection
+        do {
+            let candidates = try container.transactionRepository.fetchPendingReview()
+                .filter {
+                    $0.hasRecategorizationSuggestion &&
+                    ($0.suggestedConfidence ?? 0) >= AppConfig.softAutoCategorizationThreshold
+                }
+
+            for transaction in candidates {
+                guard let categoryID = transaction.suggestedCategoryID else { continue }
+                try container.correctionLearningService.applyCorrection(
+                    for: transaction,
+                    categoryID: categoryID,
+                    subcategoryID: transaction.suggestedSubcategoryID,
+                    applyToFuture: false
+                )
+            }
+
+            load(using: container)
+            statusMessage = language.localized(
+                "review.status.acceptedHighConfidence",
+                language.formatInteger(candidates.count)
+            )
+            errorMessage = nil
+            NotificationCenter.default.post(name: AppContainer.importDidFinishNotification, object: nil)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     func applyToSimilar(using container: AppContainer) {
         let language = AppLanguage.currentSelection
         guard let transaction = selectedTransaction,
@@ -269,58 +346,24 @@ final class ReviewQueueViewModel {
         defer { isRecategorizing = false }
 
         do {
-            let pending = try container.transactionRepository.fetchPendingReview()
-            guard !pending.isEmpty else {
-                recategorizationSummary = language.localized("review.status.noPendingToRecategorize")
+            let candidates = try container.transactionRepository.fetchRecategorizationCandidates()
+            guard !candidates.isEmpty else {
+                recategorizationSummary = language.localized("review.status.noCandidatesToRecategorize")
                 return
             }
 
-            var autoResolved = 0
-            var updatedSuggestion = 0
-
-            for transaction in pending {
-                let dto = normalizedDTO(from: transaction)
-                let decision = await container.categorizationOrchestrator.categorize(dto)
-
-                guard let categoryID = decision.categoryID else { continue }
-
-                if !decision.shouldQueueForReview, decision.confidence >= AppConfig.softAutoCategorizationThreshold {
-                    // High confidence → auto-apply and remove from queue
-                    try container.transactionRepository.applyDecision(
-                        transactionID: transaction.id,
-                        categoryID: categoryID,
-                        subcategoryID: decision.subcategoryID,
-                        source: decision.source,
-                        confidence: decision.confidence,
-                        needsReview: false,
-                        reviewStatus: .accepted,
-                        reason: "[ML re-run] \(decision.reason)",
-                        isRecurringCandidate: decision.isRecurringCandidate
-                    )
-                    autoResolved += 1
-                } else if decision.confidence > transaction.confidence {
-                    // Better suggestion than before → update suggestion without closing review
-                    try container.transactionRepository.applyDecision(
-                        transactionID: transaction.id,
-                        categoryID: categoryID,
-                        subcategoryID: decision.subcategoryID,
-                        source: decision.source,
-                        confidence: decision.confidence,
-                        needsReview: true,
-                        reviewStatus: .pending,
-                        reason: "[ML re-run] \(decision.reason)",
-                        isRecurringCandidate: decision.isRecurringCandidate
-                    )
-                    updatedSuggestion += 1
-                }
-            }
+            let result = try await container.recategorizationService.analyze(candidates)
 
             load(using: container)
             NotificationCenter.default.post(name: AppContainer.importDidFinishNotification, object: nil)
 
             var parts: [String] = []
-            if autoResolved > 0 { parts.append(language.localized("review.status.autoResolved", language.formatInteger(autoResolved))) }
-            if updatedSuggestion > 0 { parts.append(language.localized("review.status.suggestionsUpdated", language.formatInteger(updatedSuggestion))) }
+            if result.autoResolved > 0 {
+                parts.append(language.localized("review.status.autoResolved", language.formatInteger(result.autoResolved)))
+            }
+            if result.suggestionsCreated > 0 {
+                parts.append(language.localized("review.status.suggestionsUpdated", language.formatInteger(result.suggestionsCreated)))
+            }
             if parts.isEmpty {
                 recategorizationSummary = language.localized("review.status.mlNoImprovements")
             } else {
@@ -359,12 +402,12 @@ final class ReviewQueueViewModel {
         if nextIndex < filteredList.count {
             let next = filteredList[nextIndex]
             selectedTransaction = next
-            selectedCategoryID = next.categoryID
+            selectedCategoryID = next.suggestedCategoryID ?? next.categoryID
             selectedKind = next.resolvedKind
         } else if currentIndex > 0 {
             let prev = filteredList[currentIndex - 1]
             selectedTransaction = prev
-            selectedCategoryID = prev.categoryID
+            selectedCategoryID = prev.suggestedCategoryID ?? prev.categoryID
             selectedKind = prev.resolvedKind
         } else {
             selectedTransaction = nil

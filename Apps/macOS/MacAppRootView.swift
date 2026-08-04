@@ -20,17 +20,16 @@ struct MacAppRootView: View {
                     MacDashboardView(
                         openImports: { selectedSection = .imports },
                         openTransactions: { selectedSection = .transactions },
-                        openInsights: { selectedSection = .insights },
                         openReview: { selectedSection = .review }
                     )
                 case .imports:
                     MacImportsView(openTransactions: { selectedSection = .transactions })
                 case .transactions:
                     MacTransactionsView()
-                case .insights:
-                    MacInsightsView()
                 case .review:
                     MacReviewQueueView()
+                case .audit:
+                    MacCategoryAuditView()
                 case .categories:
                     MacCategoriesView()
                 case .budgets:
@@ -66,9 +65,9 @@ struct MacAppRootView: View {
             return .imports
         case .transactions:
             return .transactions
-        case .insights:
-            return .analysis
         case .review:
+            return .review
+        case .audit:
             return .review
         case .categories:
             return .categories
@@ -84,8 +83,8 @@ private enum MacSection: String, CaseIterable, Identifiable {
     case dashboard
     case imports
     case transactions
-    case insights
     case review
+    case audit
     case categories
     case budgets
     case settings
@@ -97,8 +96,8 @@ private enum MacSection: String, CaseIterable, Identifiable {
         case .dashboard: return "Dashboard"
         case .imports: return "Import"
         case .transactions: return "Transactions"
-        case .insights: return "Analysis"
         case .review: return "Review"
+        case .audit: return "audit.title"
         case .categories: return "Categories"
         case .budgets: return "Budgets"
         case .settings: return "Settings"
@@ -110,8 +109,8 @@ private enum MacSection: String, CaseIterable, Identifiable {
         case .dashboard: return "chart.bar"
         case .imports: return "square.and.arrow.down"
         case .transactions: return "tablecells"
-        case .insights: return "chart.xyaxis.line"
         case .review: return "checklist"
+        case .audit: return "rectangle.and.text.magnifyingglass"
         case .categories: return "tag"
         case .budgets: return "target"
         case .settings: return "gearshape"

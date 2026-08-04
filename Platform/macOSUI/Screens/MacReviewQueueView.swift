@@ -28,6 +28,13 @@ struct MacReviewQueueView: View {
                         }
                     }
                     .disabled(viewModel.isRecategorizing || viewModel.transactions.isEmpty)
+
+                    Divider()
+
+                    Button(LocalizedStringKey("Accept high-confidence suggestions")) {
+                        viewModel.acceptAllHighConfidenceSuggestions(using: appContainer)
+                    }
+                    .disabled(viewModel.transactions.allSatisfy { !$0.hasRecategorizationSuggestion })
                 } label: {
                     Label(LocalizedStringKey("Review Actions"), systemImage: "ellipsis.circle")
                 }
@@ -146,9 +153,19 @@ struct MacReviewQueueView: View {
                         .contextMenu {
                             Button(LocalizedStringKey("Approve Suggestion")) {
                                 viewModel.select(transaction)
-                                viewModel.approveSelected(using: appContainer)
+                                if transaction.hasRecategorizationSuggestion {
+                                    viewModel.acceptSuggestedCategory(using: appContainer)
+                                } else {
+                                    viewModel.approveSelected(using: appContainer)
+                                }
                             }
-                            .disabled(transaction.categoryID == nil)
+                            .disabled(transaction.categoryID == nil && !transaction.hasRecategorizationSuggestion)
+                            if transaction.hasRecategorizationSuggestion {
+                                Button(LocalizedStringKey("Dismiss Category Suggestion")) {
+                                    viewModel.select(transaction)
+                                    viewModel.dismissSuggestedCategory(using: appContainer)
+                                }
+                            }
                             Button(LocalizedStringKey("Mark as Transfer")) {
                                 viewModel.select(transaction)
                                 viewModel.markAsTransfer(using: appContainer)
@@ -189,7 +206,11 @@ struct MacReviewQueueView: View {
                 }
 
                 HStack {
-                    categoryBadge(categoryID: transaction.categoryID)
+                    if transaction.hasRecategorizationSuggestion {
+                        suggestionBadge(for: transaction)
+                    } else {
+                        categoryBadge(categoryID: transaction.categoryID)
+                    }
                     Spacer()
                     Text(transaction.resolvedKind.rawValue.capitalized)
                         .font(.caption2)
@@ -230,8 +251,17 @@ struct MacReviewQueueView: View {
             infoBlock(LocalizedStringKey("Date"), transaction.bookingDate.formatted(date: .complete, time: .omitted))
             infoBlock(LocalizedStringKey("Amount"), transaction.amount.privacyFormatted(hidden: isPrivacyModeEnabled, currencyCode: transaction.currencyCode))
             infoBlock(LocalizedStringKey("Current Category"), categoryName(for: transaction.categoryID))
+            if transaction.hasRecategorizationSuggestion {
+                infoBlock(
+                    LocalizedStringKey("Suggested Category"),
+                    "\(categoryName(for: transaction.suggestedCategoryID)) · \((transaction.suggestedConfidence ?? 0).formatted(.percent.precision(.fractionLength(0))))"
+                )
+            }
             infoBlock(LocalizedStringKey("Source"), String(localized: LocalizedStringResource(stringLiteral: transaction.categorizationSourceRaw)))
-            infoBlock(LocalizedStringKey("Explanation"), transaction.categorizationReason ?? String(localized: "No explanation available"))
+            infoBlock(
+                LocalizedStringKey("Explanation"),
+                transaction.suggestedReason ?? transaction.categorizationReason ?? String(localized: "No explanation available")
+            )
         }
         .contentCard(padding: AppLayoutMetrics.contentGap, radius: AppRadius.inner)
     }
@@ -290,6 +320,18 @@ struct MacReviewQueueView: View {
                         viewModel.markAsTransfer(using: appContainer)
                     }
                     .appSecondaryGlassButton()
+
+                    if transaction.hasRecategorizationSuggestion {
+                        Button(LocalizedStringKey("Accept Category Suggestion")) {
+                            viewModel.acceptSuggestedCategory(using: appContainer)
+                        }
+                        .buttonStyle(.glassProminent)
+
+                        Button(LocalizedStringKey("Dismiss Category Suggestion")) {
+                            viewModel.dismissSuggestedCategory(using: appContainer)
+                        }
+                        .appSecondaryGlassButton()
+                    }
 
                     Button(viewModel.isLoadingAISuggestion ? String(localized: "Asking AI…") : String(localized: "Ask AI Copilot")) {
                         Task { await viewModel.requestAISuggestion(using: appContainer) }
@@ -422,6 +464,20 @@ struct MacReviewQueueView: View {
                     .foregroundStyle(.orange)
             }
         }
+    }
+
+    private func suggestionBadge(for transaction: Transaction) -> some View {
+        HStack(spacing: 4) {
+            Text(categoryName(for: transaction.categoryID))
+                .foregroundStyle(.secondary)
+            Image(systemName: "arrow.right")
+            Text(categoryName(for: transaction.suggestedCategoryID))
+                .foregroundStyle(.green)
+        }
+        .font(.caption2)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(.green.opacity(0.12), in: Capsule())
     }
 
     private func categoryName(for categoryID: UUID?) -> String {

@@ -3,14 +3,12 @@ import SwiftUI
 
 struct MacDashboardView: View {
     @Environment(\.appContainer) private var appContainer
-    @Environment(\.isPrivacyModeEnabled) private var isPrivacyModeEnabled
     @State private var viewModel = DashboardViewModel()
     @AppStorage("isPrivacyModeEnabled") private var privacyStoredValue = false
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.english
 
     let openImports: () -> Void
     let openTransactions: () -> Void
-    let openInsights: () -> Void
     let openReview: () -> Void
 
     private let chartPalette: [Color] = [
@@ -32,11 +30,9 @@ struct MacDashboardView: View {
                     DashboardHeroPanel(
                         snapshot: snapshot,
                         renderAmount: renderAmount,
-                        heroSubtitle: heroSubtitle,
-                        deltaCaption: deltaCaption,
-                        decimalValue: decimalValue
+                        renderPercent: { appLanguage.formatPercent($0) },
+                        expenseSummary: expenseSummary(for: snapshot)
                     )
-                    .transition(.move(edge: .top).combined(with: .opacity))
 
                     DashboardActionBar(
                         openImports: openImports,
@@ -44,49 +40,44 @@ struct MacDashboardView: View {
                         openTransactions: openTransactions
                     )
 
-                    DashboardKPIStrip(
+                    DashboardCashflowCard(
                         snapshot: snapshot,
+                        decimalValue: decimalValue,
                         renderAmount: renderAmount,
                         appLanguage: appLanguage
                     )
 
-                    DashboardCopilotCard(
+                    DashboardCategoryOverviewCard(
+                        snapshot: snapshot,
+                        chartPalette: chartPalette,
+                        renderAmount: renderAmount,
+                        appLanguage: appLanguage,
+                        decimalValue: decimalValue
+                    )
+
+                    DashboardBriefingCard(
                         summary: viewModel.copilotSummary,
                         alerts: Array(viewModel.alerts.prefix(2)),
                         actions: Array(viewModel.actions.prefix(2)),
-                        isLoading: viewModel.isGeneratingCopilot,
-                        openInsights: openInsights
+                        pendingReviewCount: snapshot.pendingReviewCount,
+                        isLoading: viewModel.isGeneratingCopilot
                     )
-
-                    HStack(alignment: .top, spacing: AppLayoutMetrics.blockGap) {
-                        DashboardCategoryPressureCard(
-                            snapshot: snapshot,
-                            chartPalette: chartPalette,
-                            renderAmount: renderAmount,
-                            decimalValue: decimalValue
-                        )
-                        .frame(maxWidth: .infinity, alignment: .topLeading)
-
-                        VStack(alignment: .leading, spacing: AppLayoutMetrics.blockGap) {
-                            DashboardRecentImportsCard(snapshot: snapshot)
-                            DashboardConfidenceCard(snapshot: snapshot)
-                        }
-                        .frame(width: 320, alignment: .topLeading)
-                    }
                 }
+                .transition(.move(edge: .top).combined(with: .opacity))
             } else if viewModel.isLoading {
                 LoadingView(title: LocalizedStringKey("Preparing dashboard..."))
             } else {
                 EmptyStateView(
                     title: LocalizedStringKey("No Financial Snapshot Yet"),
-                    message: LocalizedStringKey("Import real bank movements to see your monthly balance, AI briefing and top household spending categories."),
-                    systemImage: "rectangle.stack.badge.person.crop"
+                    message: LocalizedStringKey("Import real bank movements to see your monthly balance, six-month cashflow and category changes."),
+                    systemImage: "rectangle.grid.2x2"
                 )
             }
 
             if let errorMessage = viewModel.errorMessage {
                 Text(errorMessage)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(AppColors.expense)
+                    .contentCard(padding: AppLayoutMetrics.contentGap, radius: AppRadius.card)
             }
         }
         .task(id: appLanguage) {
@@ -100,86 +91,87 @@ struct MacDashboardView: View {
     }
 
     private var dashboardAtmosphere: some View {
-        Rectangle()
-            .fill(
+        GeometryReader { proxy in
+            ZStack {
                 LinearGradient(
                     colors: [
                         AppColors.background,
-                        Color.white.opacity(0.03),
-                        AppColors.background.opacity(0.98)
+                        AppColors.background.opacity(0.96),
+                        AppColors.background
                     ],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
-            )
-            .backgroundExtensionEffect()
+
+                Circle()
+                    .fill(AppColors.income.opacity(0.12))
+                    .frame(width: proxy.size.width * 0.38)
+                    .blur(radius: 120)
+                    .offset(x: -proxy.size.width * 0.25, y: -proxy.size.height * 0.18)
+
+                Circle()
+                    .fill(AppColors.neutral.opacity(0.14))
+                    .frame(width: proxy.size.width * 0.42)
+                    .blur(radius: 150)
+                    .offset(x: proxy.size.width * 0.30, y: proxy.size.height * 0.20)
+            }
             .ignoresSafeArea()
+        }
     }
 
     private var header: some View {
         HStack(alignment: .firstTextBaseline, spacing: AppLayoutMetrics.contentGap) {
             VStack(alignment: .leading, spacing: AppLayoutMetrics.microGap) {
-                Text(LocalizedStringKey("Dashboard"))
+                Text(LocalizedStringKey("Family Overview"))
                     .font(AppTypography.displayTitle)
-                Text(LocalizedStringKey("Understand the month in one glance: net balance, pressure points and the next best move."))
+                Text(LocalizedStringKey("See what came in, what went out and where the household budget is changing."))
                     .foregroundStyle(.secondary)
             }
 
             Spacer()
-            privacyToggle
-        }
-    }
-
-    private var privacyToggle: some View {
-        Button {
-            privacyStoredValue.toggle()
-        } label: {
-            Image(systemName: privacyStoredValue ? "eye.slash.fill" : "eye.fill")
-                .font(.title2)
+            Button {
+                privacyStoredValue.toggle()
+            } label: {
+                Label(
+                    privacyStoredValue ? LocalizedStringKey("Amounts hidden") : LocalizedStringKey("Amounts visible"),
+                    systemImage: privacyStoredValue ? "eye.slash.fill" : "eye.fill"
+                )
+                .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
-                .contentTransition(.symbolEffect(.replace))
-        }
-        .buttonStyle(.plain)
-        .help(privacyStoredValue ? LocalizedStringKey("Show amounts") : LocalizedStringKey("Hide amounts"))
-    }
-
-    private func heroSubtitle(_ snapshot: DashboardSnapshot) -> String {
-        if let delta = snapshot.expenseDeltaPercentage {
-            if delta >= 0 {
-                return appLanguage.localized("dashboard.hero.expensesUp", appLanguage.formatPercent(abs(delta)))
-            } else {
-                return appLanguage.localized("dashboard.hero.expensesDown", appLanguage.formatPercent(abs(delta)))
             }
+            .buttonStyle(.plain)
+            .help(privacyStoredValue ? LocalizedStringKey("Show amounts") : LocalizedStringKey("Hide amounts"))
         }
-        return appLanguage.localized("This is the first comparable monthly snapshot available.")
     }
 
-    private func deltaCaption(_ snapshot: DashboardSnapshot) -> String {
-        let amount = renderAmount(snapshot.expenseDeltaFromPreviousMonth)
+    private func expenseSummary(for snapshot: DashboardSnapshot) -> String {
         guard let delta = snapshot.expenseDeltaPercentage else {
-            return appLanguage.localized("No previous-month comparison yet.")
+            return appLanguage.localized("dashboard.expenses.noComparison")
         }
 
-        let trend = delta >= 0 ? appLanguage.localized("Higher") : appLanguage.localized("Lower")
-        let percentage = appLanguage.formatPercent(abs(delta))
-        return appLanguage.localized("dashboard.hero.deltaCaption", trend, amount, percentage)
-    }
-
-    private func decimalValue(_ value: Decimal) -> Double {
-        NSDecimalNumber(decimal: value).doubleValue
+        if delta > 0 {
+            return appLanguage.localized("dashboard.expenses.up", appLanguage.formatPercent(delta))
+        }
+        if delta < 0 {
+            return appLanguage.localized("dashboard.expenses.down", appLanguage.formatPercent(abs(delta)))
+        }
+        return appLanguage.localized("dashboard.expenses.same")
     }
 
     private func renderAmount(_ value: Decimal) -> String {
         value.privacyFormatted(hidden: privacyStoredValue, language: appLanguage)
+    }
+
+    private func decimalValue(_ value: Decimal) -> Double {
+        NSDecimalNumber(decimal: value).doubleValue
     }
 }
 
 private struct DashboardHeroPanel: View {
     let snapshot: DashboardSnapshot
     let renderAmount: (Decimal) -> String
-    let heroSubtitle: (DashboardSnapshot) -> String
-    let deltaCaption: (DashboardSnapshot) -> String
-    let decimalValue: (Decimal) -> Double
+    let renderPercent: (Double) -> String
+    let expenseSummary: String
 
     var body: some View {
         HStack(alignment: .top, spacing: AppLayoutMetrics.sectionGap) {
@@ -194,82 +186,85 @@ private struct DashboardHeroPanel: View {
                         .foregroundStyle(snapshot.netBalance >= 0 ? AppColors.income : AppColors.expense)
                         .contentTransition(.numericText())
 
-                    Text(heroSubtitle(snapshot))
+                    Text(LocalizedStringKey("Net result for the latest month"))
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
 
                 HStack(spacing: AppLayoutMetrics.contentGap) {
-                    supportChip(
+                    DashboardHeroMetric(
                         title: LocalizedStringKey("Income"),
                         value: renderAmount(snapshot.totalIncome),
                         tint: AppColors.income
                     )
-                    supportChip(
+                    DashboardHeroMetric(
                         title: LocalizedStringKey("Expenses"),
                         value: renderAmount(snapshot.totalExpenses),
                         tint: AppColors.expense
                     )
-                    supportChip(
-                        title: LocalizedStringKey("Delta"),
-                        value: deltaCaption(snapshot),
-                        tint: snapshot.expenseDeltaFromPreviousMonth > 0 ? AppColors.warning : AppColors.neutral
+                    DashboardHeroMetric(
+                        title: LocalizedStringKey("Savings Rate"),
+                        value: renderPercent(snapshot.savingsRate),
+                        tint: snapshot.savingsRate >= 0 ? AppColors.neutral : AppColors.warning
                     )
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
             VStack(alignment: .leading, spacing: AppLayoutMetrics.contentGap) {
-                if snapshot.trend.isEmpty {
-                    Text(LocalizedStringKey("Not enough monthly movement yet to draw a trend."))
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                } else {
-                    Chart(snapshot.trend) { point in
-                        AreaMark(
-                            x: .value("Day", point.dayLabel),
-                            y: .value("Net", decimalValue(point.net))
-                        )
-                        .interpolationMethod(.catmullRom)
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [AppColors.neutral.opacity(0.28), AppColors.neutral.opacity(0.02)],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
+                Label(LocalizedStringKey("Month signal"), systemImage: "waveform.path.ecg")
+                    .font(AppTypography.sectionTitle)
 
-                        LineMark(
-                            x: .value("Day", point.dayLabel),
-                            y: .value("Net", decimalValue(point.net))
-                        )
-                        .interpolationMethod(.catmullRom)
-                        .lineStyle(StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
-                        .foregroundStyle(AppColors.neutral.gradient)
-                    }
-                    .frame(width: 320, height: 180)
-                    .chartXAxis(.hidden)
-                    .chartYAxis(.hidden)
+                Text(expenseSummary)
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(snapshot.expenseDeltaFromPreviousMonth > 0 ? AppColors.warning : AppColors.income)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Text(LocalizedStringKey("Compared with the previous month"))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+
+                if snapshot.pendingReviewCount > 0 {
+                    Label(
+                        LocalizedStringKey("Some numbers still need review"),
+                        systemImage: "exclamationmark.bubble.fill"
+                    )
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(AppColors.warning)
+                } else {
+                    Label(
+                        LocalizedStringKey("All latest movements are reviewed"),
+                        systemImage: "checkmark.seal.fill"
+                    )
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(AppColors.income)
                 }
             }
-            .frame(width: 320, alignment: .topLeading)
+            .frame(width: 290, alignment: .topLeading)
+            .contentCard(padding: AppLayoutMetrics.blockGap, radius: AppRadius.card)
         }
         .contentCard(padding: AppLayoutMetrics.heroInset, radius: AppRadius.hero)
     }
+}
 
-    private func supportChip(title: LocalizedStringKey, value: String, tint: Color) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
+private struct DashboardHeroMetric: View {
+    let title: LocalizedStringKey
+    let value: String
+    let tint: Color
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
             Text(title)
-                .font(.caption2)
+                .font(.caption)
                 .foregroundStyle(.secondary)
             Text(value)
                 .font(.callout.weight(.semibold))
-                .lineLimit(2)
+                .lineLimit(1)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, AppLayoutMetrics.contentGap)
         .padding(.vertical, 12)
-        .liquidGlassPill(padding: 0, material: AppMaterials.subtleGlass, tint: tint)
+        .liquidGlassPill(padding: 0, tint: tint)
     }
 }
 
@@ -289,168 +284,150 @@ private struct DashboardActionBar: View {
     }
 }
 
-private struct DashboardKPIStrip: View {
+private struct DashboardCashflowCard: View {
     let snapshot: DashboardSnapshot
+    let decimalValue: (Decimal) -> Double
     let renderAmount: (Decimal) -> String
     let appLanguage: AppLanguage
 
-    private let columns = [
-        GridItem(.flexible(), spacing: AppLayoutMetrics.contentGap),
-        GridItem(.flexible(), spacing: AppLayoutMetrics.contentGap),
-        GridItem(.flexible(), spacing: AppLayoutMetrics.contentGap)
-    ]
-
-    var body: some View {
-        LazyVGrid(columns: columns, spacing: AppLayoutMetrics.contentGap) {
-            kpiCard(
-                title: LocalizedStringKey("Savings Rate"),
-                value: snapshot.savingsRate.formatted(.percent.precision(.fractionLength(0))),
-                subtitle: LocalizedStringKey("Net over income this month"),
-                icon: "arrow.down.to.line.compact",
-                tint: snapshot.savingsRate >= 0 ? AppColors.income : AppColors.expense
-            )
-            kpiCard(
-                title: LocalizedStringKey("Dominant Category"),
-                value: snapshot.dominantCategoryName ?? appLanguage.localized("No category yet"),
-                subtitle: LocalizedStringKey("Main pressure point of the month"),
-                icon: "chart.bar.fill",
-                tint: AppColors.warning
-            )
-            kpiCard(
-                title: LocalizedStringKey("Pending Review"),
-                value: "\(snapshot.pendingReviewCount)",
-                subtitle: snapshot.pendingReviewCount == 0 ? LocalizedStringKey("Month is mostly settled") : LocalizedStringKey("Movements still affecting certainty"),
-                icon: "exclamationmark.bubble.fill",
-                tint: snapshot.pendingReviewCount == 0 ? AppColors.neutral : AppColors.warning
-            )
-        }
-    }
-
-    private func kpiCard(title: LocalizedStringKey, value: String, subtitle: LocalizedStringKey, icon: String, tint: Color) -> some View {
-        VStack(alignment: .leading, spacing: AppLayoutMetrics.contentGap) {
-            HStack {
-                Label(title, systemImage: icon)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Circle()
-                    .fill(tint.opacity(0.14))
-                    .frame(width: 24, height: 24)
-            }
-
-            Text(value)
-                .font(.title3.weight(.bold))
-                .lineLimit(2)
-                .contentTransition(.numericText())
-
-            Text(subtitle)
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .contentCard()
-    }
-}
-
-private struct DashboardCopilotCard: View {
-    let summary: String?
-    let alerts: [String]
-    let actions: [String]
-    let isLoading: Bool
-    let openInsights: () -> Void
-
     var body: some View {
         VStack(alignment: .leading, spacing: AppLayoutMetrics.blockGap) {
-            HStack(alignment: .center) {
-                Label(LocalizedStringKey("AI Copilot"), systemImage: "sparkles")
-                    .font(AppTypography.sectionTitle)
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: AppLayoutMetrics.microGap) {
+                    Label(LocalizedStringKey("Income and spending progress"), systemImage: "chart.xyaxis.line")
+                        .font(AppTypography.sectionTitle)
+                    Text(LocalizedStringKey("The last six months, ending with the latest imported month"))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
                 Spacer()
-                if isLoading {
-                    ProgressView()
-                        .controlSize(.small)
-                } else {
-                    Button(LocalizedStringKey("Open Analysis"), action: openInsights)
-                        .appSecondaryGlassButton()
+                if let latest = snapshot.monthlyCashflow.last {
+                    Text(appLanguage.localized("dashboard.cashflow.latest", latest.monthLabel))
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
                 }
             }
 
-            Text(LocalizedStringKey(summary ?? "No AI summary available yet."))
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .lineSpacing(4)
+            if snapshot.monthlyCashflow.isEmpty {
+                Text(LocalizedStringKey("Not enough monthly history to visualize cashflow."))
+                    .foregroundStyle(.secondary)
+            } else {
+                Chart(snapshot.monthlyCashflow) { point in
+                    BarMark(
+                        x: .value("Month", point.monthLabel),
+                        y: .value("Amount", decimalValue(point.income))
+                    )
+                    .foregroundStyle(by: .value("Flow", "Income"))
+                    .position(by: .value("Flow", "Income"))
 
-            HStack(alignment: .top, spacing: AppLayoutMetrics.contentGap) {
-                conciseColumn(
-                    title: LocalizedStringKey("Alerts"),
-                    tint: AppColors.warning,
-                    items: alerts,
-                    emptyText: LocalizedStringKey("No important alerts right now.")
-                )
-                conciseColumn(
-                    title: LocalizedStringKey("Next Actions"),
-                    tint: AppColors.neutral,
-                    items: actions,
-                    emptyText: LocalizedStringKey("No actions suggested right now.")
-                )
+                    BarMark(
+                        x: .value("Month", point.monthLabel),
+                        y: .value("Amount", decimalValue(point.expense))
+                    )
+                    .foregroundStyle(by: .value("Flow", "Expenses"))
+                    .position(by: .value("Flow", "Expenses"))
+
+                    LineMark(
+                        x: .value("Month", point.monthLabel),
+                        y: .value("Net", decimalValue(point.net))
+                    )
+                    .interpolationMethod(.catmullRom)
+                    .lineStyle(StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
+                    .foregroundStyle(by: .value("Flow", "Net"))
+                    .symbol(Circle().strokeBorder(lineWidth: 2))
+                }
+                .frame(height: 270)
+                .chartForegroundStyleScale([
+                    "Income": AppColors.income,
+                    "Expenses": AppColors.expense,
+                    "Net": AppColors.neutral
+                ])
+                .chartYAxis {
+                    AxisMarks(position: .leading)
+                }
+                .chartLegend(position: .top, alignment: .leading, spacing: AppLayoutMetrics.contentGap)
+            }
+
+            if let latest = snapshot.monthlyCashflow.last {
+                HStack(spacing: AppLayoutMetrics.contentGap) {
+                    cashflowReading(
+                        title: LocalizedStringKey("Latest income"),
+                        value: renderAmount(latest.income),
+                        tint: AppColors.income
+                    )
+                    cashflowReading(
+                        title: LocalizedStringKey("Latest expenses"),
+                        value: renderAmount(latest.expense),
+                        tint: AppColors.expense
+                    )
+                    cashflowReading(
+                        title: LocalizedStringKey("Latest net"),
+                        value: renderAmount(latest.net),
+                        tint: latest.net >= 0 ? AppColors.neutral : AppColors.warning
+                    )
+                }
             }
         }
         .contentCard()
     }
 
-    private func conciseColumn(title: LocalizedStringKey, tint: Color, items: [String], emptyText: LocalizedStringKey) -> some View {
-        VStack(alignment: .leading, spacing: AppLayoutMetrics.microGap) {
+    private func cashflowReading(title: LocalizedStringKey, value: String, tint: Color) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
             Text(title)
-                .font(.headline)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.callout.weight(.semibold))
                 .foregroundStyle(tint)
-
-            if items.isEmpty {
-                Text(emptyText)
-                    .foregroundStyle(.secondary)
-            } else {
-                ForEach(items, id: \.self) { item in
-                    HStack(alignment: .top, spacing: AppLayoutMetrics.microGap) {
-                        Circle()
-                            .fill(tint)
-                            .frame(width: 6, height: 6)
-                            .padding(.top, 6)
-                        Text(item)
-                    }
-                }
-            }
         }
-        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
-private struct DashboardCategoryPressureCard: View {
+private struct DashboardCategoryOverviewCard: View {
     let snapshot: DashboardSnapshot
+    let chartPalette: [Color]
+    let renderAmount: (Decimal) -> String
+    let appLanguage: AppLanguage
+    let decimalValue: (Decimal) -> Double
+
+    var body: some View {
+        HStack(alignment: .top, spacing: AppLayoutMetrics.sectionGap) {
+            DashboardTopCategoriesColumn(
+                categories: Array(snapshot.topCategories.prefix(5)),
+                chartPalette: chartPalette,
+                renderAmount: renderAmount,
+                decimalValue: decimalValue
+            )
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+
+            DashboardCategoryChangesColumn(
+                categories: Array(snapshot.categoryChanges.filter { $0.deltaFromPreviousMonth > 0 }.prefix(5)),
+                renderAmount: renderAmount,
+                appLanguage: appLanguage
+            )
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+        }
+        .contentCard()
+    }
+}
+
+private struct DashboardTopCategoriesColumn: View {
+    let categories: [DashboardCategoryItem]
     let chartPalette: [Color]
     let renderAmount: (Decimal) -> String
     let decimalValue: (Decimal) -> Double
 
     var body: some View {
         VStack(alignment: .leading, spacing: AppLayoutMetrics.blockGap) {
-            Label(LocalizedStringKey("Top Categories"), systemImage: "chart.bar.doc.horizontal")
+            Label(LocalizedStringKey("Where the money goes"), systemImage: "chart.bar.fill")
                 .font(AppTypography.sectionTitle)
 
-            if snapshot.topCategories.isEmpty {
+            if categories.isEmpty {
                 Text(LocalizedStringKey("No categorized expenses yet this month."))
                     .foregroundStyle(.secondary)
             } else {
-                Chart(Array(snapshot.topCategories.enumerated()), id: \.element.id) { index, item in
-                    BarMark(
-                        x: .value("Amount", decimalValue(item.amount)),
-                        y: .value("Category", item.name)
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                    .foregroundStyle(chartPalette[index % chartPalette.count].gradient)
-                }
-                .frame(height: 180)
-                .chartXAxis(.hidden)
-                .chartYAxis {
-                    AxisMarks(position: .leading)
-                }
-
-                ForEach(Array(snapshot.topCategories.enumerated()), id: \.element.id) { index, item in
+                ForEach(Array(categories.enumerated()), id: \.element.id) { index, item in
                     VStack(alignment: .leading, spacing: AppLayoutMetrics.microGap) {
                         HStack {
                             HStack(spacing: 10) {
@@ -483,65 +460,143 @@ private struct DashboardCategoryPressureCard: View {
                 }
             }
         }
-        .contentCard()
     }
 }
 
-private struct DashboardRecentImportsCard: View {
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.english
-    let snapshot: DashboardSnapshot
+private struct DashboardCategoryChangesColumn: View {
+    let categories: [DashboardCategoryItem]
+    let renderAmount: (Decimal) -> String
+    let appLanguage: AppLanguage
 
     var body: some View {
-        VStack(alignment: .leading, spacing: AppLayoutMetrics.contentGap) {
-            Label(LocalizedStringKey("Recent Imports"), systemImage: "square.and.arrow.down.on.square")
+        VStack(alignment: .leading, spacing: AppLayoutMetrics.blockGap) {
+            Label(LocalizedStringKey("What has changed"), systemImage: "arrow.up.right.circle.fill")
                 .font(AppTypography.sectionTitle)
 
-            if snapshot.recentImports.isEmpty {
-                Text(LocalizedStringKey("No imports yet. Start by loading a CSV, XLSX or PDF export."))
+            Text(LocalizedStringKey("Categories growing versus the previous month"))
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+
+            if categories.isEmpty {
+                Text(LocalizedStringKey("No category is above the previous month."))
                     .foregroundStyle(.secondary)
+                    .padding(.top, AppLayoutMetrics.microGap)
             } else {
-                ForEach(snapshot.recentImports) { session in
-                    VStack(alignment: .leading, spacing: AppLayoutMetrics.microGap) {
-                        HStack {
-                            Text(session.fileName)
-                                .lineLimit(1)
-                            Spacer()
-                            Text(appLanguage.localized("recentImports.rows", appLanguage.formatInteger(session.importedRowCount)))
-                                .font(.caption.weight(.semibold))
+                ForEach(categories) { item in
+                    HStack(alignment: .top, spacing: AppLayoutMetrics.contentGap) {
+                        Image(systemName: "arrow.up.right")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(AppColors.warning)
+                            .frame(width: 28, height: 28)
+                            .liquidGlassPill(padding: 0, tint: AppColors.warning)
+
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(item.name)
+                                .font(.headline)
+                            Text(changeCaption(for: item))
+                                .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
-
-                        Text(appLanguage.format(date: session.importedAt, dateStyle: .medium, timeStyle: .short))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Text("+\(renderAmount(item.deltaFromPreviousMonth))")
+                            .font(.callout.weight(.semibold))
+                            .foregroundStyle(AppColors.warning)
                     }
                     .padding(.vertical, AppLayoutMetrics.microGap)
                 }
             }
         }
-        .contentCard()
+    }
+
+    private func changeCaption(for item: DashboardCategoryItem) -> String {
+        if item.previousAmount == .zero {
+            return appLanguage.localized("dashboard.category.new")
+        }
+        guard let deltaPercentage = item.deltaPercentage else {
+            return appLanguage.localized("dashboard.category.amountUp", renderAmount(item.deltaFromPreviousMonth))
+        }
+        return appLanguage.localized("dashboard.category.percentUp", appLanguage.formatPercent(deltaPercentage))
     }
 }
 
-private struct DashboardConfidenceCard: View {
-    @AppStorage("appLanguage") private var appLanguage = AppLanguage.english
-    let snapshot: DashboardSnapshot
+private struct DashboardBriefingCard: View {
+    let summary: String?
+    let alerts: [String]
+    let actions: [String]
+    let pendingReviewCount: Int
+    let isLoading: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: AppLayoutMetrics.contentGap) {
-            Label(LocalizedStringKey("Month Confidence"), systemImage: "gauge.with.dots.needle.50percent")
-                .font(AppTypography.sectionTitle)
+        VStack(alignment: .leading, spacing: AppLayoutMetrics.blockGap) {
+            HStack(alignment: .center) {
+                Label(LocalizedStringKey("What deserves attention"), systemImage: "sparkles")
+                    .font(AppTypography.sectionTitle)
+                Spacer()
+                if pendingReviewCount > 0 {
+                    Text(LocalizedStringKey("Review needed"))
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(AppColors.warning)
+                        .liquidGlassPill(padding: 10, tint: AppColors.warning)
+                }
+            }
 
-            Text(appLanguage.localized("dashboard.confidence.pendingReview", appLanguage.formatInteger(snapshot.pendingReviewCount), snapshot.monthTitle))
-                .foregroundStyle(.secondary)
+            if isLoading {
+                HStack(spacing: AppLayoutMetrics.contentGap) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text(LocalizedStringKey("Preparing your household briefing..."))
+                        .foregroundStyle(.secondary)
+                }
+            } else {
+                if let summary {
+                    Text(summary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .lineSpacing(4)
+                } else {
+                    Text(LocalizedStringKey("No additional briefing available yet."))
+                        .foregroundStyle(.secondary)
+                }
 
-            ProgressView(value: snapshot.categorizedPercentage)
-                .tint(snapshot.categorizedPercentage >= 0.85 ? AppColors.income : AppColors.warning)
-
-            Text(appLanguage.localized("dashboard.confidence.coverage", appLanguage.formatPercent(snapshot.categorizedPercentage)))
-                .font(.footnote)
-                .foregroundStyle(.secondary)
+                HStack(alignment: .top, spacing: AppLayoutMetrics.sectionGap) {
+                    conciseColumn(
+                        title: LocalizedStringKey("Alerts"),
+                        tint: AppColors.warning,
+                        items: alerts,
+                        emptyText: LocalizedStringKey("No important alerts right now.")
+                    )
+                    conciseColumn(
+                        title: LocalizedStringKey("Next Actions"),
+                        tint: AppColors.neutral,
+                        items: actions,
+                        emptyText: LocalizedStringKey("No actions suggested right now.")
+                    )
+                }
+            }
         }
         .contentCard()
+    }
+
+    private func conciseColumn(title: LocalizedStringKey, tint: Color, items: [String], emptyText: LocalizedStringKey) -> some View {
+        VStack(alignment: .leading, spacing: AppLayoutMetrics.microGap) {
+            Text(title)
+                .font(.headline)
+                .foregroundStyle(tint)
+
+            if items.isEmpty {
+                Text(emptyText)
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(items, id: \.self) { item in
+                    HStack(alignment: .top, spacing: AppLayoutMetrics.microGap) {
+                        Circle()
+                            .fill(tint)
+                            .frame(width: 6, height: 6)
+                            .padding(.top, 6)
+                        Text(item)
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
     }
 }
