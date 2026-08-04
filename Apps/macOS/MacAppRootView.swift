@@ -12,6 +12,7 @@ struct MacAppRootView: View {
                 Label(section.title, systemImage: section.systemImage)
                     .tag(section)
             }
+            .listStyle(.sidebar)
             .navigationTitle(LocalizedStringKey("Finance"))
         } detail: {
             Group {
@@ -42,6 +43,7 @@ struct MacAppRootView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .navigationSplitViewStyle(.balanced)
         .toolbar {
             ToolbarItemGroup {
                 Button {

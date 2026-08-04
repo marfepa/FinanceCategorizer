@@ -21,52 +21,41 @@ struct MacInsightsView: View {
     ]
 
     var body: some View {
-        ZStack(alignment: .topLeading) {
-            GlassPageScaffold {
-                header
-            } background: {
-                analysisAtmosphere
-            } content: {
-                VStack(alignment: .leading, spacing: AppLayoutMetrics.sectionGap) {
-                    if let snapshot = viewModel.snapshot {
-                        heroSection(snapshot)
-                            .padding(.top, 104)
-                        insightsContentGrid(snapshot)
-                    } else if viewModel.isLoading {
-                        LoadingView(title: LocalizedStringKey("Analyzing finances..."))
-                            .liquidGlassPanel(
-                                padding: AppLayoutMetrics.heroInset,
-                                radius: AppRadius.panelGroup,
-                                material: AppMaterials.groupedGlass,
-                                tint: AppColors.neutral
-                            )
-                            .padding(.top, 104)
-                    } else {
-                        EmptyStateView(
-                            title: LocalizedStringKey("No Financial Analysis Yet"),
-                            message: LocalizedStringKey("Import real bank movements to unlock cashflow charts, category trends and forward-looking forecasts."),
-                            systemImage: "chart.xyaxis.line"
-                        )
+        GlassPageScaffold {
+            header
+        } content: {
+            VStack(alignment: .leading, spacing: AppLayoutMetrics.sectionGap) {
+                if let snapshot = viewModel.snapshot {
+                    heroSection(snapshot)
+                    insightsContentGrid(snapshot)
+                } else if viewModel.isLoading {
+                    LoadingView(title: LocalizedStringKey("Analyzing finances..."))
                         .liquidGlassPanel(
                             padding: AppLayoutMetrics.heroInset,
                             radius: AppRadius.panelGroup,
                             material: AppMaterials.groupedGlass,
                             tint: AppColors.neutral
                         )
-                        .padding(.top, 104)
-                    }
+                } else {
+                    EmptyStateView(
+                        title: LocalizedStringKey("No Financial Analysis Yet"),
+                        message: LocalizedStringKey("Import real bank movements to unlock cashflow charts, category trends and forward-looking forecasts."),
+                        systemImage: "chart.xyaxis.line"
+                    )
+                    .liquidGlassPanel(
+                        padding: AppLayoutMetrics.heroInset,
+                        radius: AppRadius.panelGroup,
+                        material: AppMaterials.groupedGlass,
+                        tint: AppColors.neutral
+                    )
+                }
 
-                    if let errorMessage = viewModel.errorMessage {
-                        Text(errorMessage)
-                            .foregroundStyle(.red)
-                            .liquidGlassPill(padding: 14, tint: AppColors.expense)
-                    }
+                if let errorMessage = viewModel.errorMessage {
+                    Text(errorMessage)
+                        .foregroundStyle(AppColors.expense)
+                        .contentCard(padding: AppLayoutMetrics.contentGap, radius: AppRadius.card)
                 }
             }
-            rangePicker
-                .padding(.top, 152)
-                .padding(.horizontal, AppLayoutMetrics.screenPadding)
-                .zIndex(30)
         }
         .task(id: appLanguage) {
             await viewModel.load(using: appContainer, language: appLanguage)
@@ -77,57 +66,6 @@ struct MacInsightsView: View {
             }
         }
         .navigationTitle(LocalizedStringKey("Analysis"))
-    }
-
-    private var analysisAtmosphere: some View {
-        GeometryReader { proxy in
-            ZStack {
-                LinearGradient(
-                    colors: [
-                        AppColors.background,
-                        Color.white.opacity(0.04),
-                        AppColors.background.opacity(0.98)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-
-                Circle()
-                    .fill(AppColors.income.opacity(0.18))
-                    .frame(width: proxy.size.width * 0.44)
-                    .blur(radius: 140)
-                    .offset(x: -proxy.size.width * 0.22, y: -proxy.size.height * 0.18)
-
-                Circle()
-                    .fill(AppColors.neutral.opacity(0.20))
-                    .frame(width: proxy.size.width * 0.52)
-                    .blur(radius: 180)
-                    .offset(x: proxy.size.width * 0.26, y: -proxy.size.height * 0.08)
-
-                Circle()
-                    .fill(AppColors.warning.opacity(0.12))
-                    .frame(width: proxy.size.width * 0.36)
-                    .blur(radius: 150)
-                    .offset(x: proxy.size.width * 0.20, y: proxy.size.height * 0.34)
-
-                Rectangle()
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(0.05),
-                                Color.white.opacity(0.015),
-                                Color.clear
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .frame(height: 220)
-                    .backgroundExtensionEffect()
-                    .offset(y: -proxy.size.height * 0.24)
-            }
-            .ignoresSafeArea()
-        }
     }
 
     private func insightsContentGrid(_ snapshot: FinancialAnalysisSnapshot) -> some View {
@@ -149,7 +87,7 @@ struct MacInsightsView: View {
     }
 
     private var header: some View {
-        HStack(alignment: .top, spacing: AppLayoutMetrics.sectionGap) {
+        HStack(alignment: .center, spacing: AppLayoutMetrics.sectionGap) {
             VStack(alignment: .leading, spacing: AppLayoutMetrics.contentGap) {
                 Text(LocalizedStringKey("Financial Explorer"))
                     .font(AppTypography.displayTitle)
@@ -161,39 +99,45 @@ struct MacInsightsView: View {
 
             Spacer(minLength: AppLayoutMetrics.contentGap)
 
-            VStack(alignment: .trailing, spacing: AppLayoutMetrics.microGap) {
-                headerPill(
-                    title: LocalizedStringKey("Liquid Glass"),
-                    systemImage: "sparkles",
-                    tint: AppColors.neutral
-                )
-                headerPill(
-                    title: isPrivacyModeEnabled ? LocalizedStringKey("Privacy On") : LocalizedStringKey("Privacy Off"),
-                    systemImage: isPrivacyModeEnabled ? "eye.slash.fill" : "eye.fill",
-                    tint: isPrivacyModeEnabled ? AppColors.warning : AppColors.income
-                )
+            HStack(spacing: AppLayoutMetrics.contentGap) {
+                rangePicker
+
+                Button {
+                    isPrivacyModeEnabled.toggle()
+                } label: {
+                    Label(
+                        isPrivacyModeEnabled ? LocalizedStringKey("Privacy On") : LocalizedStringKey("Privacy Off"),
+                        systemImage: isPrivacyModeEnabled ? "eye.slash.fill" : "eye.fill"
+                    )
+                }
+                .appSecondaryGlassButton()
+                .controlSize(.small)
+                .help(isPrivacyModeEnabled ? LocalizedStringKey("Show amounts") : LocalizedStringKey("Hide amounts"))
             }
         }
     }
 
     private var rangePicker: some View {
-        HStack {
-            FloatingGlassSegmentedBar(
-                options: AnalysisTimeRange.allCases,
-                title: { $0.title },
-                selection: Binding(
-                    get: { viewModel.selectedRange },
-                    set: { newValue in
-                        Task {
-                            await viewModel.refreshRange(newValue, using: appContainer, language: appLanguage)
-                        }
+        Picker(
+            "",
+            selection: Binding(
+                get: { viewModel.selectedRange },
+                set: { newValue in
+                    Task {
+                        await viewModel.refreshRange(newValue, using: appContainer, language: appLanguage)
                     }
-                )
+                }
             )
-            .frame(maxWidth: 420, alignment: .leading)
-            .compositingGroup()
-            Spacer(minLength: 0)
+        ) {
+            ForEach(AnalysisTimeRange.allCases) { range in
+                Text(range.title)
+                    .tag(range)
+            }
         }
+        .labelsHidden()
+        .pickerStyle(.segmented)
+        .controlSize(.small)
+        .frame(width: 300)
     }
 
     private func heroSection(_ snapshot: FinancialAnalysisSnapshot) -> some View {
@@ -864,13 +808,6 @@ struct MacInsightsView: View {
                 .font(AppTypography.sectionTitle)
                 .foregroundStyle(.primary)
         }
-    }
-
-    private func headerPill(title: LocalizedStringKey, systemImage: String, tint: Color) -> some View {
-        Label(title, systemImage: systemImage)
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(.secondary)
-            .liquidGlassPill(padding: 12, tint: tint)
     }
 
     private func metricCard(title: LocalizedStringKey, value: String, subtitle: LocalizedStringKey, icon: String, tint: Color) -> some View {

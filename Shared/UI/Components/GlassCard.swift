@@ -20,16 +20,6 @@ private struct LiquidGlassRoundedModifier: ViewModifier {
                         .interactive(interactive),
                     in: RoundedRectangle(cornerRadius: radius, style: .continuous)
                 )
-                .overlay {
-                    RoundedRectangle(cornerRadius: radius, style: .continuous)
-                        .strokeBorder(Color.white.opacity(0.10), lineWidth: 0.8)
-                }
-                .shadow(
-                    color: Color.black.opacity(shadowOpacity),
-                    radius: shadowRadius,
-                    x: 0,
-                    y: shadowY
-                )
         } else {
             content
                 .padding(padding)
@@ -69,11 +59,6 @@ private struct LiquidGlassCapsuleModifier: ViewModifier {
                         .interactive(interactive),
                     in: Capsule(style: .continuous)
                 )
-                .overlay {
-                    Capsule(style: .continuous)
-                        .strokeBorder(Color.white.opacity(0.10), lineWidth: 0.8)
-                }
-                .shadow(color: Color.black.opacity(0.09), radius: shadowRadius, x: 0, y: shadowY)
         } else {
             content
                 .padding(padding)
@@ -206,13 +191,13 @@ private struct ContentCardModifier: ViewModifier {
             .padding(padding)
             .background {
                 RoundedRectangle(cornerRadius: radius, style: .continuous)
-                    .fill(AppColors.cardBackground)
+                    .fill(.regularMaterial)
             }
             .overlay {
                 RoundedRectangle(cornerRadius: radius, style: .continuous)
-                    .strokeBorder(Color.white.opacity(0.06), lineWidth: 1)
+                    .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
             }
-            .shadow(color: Color.black.opacity(0.10), radius: 16, x: 0, y: 8)
+            .shadow(color: Color.black.opacity(0.06), radius: 10, x: 0, y: 4)
     }
 }
 
@@ -265,8 +250,6 @@ struct GlassPageScaffold<Header: View, Content: View, Background: View>: View {
 
     var body: some View {
         ZStack {
-            Rectangle()
-                .fill(.windowBackground)
             background
 
             ScrollView {

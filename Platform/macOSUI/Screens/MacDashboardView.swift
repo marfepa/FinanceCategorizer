@@ -22,8 +22,6 @@ struct MacDashboardView: View {
     var body: some View {
         GlassPageScaffold {
             header
-        } background: {
-            dashboardAtmosphere
         } content: {
             if let snapshot = viewModel.snapshot {
                 VStack(alignment: .leading, spacing: AppLayoutMetrics.sectionGap) {
@@ -93,35 +91,6 @@ struct MacDashboardView: View {
         }
     }
 
-    private var dashboardAtmosphere: some View {
-        GeometryReader { proxy in
-            ZStack {
-                LinearGradient(
-                    colors: [
-                        AppColors.background,
-                        AppColors.background.opacity(0.96),
-                        AppColors.background
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-
-                Circle()
-                    .fill(AppColors.income.opacity(0.12))
-                    .frame(width: proxy.size.width * 0.38)
-                    .blur(radius: 120)
-                    .offset(x: -proxy.size.width * 0.25, y: -proxy.size.height * 0.18)
-
-                Circle()
-                    .fill(AppColors.neutral.opacity(0.14))
-                    .frame(width: proxy.size.width * 0.42)
-                    .blur(radius: 150)
-                    .offset(x: proxy.size.width * 0.30, y: proxy.size.height * 0.20)
-            }
-            .ignoresSafeArea()
-        }
-    }
-
     private var header: some View {
         HStack(alignment: .firstTextBaseline, spacing: AppLayoutMetrics.contentGap) {
             VStack(alignment: .leading, spacing: AppLayoutMetrics.microGap) {
@@ -140,9 +109,9 @@ struct MacDashboardView: View {
                     systemImage: privacyStoredValue ? "eye.slash.fill" : "eye.fill"
                 )
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
             }
-            .buttonStyle(.plain)
+            .appSecondaryGlassButton()
+            .controlSize(.small)
             .help(privacyStoredValue ? LocalizedStringKey("Show amounts") : LocalizedStringKey("Hide amounts"))
         }
     }
