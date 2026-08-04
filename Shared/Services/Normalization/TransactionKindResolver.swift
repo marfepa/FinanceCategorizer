@@ -57,4 +57,3 @@ struct TransactionKindResolver {
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
-
