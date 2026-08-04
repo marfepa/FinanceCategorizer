@@ -57,4 +57,32 @@ final class CategorizationOrchestrator: CategorizationOrchestrating {
             reason: "No reliable match."
         )
     }
+
+    /// Runs the deterministic ranking used to audit an existing category.
+    /// It deliberately avoids merchant memory and Foundation Models first:
+    /// both can repeat a previous decision instead of detecting that it is
+    /// inconsistent with the current transaction text.
+    func recommendRecategorization(_ input: NormalizedTransactionDTO) async -> CategorizationDecision {
+        if let ruleMatch = ruleEngine.match(input) {
+            return confidenceScorer.finalize(ruleMatch)
+        }
+
+        if let mlMatch = classifier.predict(input) {
+            return confidenceScorer.finalize(mlMatch)
+        }
+
+        if let merchantMatch = merchantMemory.match(input) {
+            return confidenceScorer.finalize(merchantMatch)
+        }
+
+        return CategorizationDecision(
+            categoryID: nil,
+            subcategoryID: nil,
+            source: .unknown,
+            confidence: 0,
+            shouldQueueForReview: true,
+            isRecurringCandidate: false,
+            reason: "No reliable recategorization signal."
+        )
+    }
 }

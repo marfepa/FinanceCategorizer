@@ -24,36 +24,35 @@ final class MerchantMemoryEngine {
             return nil
         }
 
-        if let merchant = input.merchantCanonicalName,
-           let categoryID = preferredCategoryID(for: merchant, sign: input.sign) {
+        if let previous = try? transactionRepository.fetchFirst(byFingerprint: input.fingerprint, sign: input.sign),
+           let categoryID = previous.categoryID {
             return CategorizationDecision(
                 categoryID: categoryID,
-                subcategoryID: nil,
+                subcategoryID: previous.subcategoryID,
                 source: .merchantMemory,
-                confidence: 0.95,
+                confidence: 0.93,
                 shouldQueueForReview: false,
-                isRecurringCandidate: false,
-                reason: "Learned from previous confirmed transactions for merchant '\(merchant)'."
+                isRecurringCandidate: previous.isRecurringCandidate,
+                reason: "Matched a previous normalized transaction fingerprint."
             )
         }
 
-        guard let previous = try? transactionRepository.fetchFirst(byFingerprint: input.fingerprint, sign: input.sign),
-              let categoryID = previous.categoryID else {
-            return nil
+        if let merchant = input.merchantCanonicalName,
+           let memoryMatch = preferredCategoryMatch(for: merchant, sign: input.sign) {
+            return CategorizationDecision(
+                categoryID: memoryMatch.categoryID,
+                subcategoryID: nil,
+                source: .merchantMemory,
+                confidence: memoryMatch.confidence,
+                shouldQueueForReview: false,
+                isRecurringCandidate: false,
+                reason: "Learned from \(memoryMatch.count) confirmed transactions for merchant '\(merchant)'."
+            )
         }
-
-        return CategorizationDecision(
-            categoryID: categoryID,
-            subcategoryID: previous.subcategoryID,
-            source: .merchantMemory,
-            confidence: 0.88,
-            shouldQueueForReview: false,
-            isRecurringCandidate: previous.isRecurringCandidate,
-            reason: "Matched a previous normalized transaction fingerprint."
-        )
+        return nil
     }
 
-    private func preferredCategoryID(for merchant: String, sign: Int) -> UUID? {
+    private func preferredCategoryMatch(for merchant: String, sign: Int) -> (categoryID: UUID, count: Int, confidence: Double)? {
         guard let transactions = try? transactionRepository.fetchByMerchant(merchant, limit: 100) else {
             return nil
         }
@@ -63,8 +62,25 @@ final class MerchantMemoryEngine {
             return sign >= 0 ? $0.amount > .zero : $0.amount < .zero
         }
 
-        return Dictionary(grouping: matchingDirection, by: { $0.categoryID! })
-            .max { lhs, rhs in lhs.value.count < rhs.value.count }?
-            .key
+        let ranked = Dictionary(grouping: matchingDirection, by: { $0.categoryID! })
+            .map { categoryID, items in
+                let averageConfidence = items.map(\.confidence).reduce(0, +) / Double(items.count)
+                return (categoryID: categoryID, count: items.count, averageConfidence: averageConfidence)
+            }
+            .sorted {
+                if $0.count == $1.count {
+                    return $0.averageConfidence > $1.averageConfidence
+                }
+                return $0.count > $1.count
+            }
+
+        guard let winner = ranked.first else { return nil }
+        if let runnerUp = ranked.dropFirst().first, winner.count == runnerUp.count {
+            return nil
+        }
+
+        let voteConfidence = min(0.96, 0.78 + Double(min(winner.count, 4)) * 0.04)
+        let confidence = max(voteConfidence, min(0.96, winner.averageConfidence))
+        return (winner.categoryID, winner.count, confidence)
     }
 }

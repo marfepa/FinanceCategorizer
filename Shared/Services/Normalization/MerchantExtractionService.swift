@@ -8,6 +8,19 @@ struct MerchantCanonicalizer {
         "MERCADONA SA": "Mercadona",
         "MERCADONA VALENCIA": "Mercadona",
         "CONSUM COOP": "Consum",
+        "CONSUM": "Consum",
+        "CARREFOUR": "Carrefour",
+        "CARREF": "Carrefour",
+        "ALDI": "Aldi",
+        "LIDL": "Lidl",
+        "APPLE BILL ITUNES": "Apple iTunes",
+        "ITUNES.COM": "Apple iTunes",
+        "HSN STORE.COM": "HSN Store",
+        "DECATHLON": "Decathlon",
+        "IKEA VALENCIA HFB": "IKEA",
+        "LEROY MERLIN": "Leroy Merlin",
+        "DRUNI": "Druni",
+        "BARBERIA": "Barberia",
         "UBER TRIP": "Uber",
         "UBER EATS": "Uber Eats",
         "NETFLIX": "Netflix",
@@ -26,6 +39,27 @@ struct MerchantCanonicalizer {
         }
         if normalized.contains("MERCADONA") {
             return ("Mercadona", "Mercadona")
+        }
+        if normalized.contains("CARREFOUR") || normalized.hasPrefix("CARREF") {
+            return ("Carrefour", "Carrefour")
+        }
+        if normalized.contains("CONSUM") {
+            return ("Consum", "Consum")
+        }
+        if normalized.contains("APPLE") && normalized.contains("ITUNES") {
+            return ("Apple iTunes", "Apple iTunes")
+        }
+        if normalized.contains("HSN STORE") {
+            return ("HSN Store", "HSN Store")
+        }
+        if normalized.contains("DECATHLON") {
+            return ("Decathlon", "Decathlon")
+        }
+        if normalized.contains("IKEA") {
+            return ("IKEA", "IKEA")
+        }
+        if normalized.contains("LEROY MERLIN") {
+            return ("Leroy Merlin", "Leroy Merlin")
         }
         if normalized.contains("UBER EATS") {
             return ("Uber Eats", "Uber Eats")

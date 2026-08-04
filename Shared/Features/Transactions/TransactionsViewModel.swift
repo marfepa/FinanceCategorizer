@@ -267,53 +267,25 @@ final class TransactionsViewModel {
                 .filter { $0.categorizationSourceRaw != CategorizationSource.manual.rawValue }
 
             guard !candidates.isEmpty else {
-                recategorizationSummary = "No \(targetKind.rawValue) movements are eligible for automatic re-categorization."
+                recategorizationSummary = AppLanguage.currentSelection.localized("transactions.noRecategorizationCandidates")
                 return
             }
 
-            var autoResolved = 0
-            var improvedSuggestions = 0
-
-            for transaction in candidates {
-                let decision = await container.categorizationOrchestrator.categorize(normalizedDTO(from: transaction))
-                guard let categoryID = decision.categoryID else { continue }
-
-                let hasBetterCategory = transaction.categoryID != categoryID
-                let hasHigherConfidence = decision.confidence > transaction.confidence
-                let shouldUpdate = hasBetterCategory || hasHigherConfidence || transaction.needsReview
-                guard shouldUpdate else { continue }
-
-                let shouldAutoAccept = !decision.shouldQueueForReview &&
-                    decision.confidence >= AppConfig.softAutoCategorizationThreshold
-
-                try container.transactionRepository.applyDecision(
-                    transactionID: transaction.id,
-                    categoryID: categoryID,
-                    subcategoryID: decision.subcategoryID,
-                    source: decision.source,
-                    confidence: decision.confidence,
-                    needsReview: !shouldAutoAccept,
-                    reviewStatus: shouldAutoAccept ? .accepted : .pending,
-                    reason: "[Type re-categorization] \(decision.reason)",
-                    isRecurringCandidate: decision.isRecurringCandidate
-                )
-
-                if shouldAutoAccept {
-                    autoResolved += 1
-                } else {
-                    improvedSuggestions += 1
-                }
-            }
+            let result = try await container.recategorizationService.analyze(candidates)
 
             load(using: container)
             NotificationCenter.default.post(name: AppContainer.importDidFinishNotification, object: nil)
 
-            if autoResolved == 0 && improvedSuggestions == 0 {
-                recategorizationSummary = "The model has no better \(targetKind.rawValue) categorization proposals yet."
+            if result.autoResolved == 0 && result.suggestionsCreated == 0 {
+                recategorizationSummary = AppLanguage.currentSelection.localized("transactions.noRecategorizationImprovements")
             } else {
-                recategorizationSummary = "Re-categorized \(targetKind.rawValue) movements: \(autoResolved) auto-applied, \(improvedSuggestions) left for review."
+                recategorizationSummary = AppLanguage.currentSelection.localized(
+                    "transactions.recategorizationSummary",
+                    AppLanguage.currentSelection.formatInteger(result.autoResolved),
+                    AppLanguage.currentSelection.formatInteger(result.suggestionsCreated)
+                )
             }
-            statusMessage = "Select the movement type first so the model learns from a cleaner context."
+            statusMessage = AppLanguage.currentSelection.localized("transactions.recategorizationReviewHint")
             errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
