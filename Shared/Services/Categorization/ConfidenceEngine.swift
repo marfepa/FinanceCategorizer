@@ -30,7 +30,7 @@ struct ConfidenceScorer {
             subcategoryID: decision.subcategoryID,
             source: decision.source,
             confidence: decision.confidence,
-            shouldQueueForReview: score.shouldSendToReview || decision.categoryID == nil,
+            shouldQueueForReview: decision.shouldQueueForReview || score.shouldSendToReview || decision.categoryID == nil,
             isRecurringCandidate: decision.isRecurringCandidate,
             reason: decision.reason
         )

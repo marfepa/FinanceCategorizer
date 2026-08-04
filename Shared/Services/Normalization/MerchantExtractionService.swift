@@ -46,10 +46,27 @@ struct MerchantCanonicalizer {
 
 struct MerchantExtractionService {
     func extract(from cleanedDescription: String) -> String {
-        cleanedDescription
-            .split(separator: " ")
+        var tokens = cleanedDescription.split(separator: " ").map(String.init)
+
+        // Card-wallet prefixes are payment rails, not merchants. Removing
+        // them lets "APPLE PAY EN LIDL" resolve to Lidl and keeps rules and
+        // merchant memory aligned with the actual supermarket.
+        let paymentPrefixes = [
+            ["APPLE", "PAY"],
+            ["GOOGLE", "PAY"],
+            ["SAMSUNG", "PAY"],
+            ["PAYPAL"],
+            ["BIZUM"]
+        ]
+        if let prefix = paymentPrefixes.first(where: { tokens.starts(with: $0) }) {
+            tokens.removeFirst(prefix.count)
+            if tokens.first == "EN" || tokens.first == "DE" {
+                tokens.removeFirst()
+            }
+        }
+
+        return tokens
             .prefix(3)
-            .map(String.init)
             .joined(separator: " ")
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }

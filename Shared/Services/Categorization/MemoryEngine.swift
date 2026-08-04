@@ -17,6 +17,13 @@ final class MerchantMemoryEngine {
     }
 
     func match(_ input: NormalizedTransactionDTO) -> CategorizationDecision? {
+        let merchantText = "\(input.merchantCanonicalName ?? "") \(input.cleanedDescription)"
+        guard !CategoryTextSignals.containsSupermarket(in: merchantText) else {
+            // Let the deterministic supermarket signal win over stale
+            // merchant memory such as a previous generic "Compras" label.
+            return nil
+        }
+
         if let merchant = input.merchantCanonicalName,
            let categoryID = preferredCategoryID(for: merchant, sign: input.sign) {
             return CategorizationDecision(

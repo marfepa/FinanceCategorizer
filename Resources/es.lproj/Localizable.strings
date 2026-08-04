@@ -339,6 +339,7 @@
 "dashboard.hero.deltaCaption" = "%@ gasto por %@ (%@).";
 "dashboard.confidence.pendingReview" = "%@ movimientos siguen pendientes de revisión en %@, así que algunos totales y pesos por categoría todavía pueden cambiar.";
 "dashboard.confidence.coverage" = "Cobertura categorizada: %@";
+"dashboard.confidence.uncategorized" = "%@ movimientos de gasto aún necesitan confirmar categoría (%@).";
 "appleAI.intent.monthlyBriefing.title" = "Resumen del mes";
 "appleAI.intent.monthlyBriefing.subtitle" = "Panorámica corta del mes actual";
 "appleAI.intent.optimizeSpending.title" = "Optimizar gasto";

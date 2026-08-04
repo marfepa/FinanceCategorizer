@@ -69,7 +69,7 @@ struct MacDashboardView: View {
 
                         VStack(alignment: .leading, spacing: AppLayoutMetrics.blockGap) {
                             DashboardRecentImportsCard(snapshot: snapshot)
-                            DashboardConfidenceCard(snapshot: snapshot)
+                            DashboardConfidenceCard(snapshot: snapshot, renderAmount: renderAmount)
                         }
                         .frame(width: 320, alignment: .topLeading)
                     }
@@ -526,6 +526,7 @@ private struct DashboardRecentImportsCard: View {
 private struct DashboardConfidenceCard: View {
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.english
     let snapshot: DashboardSnapshot
+    let renderAmount: (Decimal) -> String
 
     var body: some View {
         VStack(alignment: .leading, spacing: AppLayoutMetrics.contentGap) {
@@ -541,6 +542,18 @@ private struct DashboardConfidenceCard: View {
             Text(appLanguage.localized("dashboard.confidence.coverage", appLanguage.formatPercent(snapshot.categorizedPercentage)))
                 .font(.footnote)
                 .foregroundStyle(.secondary)
+
+            if snapshot.uncategorizedExpenseCount > 0 {
+                Text(
+                    appLanguage.localized(
+                        "dashboard.confidence.uncategorized",
+                        appLanguage.formatInteger(snapshot.uncategorizedExpenseCount),
+                        renderAmount(snapshot.uncategorizedExpenseAmount)
+                    )
+                )
+                .font(.footnote)
+                .foregroundStyle(AppColors.warning)
+            }
         }
         .contentCard()
     }

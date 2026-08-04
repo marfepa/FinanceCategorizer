@@ -44,6 +44,27 @@ final class FinanceCategorizerTests: XCTestCase {
         XCTAssertFalse(normalized.fingerprint.isEmpty)
     }
 
+    func testMerchantExtractionSkipsWalletPrefixes() {
+        XCTAssertEqual(
+            MerchantExtractionService().extract(from: "APPLE PAY EN LIDL VALENCIA"),
+            "LIDL VALENCIA"
+        )
+    }
+
+    func testConfidenceScorerPreservesReviewRequestBelowAutoAcceptThreshold() {
+        let decision = CategorizationDecision(
+            categoryID: UUID(),
+            subcategoryID: nil,
+            source: .localML,
+            confidence: 0.78,
+            shouldQueueForReview: true,
+            isRecurringCandidate: false,
+            reason: "Heuristic"
+        )
+
+        XCTAssertTrue(ConfidenceScorer().finalize(decision).shouldQueueForReview)
+    }
+
     func testConfidenceScoreThresholds() {
         XCTAssertTrue(ConfidenceScore(value: 0.95).shouldAutoAccept)
         XCTAssertTrue(ConfidenceScore(value: 0.81).shouldAutoAcceptButMarkSoft)
@@ -1173,6 +1194,186 @@ final class FinanceCategorizerTests: XCTestCase {
         XCTAssertEqual(snapshot?.totalExpenses, Decimal(40))
         XCTAssertEqual(snapshot?.netBalance, Decimal(60))
         XCTAssertEqual(snapshot?.pendingReviewCount, 0)
+    }
+
+    func testDashboardPlacesPayrollAfterCutoffInAccountingMonth() {
+        UserDefaults.standard.set(25, forKey: "payrollCutoffDay")
+
+        let payroll = Transaction(
+            bookingDate: date(year: 2026, month: 7, day: 30),
+            rawDescription: "NOMINA JULIO",
+            cleanedDescription: "NOMINA JULIO",
+            amount: Decimal(2_000),
+            kindRaw: TransactionKind.income.rawValue,
+            needsReview: false,
+            reviewStatusRaw: ReviewStatus.accepted.rawValue
+        )
+        let expense = Transaction(
+            bookingDate: date(year: 2026, month: 7, day: 31),
+            rawDescription: "MERCADONA",
+            cleanedDescription: "MERCADONA",
+            amount: Decimal(-75),
+            kindRaw: TransactionKind.expense.rawValue,
+            needsReview: false,
+            reviewStatusRaw: ReviewStatus.accepted.rawValue
+        )
+
+        let snapshot = DashboardInsightService().buildSnapshot(
+            transactions: [payroll, expense],
+            categories: [],
+            recentImports: [],
+            locale: .current,
+            now: date(year: 2026, month: 8, day: 4)
+        )
+
+        XCTAssertEqual(snapshot?.totalIncome, Decimal(2_000))
+        XCTAssertEqual(snapshot?.totalExpenses, Decimal.zero)
+        XCTAssertEqual(snapshot?.netBalance, Decimal(2_000))
+        XCTAssertTrue(snapshot?.monthTitle.lowercased().contains("ago") == true)
+    }
+
+    func testPayrollAfterCutoffMovesEveryMonthForward() {
+        let defaults = UserDefaults.standard
+        let previousCutoff = defaults.object(forKey: "payrollCutoffDay")
+        defaults.set(25, forKey: "payrollCutoffDay")
+        defer {
+            if let previousCutoff {
+                defaults.set(previousCutoff, forKey: "payrollCutoffDay")
+            } else {
+                defaults.removeObject(forKey: "payrollCutoffDay")
+            }
+        }
+
+        for (month, expectedMonth) in [(7, 8), (8, 9), (9, 10)] {
+            let payroll = Transaction(
+                bookingDate: date(year: 2026, month: month, day: 30),
+                rawDescription: "NOMINA",
+                cleanedDescription: "NOMINA",
+                amount: Decimal(2_000),
+                kindRaw: TransactionKind.income.rawValue,
+                needsReview: false,
+                reviewStatusRaw: ReviewStatus.accepted.rawValue
+            )
+
+            let accountingComponents = Calendar.current.dateComponents(
+                [.month],
+                from: payroll.accountingDate
+            )
+            XCTAssertEqual(accountingComponents.month, expectedMonth)
+        }
+    }
+
+    func testDashboardDoesNotUseFutureOrTransferToSelectReferenceMonth() {
+        let payroll = Transaction(
+            bookingDate: date(year: 2026, month: 7, day: 30),
+            rawDescription: "NOMINA JULIO",
+            cleanedDescription: "NOMINA JULIO",
+            amount: Decimal(2_000),
+            kindRaw: TransactionKind.income.rawValue,
+            needsReview: false,
+            reviewStatusRaw: ReviewStatus.accepted.rawValue
+        )
+        let transfer = Transaction(
+            bookingDate: date(year: 2026, month: 8, day: 2),
+            rawDescription: "TRASPASO ENTRE CUENTAS",
+            cleanedDescription: "TRASPASO ENTRE CUENTAS",
+            amount: Decimal(-2_000),
+            kindRaw: TransactionKind.transfer.rawValue,
+            needsReview: false,
+            reviewStatusRaw: ReviewStatus.accepted.rawValue
+        )
+        let futureExpense = Transaction(
+            bookingDate: date(year: 2026, month: 12, day: 30),
+            rawDescription: "COMPRA FUTURA",
+            cleanedDescription: "COMPRA FUTURA",
+            amount: Decimal(-10),
+            kindRaw: TransactionKind.expense.rawValue,
+            needsReview: false,
+            reviewStatusRaw: ReviewStatus.accepted.rawValue
+        )
+
+        let snapshot = DashboardInsightService().buildSnapshot(
+            transactions: [payroll, transfer, futureExpense],
+            categories: [],
+            recentImports: [],
+            locale: .current,
+            now: date(year: 2026, month: 8, day: 4)
+        )
+
+        XCTAssertEqual(snapshot?.totalIncome, Decimal(2_000))
+        XCTAssertEqual(snapshot?.totalExpenses, Decimal.zero)
+        XCTAssertTrue(snapshot?.monthTitle.lowercased().contains("ago") == true)
+    }
+
+    func testDashboardShowsLegacySupermarketSpendAsFoodAndReportsItForReview() {
+        let groceries = Category(
+            name: "Alimentacion",
+            iconName: "cart",
+            colorHex: "#4CAF50",
+            isIncome: false
+        )
+        let legacySupermarketExpense = Transaction(
+            bookingDate: date(year: 2026, month: 7, day: 30),
+            rawDescription: "APPLE PAY EN LIDL",
+            cleanedDescription: "APPLE PAY EN LIDL",
+            merchantCanonicalName: "Apple Pay En",
+            amount: Decimal(-18),
+            kindRaw: TransactionKind.expense.rawValue,
+            needsReview: true,
+            reviewStatusRaw: ReviewStatus.pending.rawValue
+        )
+
+        let snapshot = DashboardInsightService().buildSnapshot(
+            transactions: [legacySupermarketExpense],
+            categories: [groceries],
+            recentImports: [],
+            locale: .current,
+            now: date(year: 2026, month: 8, day: 4)
+        )
+
+        XCTAssertEqual(snapshot?.topCategories.first?.name, "Alimentacion")
+        XCTAssertEqual(snapshot?.topCategories.first?.amount, Decimal(18))
+        XCTAssertEqual(snapshot?.uncategorizedExpenseCount, 1)
+        XCTAssertEqual(snapshot?.uncategorizedExpenseAmount, Decimal(18))
+    }
+
+    func testSupermarketSignalsOverrideGenericMerchantMemory() async throws {
+        let container = AppContainer(inMemory: true)
+        let categories = try container.categoryRepository.fetchAll()
+        let groceries = try XCTUnwrap(categories.first(where: { $0.name == "Alimentacion" }))
+        let shopping = try XCTUnwrap(categories.first(where: { $0.name == "Compras" }))
+
+        let previous = Transaction(
+            bookingDate: date(year: 2026, month: 6, day: 1),
+            rawDescription: "CARREFOUR",
+            cleanedDescription: "CARREFOUR",
+            merchantCanonicalName: "Carrefour",
+            amount: Decimal(-20),
+            kindRaw: TransactionKind.expense.rawValue,
+            categoryID: shopping.id,
+            needsReview: false,
+            reviewStatusRaw: ReviewStatus.accepted.rawValue
+        )
+        try container.transactionRepository.insert(previous)
+
+        let decision = await container.categorizationOrchestrator.categorize(
+            NormalizedTransactionDTO(
+                externalID: nil,
+                bookingDate: date(year: 2026, month: 7, day: 30),
+                valueDate: nil,
+                rawDescription: "CARREFOUR EXPRESS",
+                cleanedDescription: "CARREFOUR EXPRESS",
+                merchantDisplayName: "Carrefour",
+                merchantCanonicalName: "Carrefour",
+                amount: Decimal(-18),
+                currencyCode: "EUR",
+                accountName: nil,
+                sign: -1,
+                fingerprint: "carrefour-test"
+            )
+        )
+
+        XCTAssertEqual(decision.categoryID, groceries.id)
     }
 
     func testTransferIsRemovedFromReviewQueue() throws {

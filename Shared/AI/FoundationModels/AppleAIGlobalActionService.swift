@@ -289,7 +289,11 @@ struct AppleAIGlobalActionService {
         return deterministicResult(for: intent, facts: facts, language: language)
     }
 
-    private func loadFacts(using container: AppContainer, context: AppleAIContext, language: AppLanguage) -> AppleAIFacts {
+    private func loadFacts(
+        using container: AppContainer,
+        context: AppleAIContext,
+        language: AppLanguage
+    ) -> AppleAIFacts {
         let transactions = (try? container.transactionRepository.fetchAll()) ?? []
         let categories = (try? container.categoryRepository.fetchAll()) ?? []
         let recentImports = (try? container.importBatchRepository.fetchRecentBatches(limit: 6)) ?? []
@@ -299,7 +303,8 @@ struct AppleAIGlobalActionService {
             transactions: transactions,
             categories: categories,
             recentImports: recentImports,
-            locale: language.locale
+            locale: language.locale,
+            dateBasis: .accounting
         )
         let analysisSnapshot = container.financialAnalysisService.analyze(
             transactions: transactions,
