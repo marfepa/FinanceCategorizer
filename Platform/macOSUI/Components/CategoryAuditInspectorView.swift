@@ -8,6 +8,9 @@ struct CategoryAuditInspectorView: View {
     let viewModel: CategoryAuditViewModel
     let onAccept: (Transaction) -> Void
     let onDismiss: (Transaction) -> Void
+    let onAssign: (Transaction, UUID) -> Void
+
+    @State private var isChoosingCategory = false
 
     var body: some View {
         Group {
@@ -58,6 +61,35 @@ struct CategoryAuditInspectorView: View {
                                 .font(.body)
                                 .foregroundStyle(.secondary)
                                 .textSelection(.enabled)
+                        }
+
+                        VStack(alignment: .leading, spacing: AppSpacing.small) {
+                            Button {
+                                withAnimation(.snappy) {
+                                    isChoosingCategory.toggle()
+                                }
+                            } label: {
+                                Label(
+                                    LocalizedStringKey(
+                                        transaction.hasRecategorizationSuggestion
+                                            ? "audit.action.chooseDifferentCategory"
+                                            : "audit.action.changeCategory"
+                                    ),
+                                    systemImage: isChoosingCategory ? "chevron.up" : "tag"
+                                )
+                            }
+                            .buttonStyle(.bordered)
+
+                            if isChoosingCategory {
+                                CategoryOverridePicker(
+                                    categories: viewModel.categories,
+                                    selectedCategoryID: transaction.suggestedCategoryID ?? transaction.categoryID,
+                                    onSelect: { categoryID in
+                                        onAssign(transaction, categoryID)
+                                        isChoosingCategory = false
+                                    }
+                                )
+                            }
                         }
 
                         if transaction.hasRecategorizationSuggestion {

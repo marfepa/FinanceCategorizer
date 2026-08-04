@@ -108,8 +108,10 @@ struct IOSCategoryAuditView: View {
         .sheet(item: $selectedTransaction) { transaction in
             IOSCategoryAuditDetailView(
                 transaction: transaction,
+                categories: viewModel.categories,
                 currentCategory: viewModel.categoryName(for: transaction.categoryID),
                 suggestedCategory: transaction.suggestedCategoryID.map(viewModel.categoryName(for:)),
+                selectedCategoryID: transaction.suggestedCategoryID ?? transaction.categoryID,
                 confidence: viewModel.confidence(for: transaction),
                 reason: viewModel.reason(for: transaction),
                 onAccept: {
@@ -118,6 +120,10 @@ struct IOSCategoryAuditView: View {
                 },
                 onDismiss: {
                     viewModel.dismiss(transaction, using: appContainer)
+                    selectedTransaction = nil
+                },
+                onAssign: { categoryID in
+                    viewModel.assignCategory(categoryID, to: transaction, using: appContainer)
                     selectedTransaction = nil
                 }
             )

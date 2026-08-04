@@ -863,6 +863,46 @@ final class FinanceCategorizerTests: XCTestCase {
         XCTAssertEqual(try container.ruleRepository.fetchActiveRules().count, 1)
     }
 
+    func testCategoryAuditCanAssignAlternativeCategory() throws {
+        let container = AppContainer(inMemory: true)
+        try container.categoryRepository.ensureBaseCategories()
+        let categories = try container.categoryRepository.fetchAll()
+        let currentCategory = try XCTUnwrap(categories.first(where: { $0.name == "Alimentacion" }))
+        let suggestedCategory = try XCTUnwrap(categories.first(where: { $0.name == "Compras" }))
+        let alternativeCategory = try XCTUnwrap(categories.first(where: { $0.name == "Salud" }))
+        let transaction = Transaction(
+            bookingDate: .now,
+            rawDescription: "BIZUM DE INES",
+            cleanedDescription: "BIZUM DE INES",
+            amount: Decimal(-13.70),
+            categoryID: currentCategory.id,
+            categorizationSourceRaw: CategorizationSource.localML.rawValue,
+            confidence: 0.67,
+            needsReview: false,
+            reviewStatusRaw: ReviewStatus.accepted.rawValue,
+            fingerprint: "audit-alternative-category"
+        )
+        try container.transactionRepository.insert(transaction)
+        try container.transactionRepository.saveRecategorizationSuggestion(
+            transactionID: transaction.id,
+            categoryID: suggestedCategory.id,
+            source: .localML,
+            confidence: 0.67,
+            reason: "The proposal is intentionally wrong for this test."
+        )
+
+        let viewModel = CategoryAuditViewModel()
+        viewModel.load(using: container)
+        let selected = try XCTUnwrap(viewModel.transactions.first(where: { $0.id == transaction.id }))
+        viewModel.assignCategory(alternativeCategory.id, to: selected, using: container)
+
+        let saved = try XCTUnwrap(try container.transactionRepository.fetch(transactionID: transaction.id))
+        XCTAssertEqual(saved.categoryID, alternativeCategory.id)
+        XCTAssertNil(saved.suggestedCategoryID)
+        XCTAssertEqual(saved.categorizationSourceRaw, CategorizationSource.manual.rawValue)
+        XCTAssertFalse(saved.needsReview)
+    }
+
     func testReviewQueueCanCreateCustomCategory() throws {
         let container = AppContainer(inMemory: true)
         let viewModel = ReviewQueueViewModel()
