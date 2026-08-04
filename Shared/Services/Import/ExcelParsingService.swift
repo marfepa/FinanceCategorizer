@@ -13,7 +13,6 @@ enum CSVImportError: LocalizedError {
         }
     }
 }
-
 struct RawImportTable {
     let sourceType: String
     let worksheetName: String?
@@ -238,6 +237,7 @@ enum ImportValueParser {
         let trimmed = value
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .replacingOccurrences(of: "\"", with: "")
+            .replacingOccurrences(of: "−", with: "-")
         let formats = ["yyyy-MM-dd", "dd/MM/yyyy", "dd-MM-yyyy", "yyyy/MM/dd", "dd.MM.yyyy", "MM/dd/yyyy"]
 
         for format in formats {

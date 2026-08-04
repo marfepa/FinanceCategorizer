@@ -6,6 +6,10 @@ struct MacInsightsView: View {
     @AppStorage("isPrivacyModeEnabled") private var isPrivacyModeEnabled = false
     @AppStorage("appLanguage") private var appLanguage: AppLanguage = .english
     @State private var viewModel = InsightsViewModel()
+    @State private var selectedHeroCategory: String?
+    @State private var selectedCategory: String?
+    @State private var selectedMonthlyLabel: String?
+    @State private var selectedEvolutionDate: Date?
 
     private let chartPalette: [Color] = [
         Color(hue: 0.60, saturation: 0.70, brightness: 0.92),
@@ -17,52 +21,41 @@ struct MacInsightsView: View {
     ]
 
     var body: some View {
-        ZStack(alignment: .topLeading) {
-            GlassPageScaffold {
-                header
-            } background: {
-                analysisAtmosphere
-            } content: {
-                VStack(alignment: .leading, spacing: AppLayoutMetrics.sectionGap) {
-                    if let snapshot = viewModel.snapshot {
-                        heroSection(snapshot)
-                            .padding(.top, 104)
-                        insightsContentGrid(snapshot)
-                    } else if viewModel.isLoading {
-                        LoadingView(title: LocalizedStringKey("Analyzing finances..."))
-                            .liquidGlassPanel(
-                                padding: AppLayoutMetrics.heroInset,
-                                radius: AppRadius.panelGroup,
-                                material: AppMaterials.groupedGlass,
-                                tint: AppColors.neutral
-                            )
-                            .padding(.top, 104)
-                    } else {
-                        EmptyStateView(
-                            title: LocalizedStringKey("No Financial Analysis Yet"),
-                            message: LocalizedStringKey("Import real bank movements to unlock cashflow charts, category trends and forward-looking forecasts."),
-                            systemImage: "chart.xyaxis.line"
-                        )
+        GlassPageScaffold {
+            header
+        } content: {
+            VStack(alignment: .leading, spacing: AppLayoutMetrics.sectionGap) {
+                if let snapshot = viewModel.snapshot {
+                    heroSection(snapshot)
+                    insightsContentGrid(snapshot)
+                } else if viewModel.isLoading {
+                    LoadingView(title: LocalizedStringKey("Analyzing finances..."))
                         .liquidGlassPanel(
                             padding: AppLayoutMetrics.heroInset,
                             radius: AppRadius.panelGroup,
                             material: AppMaterials.groupedGlass,
                             tint: AppColors.neutral
                         )
-                        .padding(.top, 104)
-                    }
+                } else {
+                    EmptyStateView(
+                        title: LocalizedStringKey("No Financial Analysis Yet"),
+                        message: LocalizedStringKey("Import real bank movements to unlock cashflow charts, category trends and forward-looking forecasts."),
+                        systemImage: "chart.xyaxis.line"
+                    )
+                    .liquidGlassPanel(
+                        padding: AppLayoutMetrics.heroInset,
+                        radius: AppRadius.panelGroup,
+                        material: AppMaterials.groupedGlass,
+                        tint: AppColors.neutral
+                    )
+                }
 
-                    if let errorMessage = viewModel.errorMessage {
-                        Text(errorMessage)
-                            .foregroundStyle(.red)
-                            .liquidGlassPill(padding: 14, tint: AppColors.expense)
-                    }
+                if let errorMessage = viewModel.errorMessage {
+                    Text(errorMessage)
+                        .foregroundStyle(AppColors.expense)
+                        .contentCard(padding: AppLayoutMetrics.contentGap, radius: AppRadius.card)
                 }
             }
-            rangePicker
-                .padding(.top, 152)
-                .padding(.horizontal, AppLayoutMetrics.screenPadding)
-                .zIndex(30)
         }
         .task(id: appLanguage) {
             await viewModel.load(using: appContainer, language: appLanguage)
@@ -73,57 +66,6 @@ struct MacInsightsView: View {
             }
         }
         .navigationTitle(LocalizedStringKey("Analysis"))
-    }
-
-    private var analysisAtmosphere: some View {
-        GeometryReader { proxy in
-            ZStack {
-                LinearGradient(
-                    colors: [
-                        AppColors.background,
-                        Color.white.opacity(0.04),
-                        AppColors.background.opacity(0.98)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-
-                Circle()
-                    .fill(AppColors.income.opacity(0.18))
-                    .frame(width: proxy.size.width * 0.44)
-                    .blur(radius: 140)
-                    .offset(x: -proxy.size.width * 0.22, y: -proxy.size.height * 0.18)
-
-                Circle()
-                    .fill(AppColors.neutral.opacity(0.20))
-                    .frame(width: proxy.size.width * 0.52)
-                    .blur(radius: 180)
-                    .offset(x: proxy.size.width * 0.26, y: -proxy.size.height * 0.08)
-
-                Circle()
-                    .fill(AppColors.warning.opacity(0.12))
-                    .frame(width: proxy.size.width * 0.36)
-                    .blur(radius: 150)
-                    .offset(x: proxy.size.width * 0.20, y: proxy.size.height * 0.34)
-
-                Rectangle()
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(0.05),
-                                Color.white.opacity(0.015),
-                                Color.clear
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .frame(height: 220)
-                    .backgroundExtensionEffect()
-                    .offset(y: -proxy.size.height * 0.24)
-            }
-            .ignoresSafeArea()
-        }
     }
 
     private func insightsContentGrid(_ snapshot: FinancialAnalysisSnapshot) -> some View {
@@ -145,7 +87,7 @@ struct MacInsightsView: View {
     }
 
     private var header: some View {
-        HStack(alignment: .top, spacing: AppLayoutMetrics.sectionGap) {
+        HStack(alignment: .center, spacing: AppLayoutMetrics.sectionGap) {
             VStack(alignment: .leading, spacing: AppLayoutMetrics.contentGap) {
                 Text(LocalizedStringKey("Financial Explorer"))
                     .font(AppTypography.displayTitle)
@@ -157,39 +99,45 @@ struct MacInsightsView: View {
 
             Spacer(minLength: AppLayoutMetrics.contentGap)
 
-            VStack(alignment: .trailing, spacing: AppLayoutMetrics.microGap) {
-                headerPill(
-                    title: LocalizedStringKey("Liquid Glass"),
-                    systemImage: "sparkles",
-                    tint: AppColors.neutral
-                )
-                headerPill(
-                    title: isPrivacyModeEnabled ? LocalizedStringKey("Privacy On") : LocalizedStringKey("Privacy Off"),
-                    systemImage: isPrivacyModeEnabled ? "eye.slash.fill" : "eye.fill",
-                    tint: isPrivacyModeEnabled ? AppColors.warning : AppColors.income
-                )
+            HStack(spacing: AppLayoutMetrics.contentGap) {
+                rangePicker
+
+                Button {
+                    isPrivacyModeEnabled.toggle()
+                } label: {
+                    Label(
+                        isPrivacyModeEnabled ? LocalizedStringKey("Privacy On") : LocalizedStringKey("Privacy Off"),
+                        systemImage: isPrivacyModeEnabled ? "eye.slash.fill" : "eye.fill"
+                    )
+                }
+                .appSecondaryGlassButton()
+                .controlSize(.small)
+                .help(isPrivacyModeEnabled ? LocalizedStringKey("Show amounts") : LocalizedStringKey("Hide amounts"))
             }
         }
     }
 
     private var rangePicker: some View {
-        HStack {
-            FloatingGlassSegmentedBar(
-                options: AnalysisTimeRange.allCases,
-                title: { $0.title },
-                selection: Binding(
-                    get: { viewModel.selectedRange },
-                    set: { newValue in
-                        Task {
-                            await viewModel.refreshRange(newValue, using: appContainer, language: appLanguage)
-                        }
+        Picker(
+            "",
+            selection: Binding(
+                get: { viewModel.selectedRange },
+                set: { newValue in
+                    Task {
+                        await viewModel.refreshRange(newValue, using: appContainer, language: appLanguage)
                     }
-                )
+                }
             )
-            .frame(maxWidth: 420, alignment: .leading)
-            .compositingGroup()
-            Spacer(minLength: 0)
+        ) {
+            ForEach(AnalysisTimeRange.allCases) { range in
+                Text(range.title)
+                    .tag(range)
+            }
         }
+        .labelsHidden()
+        .pickerStyle(.segmented)
+        .controlSize(.small)
+        .frame(width: 300)
     }
 
     private func heroSection(_ snapshot: FinancialAnalysisSnapshot) -> some View {
@@ -222,6 +170,16 @@ struct MacInsightsView: View {
                         Text(snapshot.forecast.isNegativeTrend ? LocalizedStringKey("Spending pressure is starting to outweigh incoming cashflow.") : LocalizedStringKey("Cashflow remains resilient over the selected period."))
                             .font(.headline)
                             .foregroundStyle(.primary.opacity(0.84))
+
+                        Label(netTrendTitle(for: snapshot), systemImage: netTrendIcon(for: snapshot))
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(netTrendColor(for: snapshot))
+
+                        if let netDelta = snapshot.netDeltaFromPreviousMonth {
+                            Text(appLanguage.localized("Net change: %@", renderAmount(netDelta)))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                     }
 
                     HStack(spacing: AppLayoutMetrics.microGap) {
@@ -239,6 +197,11 @@ struct MacInsightsView: View {
                             title: LocalizedStringKey("Review"),
                             value: appLanguage.localized("insights.pendingCount", appLanguage.formatInteger(snapshot.pendingReviewCount)),
                             color: snapshot.pendingReviewCount == 0 ? AppColors.neutral : AppColors.warning
+                        )
+                        statusChip(
+                            title: LocalizedStringKey("Expense coverage"),
+                            value: appLanguage.formatPercent(snapshot.dataQuality.expenseCategorizationCoverage),
+                            color: snapshot.dataQuality.isReliable ? AppColors.income : AppColors.warning
                         )
                     }
                 }
@@ -268,6 +231,38 @@ struct MacInsightsView: View {
                         .chartXAxis(.hidden)
                         .chartYAxis {
                             AxisMarks(position: .leading)
+                        }
+                        .chartOverlay { proxy in
+                            GeometryReader { geometry in
+                                Rectangle()
+                                    .fill(.clear)
+                                    .contentShape(Rectangle())
+                                    .gesture(
+                                        DragGesture(minimumDistance: 0)
+                                            .onEnded { value in
+                                                guard let plotFrameAnchor = proxy.plotFrame else { return }
+                                                let plotFrame = geometry[plotFrameAnchor]
+                                                let yPosition = value.location.y - plotFrame.origin.y
+                                                guard yPosition >= 0,
+                                                      yPosition <= plotFrame.size.height,
+                                                      let category: String = proxy.value(atY: yPosition, as: String.self) else {
+                                                    return
+                                                }
+                                                selectedHeroCategory = category
+                                            }
+                                    )
+                            }
+                        }
+
+                        if let selectedHeroCategory,
+                           let selectedItem = snapshot.categoryBreakdown.first(where: { $0.categoryName == selectedHeroCategory }) {
+                            InteractiveChartReadout(
+                                title: selectedItem.categoryName,
+                                values: [
+                                    (appLanguage.localized("Expenses"), renderAmount(selectedItem.amount)),
+                                    (appLanguage.localized("Share"), appLanguage.formatPercent(selectedItem.percentage))
+                                ]
+                            )
                         }
                     }
                 }
@@ -366,6 +361,8 @@ struct MacInsightsView: View {
             monthlyTrendSection(snapshot)
             sectionSeparator
             categorySection(snapshot)
+            sectionSeparator
+            categoryEvolutionSection(snapshot)
         }
         .liquidGlassGrouped(tint: AppColors.neutral)
     }
@@ -433,6 +430,40 @@ struct MacInsightsView: View {
                     }
                 }
 
+                .chartOverlay { proxy in
+                    GeometryReader { geometry in
+                        Rectangle()
+                            .fill(.clear)
+                            .contentShape(Rectangle())
+                            .gesture(
+                                DragGesture(minimumDistance: 0)
+                                    .onEnded { value in
+                                        guard let plotFrameAnchor = proxy.plotFrame else { return }
+                                        let plotFrame = geometry[plotFrameAnchor]
+                                        let xPosition = value.location.x - plotFrame.origin.x
+                                        guard xPosition >= 0,
+                                              xPosition <= plotFrame.size.width,
+                                              let category: String = proxy.value(atX: xPosition, as: String.self) else {
+                                            return
+                                        }
+                                        selectedCategory = category
+                                    }
+                            )
+                    }
+                }
+
+                if let selectedCategory,
+                   let selectedItem = snapshot.categoryBreakdown.first(where: { $0.categoryName == selectedCategory }) {
+                    InteractiveChartReadout(
+                        title: selectedItem.categoryName,
+                        values: [
+                            (appLanguage.localized("Expenses"), renderAmount(selectedItem.amount)),
+                            (appLanguage.localized("Share"), appLanguage.formatPercent(selectedItem.percentage)),
+                            (appLanguage.localized("Change"), deltaLabel(for: selectedItem.deltaFromPreviousPeriod))
+                        ]
+                    )
+                }
+
                 ForEach(Array(snapshot.categoryBreakdown.prefix(6)).enumerated(), id: \.element.id) { index, item in
                     VStack(alignment: .leading, spacing: AppSpacing.xSmall) {
                         HStack {
@@ -470,6 +501,110 @@ struct MacInsightsView: View {
                         }
                     }
                     .padding(.top, AppSpacing.xSmall)
+                }
+            }
+        }
+    }
+
+    private func categoryEvolutionSection(_ snapshot: FinancialAnalysisSnapshot) -> some View {
+        let items = Array(snapshot.categoryEvolution.prefix(5))
+        let points = items.flatMap(\.points)
+
+        return VStack(alignment: .leading, spacing: AppSpacing.medium) {
+            sectionHeader(
+                title: LocalizedStringKey("Category evolution"),
+                icon: "chart.line.uptrend.xyaxis",
+                tint: AppColors.warning
+            )
+
+            Text(LocalizedStringKey("Compare the latest months and spot categories whose spending is accelerating."))
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+
+            if items.isEmpty {
+                Text(LocalizedStringKey("No category evolution available yet."))
+                    .foregroundStyle(.secondary)
+            } else {
+                Chart(points) { point in
+                    LineMark(
+                        x: .value("Month", point.startDate),
+                        y: .value("Amount", decimalValue(point.amount))
+                    )
+                    .interpolationMethod(.catmullRom)
+                    .foregroundStyle(by: .value("Category", point.categoryName))
+
+                    PointMark(
+                        x: .value("Month", point.startDate),
+                        y: .value("Amount", decimalValue(point.amount))
+                    )
+                    .foregroundStyle(by: .value("Category", point.categoryName))
+                }
+                .frame(height: 250)
+                .chartYAxis {
+                    AxisMarks(position: .leading)
+                }
+                .chartXAxis {
+                    AxisMarks(values: .stride(by: .month)) { value in
+                        AxisGridLine()
+                        AxisTick()
+                        AxisValueLabel(format: .dateTime.month(.abbreviated), centered: true)
+                    }
+                }
+                .chartOverlay { proxy in
+                    GeometryReader { geometry in
+                        Rectangle()
+                            .fill(.clear)
+                            .contentShape(Rectangle())
+                            .gesture(
+                                DragGesture(minimumDistance: 0)
+                                    .onEnded { value in
+                                        guard let plotFrameAnchor = proxy.plotFrame else { return }
+                                        let plotFrame = geometry[plotFrameAnchor]
+                                        let xPosition = value.location.x - plotFrame.origin.x
+                                        guard xPosition >= 0,
+                                              xPosition <= plotFrame.size.width,
+                                              let date: Date = proxy.value(atX: xPosition, as: Date.self) else {
+                                            return
+                                        }
+                                        selectedEvolutionDate = date
+                                    }
+                            )
+                    }
+                }
+
+                if let selectedEvolutionDate {
+                    let nearestDate = points.min {
+                        abs($0.startDate.timeIntervalSince(selectedEvolutionDate)) < abs($1.startDate.timeIntervalSince(selectedEvolutionDate))
+                    }?.startDate
+                    if let nearestDate {
+                        InteractiveChartReadout(
+                            title: nearestDate.formatted(.dateTime.month(.wide).year()),
+                            values: items.map { item in
+                                let point = item.points.first { $0.startDate == nearestDate }
+                                return (item.categoryName, renderAmount(point?.amount ?? .zero))
+                            }
+                        )
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: AppSpacing.small) {
+                    ForEach(snapshot.categoryEvolution.filter(\.isSpiking).prefix(6)) { item in
+                        HStack(alignment: .top, spacing: AppSpacing.small) {
+                            Image(systemName: "arrow.up.right.circle.fill")
+                                .foregroundStyle(AppColors.warning)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(item.categoryName)
+                                    .font(.subheadline.weight(.semibold))
+                                Text(spikeCaption(for: item))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Text("+\(renderAmount(item.deltaFromPreviousMonth))")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(AppColors.warning)
+                        }
+                    }
                 }
             }
         }
@@ -524,6 +659,39 @@ struct MacInsightsView: View {
                 .frame(height: 280)
                 .chartYAxis {
                     AxisMarks(position: .leading)
+                }
+                .chartOverlay { proxy in
+                    GeometryReader { geometry in
+                        Rectangle()
+                            .fill(.clear)
+                            .contentShape(Rectangle())
+                            .gesture(
+                                DragGesture(minimumDistance: 0)
+                                    .onEnded { value in
+                                        guard let plotFrameAnchor = proxy.plotFrame else { return }
+                                        let plotFrame = geometry[plotFrameAnchor]
+                                        let xPosition = value.location.x - plotFrame.origin.x
+                                        guard xPosition >= 0,
+                                              xPosition <= plotFrame.size.width,
+                                              let label: String = proxy.value(atX: xPosition, as: String.self) else {
+                                            return
+                                        }
+                                        selectedMonthlyLabel = label
+                                    }
+                            )
+                    }
+                }
+
+                if let selectedMonthlyLabel,
+                   let selectedPoint = snapshot.monthlyCashflow.first(where: { $0.monthLabel == selectedMonthlyLabel }) {
+                    InteractiveChartReadout(
+                        title: selectedPoint.monthLabel,
+                        values: [
+                            (appLanguage.localized("Income"), renderAmount(selectedPoint.income)),
+                            (appLanguage.localized("Expenses"), renderAmount(selectedPoint.expense)),
+                            (appLanguage.localized("Net"), renderAmount(selectedPoint.net))
+                        ]
+                    )
                 }
             }
 
@@ -642,13 +810,6 @@ struct MacInsightsView: View {
         }
     }
 
-    private func headerPill(title: LocalizedStringKey, systemImage: String, tint: Color) -> some View {
-        Label(title, systemImage: systemImage)
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(.secondary)
-            .liquidGlassPill(padding: 12, tint: tint)
-    }
-
     private func metricCard(title: LocalizedStringKey, value: String, subtitle: LocalizedStringKey, icon: String, tint: Color) -> some View {
         VStack(alignment: .leading, spacing: AppLayoutMetrics.contentGap) {
             HStack {
@@ -722,6 +883,32 @@ struct MacInsightsView: View {
         )
     }
 
+    private func netTrendTitle(for snapshot: FinancialAnalysisSnapshot) -> LocalizedStringKey {
+        switch snapshot.netTrend {
+        case .increasing: return "Net trend increasing"
+        case .decreasing: return "Net trend decreasing"
+        case .stable: return "Net trend stable"
+        case .insufficientData: return "Not enough data for net trend"
+        }
+    }
+
+    private func netTrendIcon(for snapshot: FinancialAnalysisSnapshot) -> String {
+        switch snapshot.netTrend {
+        case .increasing: return "arrow.up.right"
+        case .decreasing: return "arrow.down.right"
+        case .stable: return "equal"
+        case .insufficientData: return "questionmark"
+        }
+    }
+
+    private func netTrendColor(for snapshot: FinancialAnalysisSnapshot) -> Color {
+        switch snapshot.netTrend {
+        case .increasing: return AppColors.income
+        case .decreasing: return AppColors.warning
+        case .stable, .insufficientData: return AppColors.neutral
+        }
+    }
+
     private func statusChip(title: LocalizedStringKey, value: String, color: Color) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(title)
@@ -741,6 +928,13 @@ struct MacInsightsView: View {
     private func deltaLabel(for value: Decimal) -> String {
         let formatted = renderAmount(value)
         return value >= 0 ? "+\(formatted)" : formatted
+    }
+
+    private func spikeCaption(for item: CategoryEvolutionItem) -> String {
+        if let deltaPercentage = item.deltaPercentage {
+            return appLanguage.localized("Category increased by %@", appLanguage.formatPercent(deltaPercentage))
+        }
+        return appLanguage.localized("Category appeared this month")
     }
 
     private func bestMonth(in points: [MonthlyCashflowPoint]) -> String? {

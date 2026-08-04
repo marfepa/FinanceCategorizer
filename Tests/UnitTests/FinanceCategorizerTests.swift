@@ -735,6 +735,66 @@ final class FinanceCategorizerTests: XCTestCase {
         }
     }
 
+    func testOpenbankPDFParserHandlesSeparatedColumnsAndMultilineConcepts() throws {
+        let openbankText = """
+        Openbank
+        Fecha Operación Fecha Valor Concepto Importe Saldo
+        01/02/2026 01/02/2026 TRANSFERENCIA DE GENERALITAT VALENCIANA,
+        335,39 EUR 751,37 EUR
+        CONCEPTO NOMINA EDUCACION C.PRIVADOS 01-2026
+        02/02/2026 02/02/2026 Apple pay: COMPRA EN LIDL ALGEMESI,
+        -6,45 EUR 744,92 EUR
+        TARJETA : 5154520019563402 EL 2026-02-02
+        Página: 1 / 1
+        """
+
+        let preview = try PDFParsingService().preview(text: openbankText)
+
+        XCTAssertEqual(preview.rows.count, 2)
+        XCTAssertTrue(preview.invalidRows.isEmpty)
+        XCTAssertFalse(preview.requiresManualMapping)
+        XCTAssertEqual(preview.rows.first?.amount, Decimal(string: "335.39"))
+        XCTAssertEqual(preview.rows.last?.amount, Decimal(string: "-6.45"))
+        XCTAssertTrue(preview.rows.last?.concept.contains("LIDL ALGEMESI") == true)
+    }
+
+    func testRedactedOpenbankPDFIsBlockedInsteadOfImportingPartialRows() throws {
+        let redactedText = """
+        OpenBank, S.A.
+        Fecha Operación Fecha Valor Concepto Importe Saldo
+        Apple pay: COMPRA EN LIDL ALGEMESI EL 2026-02-02
+        Página: 1 / 1
+        """
+
+        let preview = try PDFParsingService().preview(text: redactedText)
+
+        XCTAssertTrue(preview.rows.isEmpty)
+        XCTAssertTrue(preview.requiresManualMapping)
+        XCTAssertEqual(preview.diagnostics.importableRowCount, 0)
+        XCTAssertEqual(preview.invalidRows.first?.severity, .error)
+    }
+
+    func testTransactionKindResolverRecognizesOpenbankMovementSemantics() {
+        let resolver = TransactionKindResolver()
+
+        XCTAssertEqual(
+            resolver.resolve(rawDescription: "RECARGA TARJETA PREPAGO", cleanedDescription: "RECARGA TARJETA PREPAGO", amount: -41.47),
+            .transfer
+        )
+        XCTAssertEqual(
+            resolver.resolve(rawDescription: "TRANSFERENCIA DE FERNANDEZ PARDO MARIO", cleanedDescription: "TRANSFERENCIA DE FERNANDEZ PARDO MARIO", amount: 500),
+            .transfer
+        )
+        XCTAssertEqual(
+            resolver.resolve(rawDescription: "BIZUM DE MARIA C M", cleanedDescription: "BIZUM DE MARIA C M", amount: 18.70),
+            .income
+        )
+        XCTAssertEqual(
+            resolver.resolve(rawDescription: "BIZUM A FAVOR DE MARIA C M", cleanedDescription: "BIZUM A FAVOR DE MARIA C M", amount: -10),
+            .expense
+        )
+    }
+
     func testCSVPreviewClosesQuotedMultilineRowsIndependently() throws {
         let csv = """
         Fecha;F. valor;Concepto;Importe;Saldo
@@ -1425,7 +1485,7 @@ final class FinanceCategorizerTests: XCTestCase {
         XCTAssertEqual(snapshot?.totalIncome, Decimal(2_000))
         XCTAssertEqual(snapshot?.totalExpenses, Decimal.zero)
         XCTAssertEqual(snapshot?.netBalance, Decimal(2_000))
-        XCTAssertTrue(snapshot?.monthTitle.lowercased().contains("ago") == true)
+        XCTAssertTrue(snapshot?.monthTitle.lowercased().contains(currentMonthName(for: date(year: 2026, month: 8, day: 1))) == true)
     }
 
     func testPayrollAfterCutoffMovesEveryMonthForward() {
@@ -1498,7 +1558,7 @@ final class FinanceCategorizerTests: XCTestCase {
 
         XCTAssertEqual(snapshot?.totalIncome, Decimal(2_000))
         XCTAssertEqual(snapshot?.totalExpenses, Decimal.zero)
-        XCTAssertTrue(snapshot?.monthTitle.lowercased().contains("ago") == true)
+        XCTAssertTrue(snapshot?.monthTitle.lowercased().contains(currentMonthName(for: date(year: 2026, month: 8, day: 1))) == true)
     }
 
     func testDashboardShowsLegacySupermarketSpendAsFoodAndReportsItForReview() {
@@ -1531,6 +1591,181 @@ final class FinanceCategorizerTests: XCTestCase {
         XCTAssertEqual(snapshot?.topCategories.first?.amount, Decimal(18))
         XCTAssertEqual(snapshot?.uncategorizedExpenseCount, 1)
         XCTAssertEqual(snapshot?.uncategorizedExpenseAmount, Decimal(18))
+    }
+
+    func testDashboardReportsNetTrendAndExpenseCoverage() {
+        let groceries = Category(
+            name: "Alimentacion",
+            iconName: "cart",
+            colorHex: "#4CAF50",
+            isIncome: false
+        )
+        let juneIncome = Transaction(
+            bookingDate: date(year: 2026, month: 6, day: 5),
+            rawDescription: "NOMINA JUNIO",
+            cleanedDescription: "NOMINA JUNIO",
+            amount: 100,
+            kindRaw: TransactionKind.income.rawValue,
+            categoryID: groceries.id,
+            needsReview: false,
+            reviewStatusRaw: ReviewStatus.accepted.rawValue
+        )
+        let juneExpense = Transaction(
+            bookingDate: date(year: 2026, month: 6, day: 6),
+            rawDescription: "LIDL",
+            cleanedDescription: "LIDL",
+            amount: -40,
+            kindRaw: TransactionKind.expense.rawValue,
+            categoryID: groceries.id,
+            needsReview: false,
+            reviewStatusRaw: ReviewStatus.accepted.rawValue
+        )
+        let julyIncome = Transaction(
+            bookingDate: date(year: 2026, month: 7, day: 5),
+            rawDescription: "NOMINA JULIO",
+            cleanedDescription: "NOMINA JULIO",
+            amount: 100,
+            kindRaw: TransactionKind.income.rawValue,
+            categoryID: groceries.id,
+            needsReview: false,
+            reviewStatusRaw: ReviewStatus.accepted.rawValue
+        )
+        let julyExpense = Transaction(
+            bookingDate: date(year: 2026, month: 7, day: 6),
+            rawDescription: "LIDL",
+            cleanedDescription: "LIDL",
+            amount: -80,
+            kindRaw: TransactionKind.expense.rawValue,
+            categoryID: groceries.id,
+            needsReview: false,
+            reviewStatusRaw: ReviewStatus.accepted.rawValue
+        )
+        let internalTransfer = Transaction(
+            bookingDate: date(year: 2026, month: 7, day: 7),
+            rawDescription: "TRASPASO ENTRE CUENTAS",
+            cleanedDescription: "TRASPASO ENTRE CUENTAS",
+            amount: 500,
+            kindRaw: TransactionKind.transfer.rawValue,
+            needsReview: true,
+            reviewStatusRaw: ReviewStatus.pending.rawValue
+        )
+
+        let snapshot = DashboardInsightService().buildSnapshot(
+            transactions: [juneIncome, juneExpense, julyIncome, julyExpense, internalTransfer],
+            categories: [groceries],
+            recentImports: [],
+            locale: .current,
+            now: date(year: 2026, month: 8, day: 4)
+        )
+
+        XCTAssertEqual(snapshot?.netBalance, Decimal(20))
+        XCTAssertEqual(snapshot?.netTrend, .decreasing)
+        XCTAssertEqual(snapshot?.netDeltaFromPreviousMonth, Decimal(-40))
+        XCTAssertEqual(snapshot?.dataQuality.expenseCategorizationCoverage, 1)
+        XCTAssertEqual(snapshot?.dataQuality.internalTransferCount, 1)
+        XCTAssertTrue(snapshot?.dataQuality.isReliable == true)
+    }
+
+    func testFinancialAnalysisDetectsCategorySpikesAcrossMonths() {
+        let groceries = Category(
+            name: "Alimentacion",
+            iconName: "cart",
+            colorHex: "#4CAF50",
+            isIncome: false
+        )
+        let shopping = Category(
+            name: "Compras",
+            iconName: "bag",
+            colorHex: "#FF9800",
+            isIncome: false
+        )
+        let transactions = [
+            Transaction(bookingDate: date(year: 2026, month: 1, day: 5), rawDescription: "LIDL", cleanedDescription: "LIDL", amount: -100, kindRaw: TransactionKind.expense.rawValue, categoryID: groceries.id, needsReview: false, reviewStatusRaw: ReviewStatus.accepted.rawValue),
+            Transaction(bookingDate: date(year: 2026, month: 2, day: 5), rawDescription: "LIDL", cleanedDescription: "LIDL", amount: -110, kindRaw: TransactionKind.expense.rawValue, categoryID: groceries.id, needsReview: false, reviewStatusRaw: ReviewStatus.accepted.rawValue),
+            Transaction(bookingDate: date(year: 2026, month: 3, day: 5), rawDescription: "LIDL", cleanedDescription: "LIDL", amount: -180, kindRaw: TransactionKind.expense.rawValue, categoryID: groceries.id, needsReview: false, reviewStatusRaw: ReviewStatus.accepted.rawValue),
+            Transaction(bookingDate: date(year: 2026, month: 3, day: 6), rawDescription: "MANGO", cleanedDescription: "MANGO", amount: -50, kindRaw: TransactionKind.expense.rawValue, categoryID: shopping.id, needsReview: false, reviewStatusRaw: ReviewStatus.accepted.rawValue)
+        ]
+
+        let snapshot = FinancialAnalysisService().analyze(
+            transactions: transactions,
+            categories: [groceries, shopping],
+            range: .all
+        )
+
+        let groceriesEvolution = snapshot.categoryEvolution.first(where: { $0.categoryName == "Alimentacion" })
+        let shoppingEvolution = snapshot.categoryEvolution.first(where: { $0.categoryName == "Compras" })
+
+        XCTAssertEqual(snapshot.netBalance, Decimal(-440))
+        XCTAssertEqual(snapshot.netTrend, .decreasing)
+        XCTAssertEqual(groceriesEvolution?.latestAmount, Decimal(180))
+        XCTAssertEqual(groceriesEvolution?.previousAmount, Decimal(110))
+        XCTAssertTrue(groceriesEvolution?.isSpiking == true)
+        XCTAssertTrue(shoppingEvolution?.isSpiking == true)
+        XCTAssertEqual(snapshot.dataQuality.expenseCategorizationCoverage, 1)
+    }
+
+    func testDashboardAndAnalysisUseTheSameCurrentAccountingMonth() throws {
+        let groceries = Category(
+            name: "Alimentacion",
+            iconName: "cart",
+            colorHex: "#4CAF50",
+            isIncome: false
+        )
+        let now = date(year: 2026, month: 8, day: 4)
+        let transactions = [
+            Transaction(
+                bookingDate: date(year: 2026, month: 8, day: 1),
+                rawDescription: "NOMINA AGOSTO",
+                cleanedDescription: "NOMINA AGOSTO",
+                amount: Decimal(string: "5834.21")!,
+                kindRaw: TransactionKind.income.rawValue,
+                needsReview: false,
+                reviewStatusRaw: ReviewStatus.accepted.rawValue
+            ),
+            Transaction(
+                bookingDate: date(year: 2026, month: 8, day: 2),
+                rawDescription: "MERCADONA",
+                cleanedDescription: "MERCADONA",
+                amount: Decimal(string: "-1707.21")!,
+                kindRaw: TransactionKind.expense.rawValue,
+                categoryID: groceries.id,
+                needsReview: false,
+                reviewStatusRaw: ReviewStatus.accepted.rawValue
+            ),
+            Transaction(
+                bookingDate: date(year: 2026, month: 9, day: 1),
+                rawDescription: "FUTURE MOVEMENT",
+                cleanedDescription: "FUTURE MOVEMENT",
+                amount: Decimal(string: "-660.15")!,
+                kindRaw: TransactionKind.expense.rawValue,
+                categoryID: groceries.id,
+                needsReview: false,
+                reviewStatusRaw: ReviewStatus.accepted.rawValue
+            )
+        ]
+
+        let dashboard = try XCTUnwrap(
+            DashboardInsightService().buildSnapshot(
+                transactions: transactions,
+                categories: [groceries],
+                recentImports: [],
+                locale: Locale(identifier: "es"),
+                now: now
+            )
+        )
+        let analysis = FinancialAnalysisService().analyze(
+            transactions: transactions,
+            categories: [groceries],
+            range: .month,
+            now: now
+        )
+
+        XCTAssertEqual(dashboard.totalIncome, analysis.totalIncome)
+        XCTAssertEqual(dashboard.totalExpenses, analysis.totalExpenses)
+        XCTAssertEqual(dashboard.netBalance, analysis.netBalance)
+        XCTAssertEqual(analysis.totalIncome, Decimal(string: "5834.21")!)
+        XCTAssertEqual(analysis.totalExpenses, Decimal(string: "1707.21")!)
+        XCTAssertFalse(analysis.monthlyCashflow.contains { $0.monthLabel.lowercased().contains("sep") })
     }
 
     func testSupermarketSignalsOverrideGenericMerchantMemory() async throws {
@@ -1652,6 +1887,13 @@ final class FinanceCategorizerTests: XCTestCase {
         components.month = month
         components.day = day
         return components.date ?? .now
+    }
+
+    private func currentMonthName(for date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = .current
+        formatter.dateFormat = "LLLL"
+        return formatter.string(from: date).lowercased()
     }
 
     private func currentMonthYearForTests(referenceDate: Date = Date()) -> String {

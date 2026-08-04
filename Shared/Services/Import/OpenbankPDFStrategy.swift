@@ -9,8 +9,8 @@ struct OpenbankPDFStrategy: PDFBankStrategy {
     private let spanishAmountRegex: NSRegularExpression?
 
     init() {
-        dateStartRegex = try? NSRegularExpression(pattern: #"^(\d{2}[/-]\d{2}[/-]\d{4})"#)
-        spanishAmountRegex = try? NSRegularExpression(pattern: #"-?\d{1,3}(?:\.\d{3})*,\d{2}"#)
+        dateStartRegex = try? NSRegularExpression(pattern: #"^(\d{2}[/-]\d{2}[/-]\d{4})\b"#)
+        spanishAmountRegex = try? NSRegularExpression(pattern: #"[-+−]?\s*\d{1,3}(?:[.\s]\d{3})*,\d{2}(?=\s*(?:EUR|€)?(?:\s|$))"#)
     }
     
     func matches(fullText: String) -> Double {
@@ -27,12 +27,6 @@ struct OpenbankPDFStrategy: PDFBankStrategy {
         return dateStartRegex.firstMatch(in: line, range: range) != nil
     }
 
-    private func lineContainsAmount(_ line: String) -> Bool {
-        guard let spanishAmountRegex else { return false }
-        let range = NSRange(location: 0, length: line.utf16.count)
-        return spanishAmountRegex.firstMatch(in: line, range: range) != nil
-    }
-
     // MARK: - Block-Based Extraction
 
     func extractTransactions(from rawLines: [String]) -> [RawPDFTransaction] {
@@ -42,42 +36,18 @@ struct OpenbankPDFStrategy: PDFBankStrategy {
 
         var transactions: [RawPDFTransaction] = []
         var pendingBlock: [String] = []
-        var pendingHasAmount = false
 
         for line in trimmedLines {
             let startsWithDate = lineStartsWithDate(line)
-            let hasAmount = lineContainsAmount(line)
-
-            if startsWithDate && hasAmount {
-                if !pendingBlock.isEmpty {
-                    if let tx = buildTransaction(from: pendingBlock) {
-                        transactions.append(tx)
-                    }
-                    pendingBlock = []
-                    pendingHasAmount = false
-                }
-                if let tx = buildTransaction(from: [line]) {
+            if startsWithDate && !pendingBlock.isEmpty {
+                if let tx = buildTransaction(from: pendingBlock) {
                     transactions.append(tx)
                 }
-            } else if startsWithDate {
-                if pendingHasAmount {
-                    if let tx = buildTransaction(from: pendingBlock) {
-                        transactions.append(tx)
-                    }
-                    pendingBlock = [line]
-                    pendingHasAmount = false
-                } else if pendingBlock.isEmpty {
-                    pendingBlock = [line]
-                } else {
-                    pendingBlock.append(line)
-                }
-            } else if hasAmount {
+                pendingBlock = []
+            }
+
+            if startsWithDate || !pendingBlock.isEmpty {
                 pendingBlock.append(line)
-                pendingHasAmount = true
-            } else {
-                if !pendingBlock.isEmpty {
-                    pendingBlock.append(line)
-                }
             }
         }
 
@@ -183,7 +153,11 @@ struct OpenbankPDFStrategy: PDFBankStrategy {
         }
 
         let trailingMatches = Array(matches[trailingStartIndex...])
-        let amounts = trailingMatches.map { nsText.substring(with: $0.range) }
+        let amounts = trailingMatches.map {
+            nsText.substring(with: $0.range)
+                .replacingOccurrences(of: "−", with: "-")
+                .replacingOccurrences(of: " ", with: "")
+        }
 
         let cutoffLocation = trailingMatches[0].range.location
         let cleanText = nsText.substring(to: cutoffLocation)

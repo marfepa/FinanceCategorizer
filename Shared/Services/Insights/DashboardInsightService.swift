@@ -9,7 +9,6 @@ struct DashboardCategoryItem: Identifiable {
     let deltaFromPreviousMonth: Decimal
     let deltaPercentage: Double?
 }
-
 struct DashboardTrendPoint: Identifiable {
     let id: String
     let date: Date
@@ -17,11 +16,6 @@ struct DashboardTrendPoint: Identifiable {
     let income: Decimal
     let expense: Decimal
     let net: Decimal
-}
-
-enum DashboardDateBasis {
-    case booking
-    case accounting
 }
 
 struct DashboardSnapshot {
@@ -41,10 +35,15 @@ struct DashboardSnapshot {
     let categoryChanges: [DashboardCategoryItem]
     let trend: [DashboardTrendPoint]
     let monthlyCashflow: [MonthlyCashflowPoint]
+    let netTrend: FinancialTrendDirection
+    let netDeltaFromPreviousMonth: Decimal?
+    let dataQuality: FinancialDataQuality
     let recentImports: [ImportBatch]
 }
 
 struct DashboardInsightService {
+    private let classifier = FinancialMovementClassifier()
+
     func buildSnapshot(
         transactions: [Transaction],
         categories: [Category],
@@ -56,27 +55,18 @@ struct DashboardInsightService {
         // The dashboard follows the accounting month used by the app's
         // reporting rules. A payroll booked on 30/07 therefore belongs to
         // August when the configured payroll cutoff moves it forward.
-        let validTransactions = transactions.filter { $0.resolvedKind != .transfer }
-        let calendar = Calendar.current
+        let reportingScope = FinancialReportingScope(now: now, dateBasis: dateBasis)
+        let validTransactions = reportingScope.eligibleTransactions(
+            from: transactions,
+            classifier: classifier
+        )
+        let calendar = reportingScope.calendar
         let today = calendar.startOfDay(for: now)
-        let nonFutureTransactions = validTransactions.filter {
-            calendar.startOfDay(for: dashboardDate(for: $0, basis: dateBasis)) <= today
-        }
-        guard let latestKnownDate = nonFutureTransactions.map({ dashboardDate(for: $0, basis: dateBasis) }).max() else {
+        guard let currentMonthStart = reportingScope.activeMonthStart(
+            from: transactions,
+            classifier: classifier
+        ) else {
             return nil
-        }
-
-        let calendarMonthStart = startOfMonth(for: today)
-        let calendarMonthEnd = calendar.date(byAdding: .month, value: 1, to: calendarMonthStart)
-        let currentMonthStart: Date
-        if nonFutureTransactions.contains(where: {
-            let date = dashboardDate(for: $0, basis: dateBasis)
-            return date >= calendarMonthStart &&
-                date < (calendarMonthEnd ?? .distantFuture)
-        }) {
-            currentMonthStart = calendarMonthStart
-        } else {
-            currentMonthStart = startOfMonth(for: latestKnownDate)
         }
 
         guard let nextMonthStart = calendar.date(byAdding: .month, value: 1, to: currentMonthStart),
@@ -85,13 +75,17 @@ struct DashboardInsightService {
         }
 
         let currentMonthTransactions = validTransactions
-            .filter {
-                let date = dashboardDate(for: $0, basis: dateBasis)
-                return date >= currentMonthStart &&
-                    date < nextMonthStart &&
-                    calendar.startOfDay(for: date) <= today
+            .filter { transaction in
+                let date = reportingScope.date(for: transaction)
+                return date >= currentMonthStart && date < nextMonthStart
             }
-            .sorted { dashboardDate(for: $0, basis: dateBasis) < dashboardDate(for: $1, basis: dateBasis) }
+            .sorted { reportingScope.date(for: $0) < reportingScope.date(for: $1) }
+        let currentMonthSourceTransactions = transactions.filter { transaction in
+            let date = reportingScope.date(for: transaction)
+            return date >= currentMonthStart &&
+                date < nextMonthStart &&
+                reportingScope.isVisible(transaction)
+        }
         let previousMonthTransactions = validTransactions
             .filter {
                 let date = dashboardDate(for: $0, basis: dateBasis)
@@ -110,9 +104,8 @@ struct DashboardInsightService {
         let savingsRate = totalIncome == .zero ? 0 : doubleValue(netBalance / totalIncome)
         let categorizedCount = currentMonthTransactions.filter { $0.categoryID != nil }.count
         let categorizedPercentage = currentMonthTransactions.isEmpty ? 0 : Double(categorizedCount) / Double(currentMonthTransactions.count)
-        let pendingReviewCount = currentMonthTransactions.filter {
-            $0.categoryID == nil || $0.needsReview || $0.reviewStatusRaw == ReviewStatus.pending.rawValue
-        }.count
+        let dataQuality = classifier.dataQuality(for: currentMonthSourceTransactions)
+        let pendingReviewCount = dataQuality.pendingReviewCount
 
         let previousExpenses = previousMonthTransactions
             .filter(isExpense)
@@ -161,6 +154,9 @@ struct DashboardInsightService {
             categoryChanges: Array(categoryItems.sorted(by: categoryChangeSort).prefix(8)),
             trend: trend,
             monthlyCashflow: monthlyCashflow,
+            netTrend: classifier.trend(for: monthlyCashflow),
+            netDeltaFromPreviousMonth: classifier.deltaFromPreviousMonth(for: monthlyCashflow),
+            dataQuality: dataQuality,
             recentImports: Array(recentImports.prefix(4))
         )
     }
@@ -336,11 +332,11 @@ struct DashboardInsightService {
     }
 
     private func isIncome(_ transaction: Transaction) -> Bool {
-        transaction.resolvedKind == .income && decimalValue(transaction.amount) > 0
+        classifier.isIncome(transaction)
     }
 
     private func isExpense(_ transaction: Transaction) -> Bool {
-        transaction.resolvedKind == .expense && decimalValue(transaction.amount) < 0
+        classifier.isExpense(transaction)
     }
 
     private func storedCategoryName(for transaction: Transaction, categoryMap: [UUID: String]) -> String? {
@@ -349,22 +345,6 @@ struct DashboardInsightService {
     }
 
     private func categoryName(for transaction: Transaction, categoryMap: [UUID: String]) -> String? {
-        if let storedName = storedCategoryName(for: transaction, categoryMap: categoryMap) {
-            return storedName
-        }
-
-        // Keep legacy supermarket movements visible under Alimentacion while
-        // the confidence card still reports that their stored category needs
-        // confirmation. This avoids silently losing real grocery spend.
-        guard isExpense(transaction),
-              CategoryTextSignals.containsSupermarket(
-                in: "\(transaction.merchantCanonicalName ?? "") \(transaction.cleanedDescription)"
-              ) else {
-            return nil
-        }
-
-        return categoryMap.values.first {
-            $0.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current) == "alimentacion"
-        } ?? "Alimentacion"
+        classifier.categoryName(for: transaction, categoryMap: categoryMap)
     }
 }

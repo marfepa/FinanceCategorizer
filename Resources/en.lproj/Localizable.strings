@@ -95,6 +95,21 @@
 "Expenses" = "Expenses";
 "Delta" = "Delta";
 "Not enough monthly movement yet to draw a trend." = "Not enough monthly movement yet to draw a trend.";
+"Net trend increasing" = "Net trend increasing";
+"Net trend decreasing" = "Net trend decreasing";
+"Net trend stable" = "Net trend stable";
+"Not enough data for net trend" = "Not enough data for net trend";
+"Net change: %@" = "Net change: %@";
+"Net change" = "Net change";
+"Expense coverage: %@" = "Expense coverage: %@";
+"Expense coverage" = "Expense coverage";
+"Share" = "Share";
+"Change" = "Change";
+"Category evolution" = "Category evolution";
+"Compare the latest months and spot categories whose spending is accelerating." = "Compare the latest months and spot categories whose spending is accelerating.";
+"No category evolution available yet." = "No category evolution available yet.";
+"Category increased by %@" = "Category increased by %@";
+"Category appeared this month" = "Category appeared this month";
 
 /* Dashboard Actions */
 "Import File" = "Import File";

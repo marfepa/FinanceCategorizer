@@ -14,10 +14,10 @@ enum AppLayoutMetrics {
     static let microGap: CGFloat = 8
     static let contentGap: CGFloat = 16
     static let blockGap: CGFloat = 24
-    static let sectionGap: CGFloat = 32
-    static let screenPadding: CGFloat = 32
-    static let heroInset: CGFloat = 48
-    static let liquidHeroInset: CGFloat = 56
-    static let glassMergeSpacing: CGFloat = 18
+    static let sectionGap: CGFloat = 24
+    static let screenPadding: CGFloat = 24
+    static let heroInset: CGFloat = 32
+    static let liquidHeroInset: CGFloat = 36
+    static let glassMergeSpacing: CGFloat = 12
     static let maxInspectorWidth: CGFloat = 380
 }

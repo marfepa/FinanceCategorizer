@@ -95,6 +95,21 @@
 "Expenses" = "Gastos";
 "Delta" = "Diferencia";
 "Not enough monthly movement yet to draw a trend." = "No hay suficiente movimiento mensual para dibujar una tendencia.";
+"Net trend increasing" = "La tendencia neta es creciente";
+"Net trend decreasing" = "La tendencia neta es decreciente";
+"Net trend stable" = "La tendencia neta es estable";
+"Not enough data for net trend" = "No hay datos suficientes para la tendencia neta";
+"Net change: %@" = "Cambio neto: %@";
+"Net change" = "Cambio neto";
+"Expense coverage: %@" = "Cobertura de categorización del gasto: %@";
+"Expense coverage" = "Cobertura del gasto";
+"Share" = "Peso";
+"Change" = "Cambio";
+"Category evolution" = "Evolución por categoría";
+"Compare the latest months and spot categories whose spending is accelerating." = "Compara los últimos meses y detecta las categorías cuyo gasto se está acelerando.";
+"No category evolution available yet." = "Todavía no hay evolución por categoría disponible.";
+"Category increased by %@" = "La categoría ha aumentado un %@";
+"Category appeared this month" = "La categoría aparece este mes";
 
 /* Dashboard Actions */
 "Import File" = "Importar Archivo";

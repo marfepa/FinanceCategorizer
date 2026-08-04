@@ -8,6 +8,7 @@ struct MacCategoriesView: View {
     @State private var transactionsViewModel = TransactionsViewModel()
     @State private var selectedCategory: CategoryListItem?
     @State private var selectedDetailRange: AnalysisTimeRange = .sixMonths
+    @State private var selectedDetailDate: Date?
 
     private let chartPalette: [Color] = [
         Color(hue: 0.60, saturation: 0.70, brightness: 0.92),
@@ -286,6 +287,37 @@ struct MacCategoriesView: View {
                         AxisTick()
                         AxisValueLabel(format: .dateTime.month(.abbreviated), centered: true)
                     }
+                }
+                .chartOverlay { proxy in
+                    GeometryReader { geometry in
+                        Rectangle()
+                            .fill(.clear)
+                            .contentShape(Rectangle())
+                            .gesture(
+                                DragGesture(minimumDistance: 0)
+                                    .onEnded { value in
+                                        guard let plotFrameAnchor = proxy.plotFrame else { return }
+                                        let plotFrame = geometry[plotFrameAnchor]
+                                        let xPosition = value.location.x - plotFrame.origin.x
+                                        guard xPosition >= 0,
+                                              xPosition <= plotFrame.size.width,
+                                              let date: Date = proxy.value(atX: xPosition, as: Date.self) else {
+                                            return
+                                        }
+                                        selectedDetailDate = date
+                                    }
+                            )
+                    }
+                }
+
+                if let selectedDetailDate,
+                   let selectedPoint = detailMonthlySpendPoints(for: category).min(by: {
+                       abs($0.startDate.timeIntervalSince(selectedDetailDate)) < abs($1.startDate.timeIntervalSince(selectedDetailDate))
+                   }) {
+                    InteractiveChartReadout(
+                        title: selectedPoint.monthLabel,
+                        values: [("Gasto", formattedAmount(selectedPoint.amount))]
+                    )
                 }
 
                 HStack(spacing: AppSpacing.medium) {
