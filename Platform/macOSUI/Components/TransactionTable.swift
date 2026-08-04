@@ -47,8 +47,16 @@ struct TransactionTable: View {
                 } label: {
                     HStack {
                         VStack(alignment: .leading, spacing: AppSpacing.xSmall) {
-                            Text(transaction.rawDescription)
+                            Text(transaction.merchantDisplayName ?? transaction.rawDescription)
                                 .foregroundStyle(.primary)
+                                .lineLimit(1)
+                            if let merchant = transaction.merchantCanonicalName,
+                               merchant != transaction.merchantDisplayName {
+                                Text(merchant)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                            }
                             Text(appLanguage.format(date: transaction.bookingDate))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)

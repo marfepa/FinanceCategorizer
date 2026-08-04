@@ -4,9 +4,9 @@ import Observation
 @MainActor
 @Observable
 final class InsightsViewModel {
-    // Match the dashboard's latest accounting month by default. Longer
-    // horizons remain available through the native segmented picker.
-    var selectedRange: AnalysisTimeRange = .month
+    // Give the analysis enough context to make trends and scenarios legible.
+    // The service still anchors the range at the latest accounting month.
+    var selectedRange: AnalysisTimeRange = .sixMonths
     var snapshot: FinancialAnalysisSnapshot?
     var aiNarrative: String?
     var insights: [Insight] = []

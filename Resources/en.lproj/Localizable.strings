@@ -82,6 +82,8 @@
 "dashboard.category.new" = "New this month";
 "dashboard.category.amountUp" = "%@ more than last month";
 "dashboard.category.percentUp" = "%@ more than last month";
+"dashboard.netTrend.explanation" = "The net trend also reflects income changes.";
+"dashboard.transferExclusion" = "%@ internal transfers are excluded from cashflow totals.";
 
 /* Dashboard Hero */
 "Expenses are up %lld versus the previous month." = "Expenses are up %lld versus the previous month.";
@@ -416,6 +418,7 @@
 "analysis.summary.pendingReview" = "- %lld transactions are still pending review and may affect the final picture.";
 "analysis.summary.riskNegative" = "Attention: the current trend is negative.";
 "analysis.summary.riskSustainable" = "The current trend remains sustainable.";
+"analysis.summary.riskLimited" = "The history is limited, so this is only a current-pace scenario.";
 
 /* Apple AI Deterministic Results */
 "appleAI.deterministic.monthlyBriefing.title" = "Pulse of the month";
@@ -688,3 +691,67 @@
 "audit.inspector.reason" = "Why this proposal";
 "audit.inspector.emptyTitle" = "Select a movement";
 "audit.inspector.emptyMessage" = "Select a row to inspect its category, confidence and evidence.";
+
+/* Analysis and category clarity */
+"Financial Explorer" = "Financial Explorer";
+"A visual overview of household cashflow, category pressure, recurring charges and medium-term projection." = "A visual overview of household cashflow, category pressure, recurring charges and medium-term projection.";
+"Net household position" = "Net household position";
+"A single reading of the selected financial horizon." = "A single reading of the selected financial horizon.";
+"Cashflow remains resilient over the selected period." = "Cashflow remains resilient over the selected period.";
+"Spending pressure is starting to outweigh incoming cashflow." = "Spending pressure is starting to outweigh incoming cashflow.";
+"Category concentration" = "Category concentration";
+"Signal deck" = "Signal deck";
+"Categorized" = "Categorized";
+"Coverage of the imported base" = "Coverage of the imported base";
+"Net over income" = "Net over income";
+"Recurring Charges" = "Recurring charges";
+"Patterns detected" = "Patterns detected";
+"Forecast 12M" = "12-month scenario";
+"Deterministic projection" = "Scenario based on the current pace";
+"Forecast" = "Scenario";
+"Monthly Cashflow" = "Monthly cashflow";
+"Expenses by Category" = "Expenses by category";
+"Category evolution" = "Category evolution";
+"Compare the latest months and spot categories whose spending is accelerating." = "Compare the latest months and spot categories whose spending is accelerating.";
+"AI Copilot Summary" = "AI Copilot summary";
+"Generating summary..." = "Generating summary…";
+"No category data available yet." = "No category data available yet.";
+"No category evolution available yet." = "No category evolution available yet.";
+"Not enough monthly history to visualize cashflow." = "Not enough monthly history to visualize cashflow.";
+"No Financial Analysis Yet" = "No financial analysis yet";
+"Import real bank movements to unlock cashflow charts, category trends and forward-looking forecasts." = "Import real bank movements to unlock cashflow charts, category trends and forward-looking forecasts.";
+"No recurring expenses detected yet." = "No recurring expenses detected yet.";
+"Current pace remains resilient over the medium term." = "Current pace remains resilient over the medium term.";
+"Warning: current pace could deteriorate household liquidity over the coming months." = "Warning: the current pace could reduce household liquidity over the coming months.";
+"Best month" = "Best month";
+"Worst month" = "Worst month";
+"Avg. monthly net" = "Average monthly net";
+"All" = "All";
+"Primary" = "Primary";
+"Subcategory" = "Subcategory";
+"Last month" = "Last month";
+"Visible months" = "Visible months";
+"Range total" = "Range total";
+"Suggestion confidence" = "Suggestion confidence";
+"Categorization confidence" = "Categorization confidence";
+"insights.scopeSummary" = "%@ · %@ pending in this period";
+"insights.transferExclusion" = "%@ internal transfers are excluded from this analysis.";
+"insights.reviewImpact" = "%@ movements still need review in %@. Category totals and scenarios may change after confirmation.";
+"insights.occurrences" = "%@ occurrences";
+"forecast.basedOnMonths" = "Scenario based on %@ month(s) of imported history.";
+"forecast.limitedHistory" = "Limited history: treat this as a simple current-pace scenario, not a trend forecast.";
+"review.pendingCount" = "%@ pending across the imported base";
+"review.similarPendingCount" = "%@ similar pending movements";
+"audit.inspector.multipleTitle" = "Multiple movements selected";
+"audit.inspector.multipleMessage" = "%@ movements are selected. Use the audit actions to apply or dismiss proposals in bulk.";
+"categories.subtitle" = "A clear catalog view with the activity share of each category.";
+"categories.empty.title" = "No categories yet";
+"categories.empty.message" = "Import movements to seed the base catalog and see how activity is distributed.";
+"categories.monthlyTrend.title" = "Monthly trend";
+"categories.monthlyTrend.subtitle" = "See how %@ changes across the selected range.";
+"categories.monthlyTrend.empty.title" = "No spending in this range";
+"categories.monthlyTrend.empty.message" = "Try a wider period to see this category's monthly trend.";
+"categories.emptyDetail.message" = "Movements assigned to %@ will appear here with an inspector ready to edit category and type.";
+"categories.associatedMovement.one" = "1 associated movement";
+"categories.associatedMovement.many" = "%@ associated movements";
+"categories.shareOfMovements" = "%@ of categorized movements";

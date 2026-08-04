@@ -4,6 +4,7 @@ import SwiftUI
 struct MacCategoriesView: View {
     @Environment(\.appContainer) private var appContainer
     @Environment(\.isPrivacyModeEnabled) private var isPrivacyModeEnabled
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.english
     @State private var viewModel = CategoriesViewModel()
     @State private var transactionsViewModel = TransactionsViewModel()
     @State private var selectedCategory: CategoryListItem?
@@ -74,20 +75,20 @@ struct MacCategoriesView: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: AppSpacing.large) {
             VStack(alignment: .leading, spacing: AppSpacing.small) {
-                Text("Categorías")
+                Text(LocalizedStringKey("Categories"))
                     .font(AppTypography.displayTitle)
 
-                Text("Una vista clara del catálogo base y del peso real de cada categoría en tus movimientos.")
+                Text(LocalizedStringKey("categories.subtitle"))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: 520, alignment: .leading)
             }
 
             HStack(alignment: .top, spacing: AppSpacing.small) {
-                SummaryChip(value: "\(categoryCount)", label: "Categorías")
-                SummaryChip(value: "\(transactionCount)", label: "Movimientos")
-                SummaryChip(value: "\(systemCategoryCount)", label: "Sistema")
-                SummaryChip(value: "\(incomeCategoryCount)", label: "Ingresos")
+                SummaryChip(value: appLanguage.formatInteger(categoryCount), label: "Categories")
+                SummaryChip(value: appLanguage.formatInteger(transactionCount), label: "Movements")
+                SummaryChip(value: appLanguage.formatInteger(systemCategoryCount), label: "System")
+                SummaryChip(value: appLanguage.formatInteger(incomeCategoryCount), label: "Income")
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -112,10 +113,10 @@ struct MacCategoriesView: View {
                 .frame(width: 72, height: 72)
 
                 VStack(spacing: AppSpacing.small) {
-                    Text("Aún no hay categorías")
+                        Text(LocalizedStringKey("categories.empty.title"))
                         .font(.title3.weight(.semibold))
 
-                    Text("Importa movimientos para sembrar el catálogo base y empezar a ver cómo se distribuye tu actividad.")
+                    Text(LocalizedStringKey("categories.empty.message"))
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
@@ -128,10 +129,10 @@ struct MacCategoriesView: View {
             .glassCard(material: AppMaterials.groupedGlass)
 
             HStack(spacing: AppSpacing.small) {
-                SummaryChip(value: "0", label: "Categorías")
-                SummaryChip(value: "0", label: "Movimientos")
-                SummaryChip(value: "0", label: "Sistema")
-                SummaryChip(value: "0", label: "Ingresos")
+                SummaryChip(value: "0", label: "Categories")
+                SummaryChip(value: "0", label: "Movements")
+                SummaryChip(value: "0", label: "System")
+                SummaryChip(value: "0", label: "Income")
             }
             .frame(maxWidth: 720)
         }
@@ -222,10 +223,10 @@ struct MacCategoriesView: View {
         VStack(alignment: .leading, spacing: AppSpacing.medium) {
             HStack(alignment: .top, spacing: AppSpacing.medium) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Evolución mensual")
+                    Text(LocalizedStringKey("categories.monthlyTrend.title"))
                         .font(AppTypography.sectionTitle)
 
-                    Text("Observa cómo cambia el gasto de \(category.name) en el rango seleccionado.")
+                    Text(appLanguage.localized("categories.monthlyTrend.subtitle", category.name))
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -244,10 +245,10 @@ struct MacCategoriesView: View {
                         .background(AppColors.neutral.opacity(0.10), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
 
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("No hay gasto en este rango")
+                        Text(LocalizedStringKey("categories.monthlyTrend.empty.title"))
                             .font(.headline)
 
-                        Text("Prueba con un periodo más amplio para ver la evolución mensual de esta categoría.")
+                        Text(LocalizedStringKey("categories.monthlyTrend.empty.message"))
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
@@ -322,16 +323,16 @@ struct MacCategoriesView: View {
 
                 HStack(spacing: AppSpacing.medium) {
                     if let latest = detailMonthlySpendPoints(for: category).last {
-                        detailMetric(title: "Último mes", value: formattedAmount(latest.amount))
+                        detailMetric(title: LocalizedStringKey("Last month"), value: formattedAmount(latest.amount))
                     }
 
                     detailMetric(
-                        title: "Meses visibles",
-                        value: "\(detailMonthlySpendPoints(for: category).count)"
+                        title: LocalizedStringKey("Visible months"),
+                        value: appLanguage.formatInteger(detailMonthlySpendPoints(for: category).count)
                     )
 
                     detailMetric(
-                        title: "Total rango",
+                        title: LocalizedStringKey("Range total"),
                         value: formattedAmount(detailMonthlySpendPoints(for: category).reduce(.zero) { $0 + $1.amount })
                     )
                 }
@@ -343,7 +344,7 @@ struct MacCategoriesView: View {
         HStack {
             FloatingGlassSegmentedBar(
                 options: AnalysisTimeRange.allCases,
-                title: { $0.title },
+                title: { appLanguage.localized($0.title) },
                 selection: $selectedDetailRange
             )
             .frame(maxWidth: 420, alignment: .leading)
@@ -424,7 +425,7 @@ struct MacCategoriesView: View {
                 Text(LocalizedStringKey("No movements in this category"))
                     .font(.title3.weight(.semibold))
 
-                Text("Los movimientos asignados a \(category.name) aparecerán aquí con su inspector listo para editar categoría y tipo.")
+                Text(appLanguage.localized("categories.emptyDetail.message", category.name))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -438,9 +439,9 @@ struct MacCategoriesView: View {
     private func detailSummary(for category: CategoryListItem) -> String {
         let count = transactionsViewModel.sortedTransactions.count
         if count == 1 {
-            return "1 movimiento asociado"
+            return appLanguage.localized("categories.associatedMovement.one")
         }
-        return "\(count) movimientos asociados"
+        return appLanguage.localized("categories.associatedMovement.many", appLanguage.formatInteger(count))
     }
 
     private func reloadData() {
@@ -538,7 +539,7 @@ struct MacCategoriesView: View {
         value.privacyFormatted(hidden: isPrivacyModeEnabled, currencyCode: AppConfig.defaultCurrencyCode)
     }
 
-    private func detailMetric(title: String, value: String) -> some View {
+    private func detailMetric(title: LocalizedStringKey, value: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
                 .font(.caption.weight(.medium))
@@ -565,23 +566,24 @@ private struct DetailMonthlySpendPoint: Identifiable {
 private struct CategoryCard: View {
     let item: CategoryListItem
     let onTap: () -> Void
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.english
     @State private var isHovered = false
 
-    private var emoji: String {
+    private var systemImage: String {
         switch item.name.lowercased() {
-        case let n where n.contains("aliment"): return "🛒"
-        case let n where n.contains("restaur"): return "🍽️"
-        case let n where n.contains("transporte"): return "🚗"
-        case let n where n.contains("suscripcion"), let n where n.contains("suscripción"): return "📱"
-        case let n where n.contains("ingreso"), let n where n.contains("nomina"): return "💰"
-        case let n where n.contains("salud"), let n where n.contains("farma"): return "🏥"
-        case let n where n.contains("ocio"), let n where n.contains("entretenimiento"): return "🎬"
-        case let n where n.contains("hogar"), let n where n.contains("casa"): return "🏠"
-        case let n where n.contains("ropa"), let n where n.contains("moda"): return "👗"
-        case let n where n.contains("viaje"), let n where n.contains("hotel"): return "✈️"
-        case let n where n.contains("educacion"), let n where n.contains("educación"): return "📚"
-        case let n where n.contains("deporte"), let n where n.contains("gym"): return "🏋️"
-        default: return item.group == "Income" ? "💵" : "📦"
+        case let n where n.contains("aliment"): return "cart.fill"
+        case let n where n.contains("restaur"): return "fork.knife"
+        case let n where n.contains("transporte"): return "car.fill"
+        case let n where n.contains("suscripcion"), let n where n.contains("suscripción"): return "iphone"
+        case let n where n.contains("ingreso"), let n where n.contains("nomina"): return "banknote.fill"
+        case let n where n.contains("salud"), let n where n.contains("farma"): return "cross.case.fill"
+        case let n where n.contains("ocio"), let n where n.contains("entretenimiento"): return "film.fill"
+        case let n where n.contains("hogar"), let n where n.contains("casa"): return "house.fill"
+        case let n where n.contains("ropa"), let n where n.contains("moda"): return "tshirt.fill"
+        case let n where n.contains("viaje"), let n where n.contains("hotel"): return "airplane"
+        case let n where n.contains("educacion"), let n where n.contains("educación"): return "book.fill"
+        case let n where n.contains("deporte"), let n where n.contains("gym"): return "figure.run"
+        default: return item.group == "Income" ? "banknote.fill" : "shippingbox.fill"
         }
     }
 
@@ -600,8 +602,9 @@ private struct CategoryCard: View {
                         RoundedRectangle(cornerRadius: 16, style: .continuous)
                             .strokeBorder(tint.opacity(0.10), lineWidth: 1)
 
-                        Text(emoji)
-                            .font(.system(size: 22))
+                        Image(systemName: systemImage)
+                            .font(.system(size: 20, weight: .semibold))
+                            .symbolRenderingMode(.hierarchical)
                     }
                     .frame(width: 48, height: 48)
 
@@ -644,7 +647,10 @@ private struct CategoryCard: View {
 
                     Spacer(minLength: 0)
 
-                    Text("Movimientos")
+                    Text(appLanguage.localized(
+                        "categories.shareOfMovements",
+                        appLanguage.formatPercent(item.activityShare)
+                    ))
                         .font(.caption2.weight(.medium))
                         .foregroundStyle(.secondary)
                 }

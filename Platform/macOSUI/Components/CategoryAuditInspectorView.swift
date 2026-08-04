@@ -5,6 +5,7 @@ struct CategoryAuditInspectorView: View {
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.english
 
     let transaction: Transaction?
+    let selectedCount: Int
     let viewModel: CategoryAuditViewModel
     let onAccept: (Transaction) -> Void
     let onDismiss: (Transaction) -> Void
@@ -80,6 +81,12 @@ struct CategoryAuditInspectorView: View {
                     }
                     .padding(AppLayoutMetrics.sectionGap)
                 }
+            } else if selectedCount > 1 {
+                ContentUnavailableView(
+                    LocalizedStringKey("audit.inspector.multipleTitle"),
+                    systemImage: "checkmark.square.stack",
+                    description: Text(appLanguage.localized("audit.inspector.multipleMessage", appLanguage.formatInteger(selectedCount)))
+                )
             } else {
                 ContentUnavailableView(
                     LocalizedStringKey("audit.inspector.emptyTitle"),

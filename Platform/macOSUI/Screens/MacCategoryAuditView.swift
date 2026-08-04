@@ -17,6 +17,7 @@ struct MacCategoryAuditView: View {
 
                 CategoryAuditInspectorView(
                     transaction: viewModel.selectedTransaction,
+                    selectedCount: viewModel.selectedVisibleCount,
                     viewModel: viewModel,
                     onAccept: { viewModel.accept($0, using: appContainer) },
                     onDismiss: { viewModel.dismiss($0, using: appContainer) }
@@ -256,7 +257,7 @@ struct MacCategoryAuditView: View {
                     .width(min: 100, ideal: 120)
                 }
                 .onChange(of: viewModel.selectedTransactionIDs) { _, newValue in
-                    guard let id = newValue.first else {
+                    guard newValue.count == 1, let id = newValue.first else {
                         viewModel.selectedTransaction = nil
                         return
                     }

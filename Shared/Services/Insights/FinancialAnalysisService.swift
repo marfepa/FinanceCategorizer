@@ -52,6 +52,11 @@ struct ForecastSnapshot {
     let projectedDelta6Months: Decimal
     let projectedDelta12Months: Decimal
     let isNegativeTrend: Bool
+    let sourceMonthCount: Int
+
+    var hasLimitedHistory: Bool {
+        sourceMonthCount < 3
+    }
 }
 
 struct RecurringExpenseItem: Identifiable {
@@ -327,7 +332,8 @@ struct FinancialAnalysisService {
             projectedDelta3Months: averageMonthlyNet * Decimal(3),
             projectedDelta6Months: averageMonthlyNet * Decimal(6),
             projectedDelta12Months: averageMonthlyNet * Decimal(12),
-            isNegativeTrend: NSDecimalNumber(decimal: averageMonthlyNet).doubleValue < 0
+            isNegativeTrend: NSDecimalNumber(decimal: averageMonthlyNet).doubleValue < 0,
+            sourceMonthCount: monthlyCashflow.count
         )
     }
 
