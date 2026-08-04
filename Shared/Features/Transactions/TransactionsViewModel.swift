@@ -22,6 +22,8 @@ final class TransactionsViewModel {
     var recategorizationSummary: String?
     var statusMessage: String?
     var errorMessage: String?
+    var duplicateGroups: [DuplicateMovementGroup] = []
+    var isScanningDuplicates = false
 
     // Filters
     var filterStartDate: Date?
@@ -85,6 +87,7 @@ final class TransactionsViewModel {
         do {
             transactions = try container.transactionRepository.fetchAll()
             categories = try container.categoryRepository.fetchAll()
+            duplicateGroups = pendingDuplicateGroups(from: transactions)
             if selectedTransaction == nil {
                 selectedTransaction = transactions.first
             } else if let selectedTransaction,
@@ -99,6 +102,70 @@ final class TransactionsViewModel {
             }
             recategorizationSummary = nil
             errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func scanDuplicates(using container: AppContainer, language: AppLanguage = .currentSelection) {
+        guard !isScanningDuplicates else { return }
+
+        isScanningDuplicates = true
+        defer { isScanningDuplicates = false }
+
+        do {
+            let allTransactions = try container.transactionRepository.fetchAll()
+            let groups = container.duplicateAuditService.analyze(transactions: allTransactions)
+            try container.transactionRepository.applyDuplicateAudit(groups)
+            load(using: container)
+            statusMessage = language.localized(
+                "duplicate.status.scanned",
+                language.formatInteger(duplicateGroups.count)
+            )
+            errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func dismissDuplicateGroup(_ group: DuplicateMovementGroup, using container: AppContainer, language: AppLanguage = .currentSelection) {
+        do {
+            try container.transactionRepository.dismissDuplicateGroup(groupID: group.id)
+            load(using: container)
+            statusMessage = language.localized("duplicate.status.dismissed")
+            errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func removeDuplicateGroup(_ group: DuplicateMovementGroup, using container: AppContainer, language: AppLanguage = .currentSelection) {
+        do {
+            try container.transactionRepository.deleteDuplicateGroup(
+                groupID: group.id,
+                keeping: group.recommendedKeepID
+            )
+            load(using: container)
+            statusMessage = language.localized("duplicate.status.resolved")
+            errorMessage = nil
+            NotificationCenter.default.post(name: AppContainer.importDidFinishNotification, object: nil)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func resolveAllDuplicateGroups(_ groups: [DuplicateMovementGroup], using container: AppContainer, language: AppLanguage = .currentSelection) {
+        guard !groups.isEmpty else { return }
+
+        do {
+            try container.transactionRepository.resolveDuplicateGroups(groups)
+            load(using: container)
+            statusMessage = language.localized(
+                "duplicate.status.resolvedAll",
+                language.formatInteger(groups.count)
+            )
+            errorMessage = nil
+            NotificationCenter.default.post(name: AppContainer.importDidFinishNotification, object: nil)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -268,6 +335,39 @@ final class TransactionsViewModel {
             sign: transaction.amount >= 0 ? 1 : -1,
             fingerprint: transaction.fingerprint
         )
+    }
+
+    private func pendingDuplicateGroups(from transactions: [Transaction]) -> [DuplicateMovementGroup] {
+        let grouped = Dictionary(grouping: transactions.filter {
+            $0.duplicateReviewStatusRaw == DuplicateReviewStatus.pending.rawValue
+        }) { $0.duplicateGroupID }
+
+        return grouped.compactMap { groupID, members in
+            guard let groupID,
+                  members.count >= 2,
+                  let first = members.first else {
+                return nil
+            }
+
+            let transactionIDs = members.map(\.id).sorted { $0.uuidString < $1.uuidString }
+            return DuplicateMovementGroup(
+                id: groupID,
+                transactionIDs: transactionIDs,
+                confidence: members.compactMap(\.duplicateConfidence).min() ?? 0,
+                reasonKey: members.compactMap(\.duplicateReasonKey).first ?? "duplicate.reason.crossSource",
+                recommendedKeepID: members.first(where: { member in
+                    member.id == member.duplicateRecommendedKeepID
+                })?.id
+                    ?? first.duplicateRecommendedKeepID
+                    ?? first.id
+            )
+        }
+        .sorted { lhs, rhs in
+            if lhs.confidence == rhs.confidence {
+                return lhs.id < rhs.id
+            }
+            return lhs.confidence > rhs.confidence
+        }
     }
 
 

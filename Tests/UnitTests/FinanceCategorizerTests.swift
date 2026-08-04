@@ -255,6 +255,257 @@ final class FinanceCategorizerTests: XCTestCase {
         XCTAssertEqual(try container.transactionRepository.count(), 4)
     }
 
+    func testImportSkipsCrossBankMovementWithDifferentDescriptionAndAdjacentDate() async throws {
+        let container = AppContainer(inMemory: true)
+
+        let firstBankCSV = """
+        Fecha;F. valor;Concepto;Importe;Saldo
+        02/01/2026;02/01/2026;COMPRA TARJETA MERCADONA VALENCIA;-42,60;100,00
+        """
+
+        let firstSummary = try await container.importOrchestrator.importCSV(
+            firstBankCSV,
+            sourceFileName: "bank-a.csv",
+            language: .spanish
+        )
+
+        XCTAssertEqual(firstSummary.importedCount, 1)
+
+        let secondBankCSV = """
+        Fecha;F. valor;Concepto;Importe;Saldo
+        03/01/2026;03/01/2026;MERCADONA SUPERMERCADO;-42,60;57,40
+        03/01/2026;03/01/2026;SPOTIFY PREMIUM;-9,99;47,41
+        """
+
+        let secondSummary = try await container.importOrchestrator.importCSV(
+            secondBankCSV,
+            sourceFileName: "bank-b.csv",
+            language: .spanish
+        )
+
+        XCTAssertEqual(secondSummary.importedCount, 1)
+        XCTAssertEqual(secondSummary.duplicatesSkipped, 1)
+        XCTAssertEqual(try container.transactionRepository.count(), 2)
+    }
+
+    func testDuplicateAuditFindsAndPersistsCrossSourceGroup() throws {
+        let container = AppContainer(inMemory: true)
+        let calendar = Calendar(identifier: .gregorian)
+        let firstDate = calendar.date(from: DateComponents(year: 2026, month: 1, day: 2))!
+        let secondDate = calendar.date(byAdding: .day, value: 1, to: firstDate)!
+
+        let first = Transaction(
+            importBatchID: UUID(),
+            externalID: "bank-a-1",
+            bookingDate: firstDate,
+            valueDate: firstDate,
+            rawDescription: "COMPRA TARJETA MERCADONA VALENCIA",
+            cleanedDescription: "MERCADONA VALENCIA",
+            merchantDisplayName: "Mercadona",
+            merchantCanonicalName: "Mercadona",
+            amount: Decimal(-42.60),
+            currencyCode: "EUR",
+            kindRaw: TransactionKind.expense.rawValue,
+            fingerprint: "fingerprint-bank-a"
+        )
+        let second = Transaction(
+            importBatchID: UUID(),
+            bookingDate: secondDate,
+            valueDate: secondDate,
+            rawDescription: "MERCADONA SUPERMERCADO",
+            cleanedDescription: "MERCADONA SUPERMERCADO",
+            merchantDisplayName: "Mercadona",
+            merchantCanonicalName: "Mercadona",
+            amount: Decimal(-42.60),
+            currencyCode: "EUR",
+            kindRaw: TransactionKind.expense.rawValue,
+            fingerprint: "fingerprint-bank-b"
+        )
+
+        try container.transactionRepository.insert([first, second])
+
+        let groups = container.duplicateAuditService.analyze(
+            transactions: try container.transactionRepository.fetchAll()
+        )
+
+        let group = try XCTUnwrap(groups.first)
+        XCTAssertEqual(groups.count, 1)
+        XCTAssertEqual(Set(group.transactionIDs), Set([first.id, second.id]))
+        XCTAssertEqual(group.reasonKey, "duplicate.reason.crossSource")
+        XCTAssertEqual(group.recommendedKeepID, first.id)
+
+        try container.transactionRepository.applyDuplicateAudit(groups)
+        var persisted = try container.transactionRepository.fetchAll()
+        XCTAssertTrue(persisted.allSatisfy { $0.duplicateGroupID == group.id })
+        XCTAssertTrue(persisted.allSatisfy { $0.duplicateReviewStatusRaw == DuplicateReviewStatus.pending.rawValue })
+
+        try container.transactionRepository.dismissDuplicateGroup(groupID: group.id)
+        persisted = try container.transactionRepository.fetchAll()
+        XCTAssertTrue(persisted.allSatisfy { $0.duplicateReviewStatusRaw == DuplicateReviewStatus.dismissed.rawValue })
+
+        // Re-scanning the same data must not undo the user's dismissal.
+        try container.transactionRepository.applyDuplicateAudit(
+            container.duplicateAuditService.analyze(transactions: persisted)
+        )
+        persisted = try container.transactionRepository.fetchAll()
+        XCTAssertTrue(persisted.allSatisfy { $0.duplicateReviewStatusRaw == DuplicateReviewStatus.dismissed.rawValue })
+
+        try container.transactionRepository.deleteDuplicateGroup(groupID: group.id, keeping: first.id)
+        XCTAssertEqual(try container.transactionRepository.count(), 1)
+        let kept = try XCTUnwrap(try container.transactionRepository.fetch(transactionID: first.id))
+        XCTAssertNil(kept.duplicateGroupID)
+        XCTAssertNil(kept.duplicateReviewStatusRaw)
+    }
+
+    func testDuplicateAuditIgnoresLegitimateRowsFromSameImportBatch() throws {
+        let container = AppContainer(inMemory: true)
+        let importBatchID = UUID()
+        let date = Date(timeIntervalSince1970: 1_767_312_000)
+
+        let first = Transaction(
+            importBatchID: importBatchID,
+            bookingDate: date,
+            valueDate: date,
+            rawDescription: "CAFETERIA TEST",
+            cleanedDescription: "CAFETERIA TEST",
+            merchantCanonicalName: "Cafeteria Test",
+            amount: Decimal(-2.50),
+            currencyCode: "EUR",
+            kindRaw: TransactionKind.expense.rawValue,
+            fingerprint: "same-fingerprint"
+        )
+        let second = Transaction(
+            importBatchID: importBatchID,
+            bookingDate: date,
+            valueDate: date,
+            rawDescription: "CAFETERIA TEST",
+            cleanedDescription: "CAFETERIA TEST",
+            merchantCanonicalName: "Cafeteria Test",
+            amount: Decimal(-2.50),
+            currencyCode: "EUR",
+            kindRaw: TransactionKind.expense.rawValue,
+            fingerprint: "same-fingerprint"
+        )
+
+        try container.transactionRepository.insert([first, second])
+
+        let groups = container.duplicateAuditService.analyze(
+            transactions: try container.transactionRepository.fetchAll()
+        )
+
+        XCTAssertTrue(groups.isEmpty)
+    }
+
+    func testDuplicateRepositoryCanResolveAllSuggestedGroups() throws {
+        let container = AppContainer(inMemory: true)
+        let calendar = Calendar(identifier: .gregorian)
+        let date = calendar.date(from: DateComponents(year: 2026, month: 2, day: 10))!
+
+        let transactions = [
+            Transaction(
+                importBatchID: UUID(),
+                externalID: "mercadona-a",
+                bookingDate: date,
+                valueDate: date,
+                rawDescription: "COMPRA MERCADONA VALENCIA",
+                cleanedDescription: "MERCADONA VALENCIA",
+                merchantCanonicalName: "Mercadona",
+                amount: Decimal(-12.50),
+                currencyCode: "EUR",
+                kindRaw: TransactionKind.expense.rawValue,
+                fingerprint: "mercadona-a"
+            ),
+            Transaction(
+                importBatchID: UUID(),
+                bookingDate: date,
+                valueDate: date,
+                rawDescription: "MERCADONA SUPERMERCADO",
+                cleanedDescription: "MERCADONA SUPERMERCADO",
+                merchantCanonicalName: "Mercadona",
+                amount: Decimal(-12.50),
+                currencyCode: "EUR",
+                kindRaw: TransactionKind.expense.rawValue,
+                fingerprint: "mercadona-b"
+            ),
+            Transaction(
+                importBatchID: UUID(),
+                externalID: "spotify-a",
+                bookingDate: date,
+                valueDate: date,
+                rawDescription: "PAGO SPOTIFY PREMIUM",
+                cleanedDescription: "SPOTIFY PREMIUM",
+                merchantCanonicalName: "Spotify",
+                amount: Decimal(-8.99),
+                currencyCode: "EUR",
+                kindRaw: TransactionKind.expense.rawValue,
+                fingerprint: "spotify-a"
+            ),
+            Transaction(
+                importBatchID: UUID(),
+                bookingDate: date,
+                valueDate: date,
+                rawDescription: "SPOTIFY SUSCRIPCION",
+                cleanedDescription: "SPOTIFY SUSCRIPCION",
+                merchantCanonicalName: "Spotify",
+                amount: Decimal(-8.99),
+                currencyCode: "EUR",
+                kindRaw: TransactionKind.expense.rawValue,
+                fingerprint: "spotify-b"
+            )
+        ]
+
+        try container.transactionRepository.insert(transactions)
+        let groups = container.duplicateAuditService.analyze(
+            transactions: try container.transactionRepository.fetchAll()
+        )
+        XCTAssertEqual(groups.count, 2)
+
+        try container.transactionRepository.applyDuplicateAudit(groups)
+        let deletedCount = try container.transactionRepository.resolveDuplicateGroups(groups)
+
+        XCTAssertEqual(deletedCount, 2)
+        XCTAssertEqual(try container.transactionRepository.count(), 2)
+        XCTAssertTrue(try container.transactionRepository.fetchAll().allSatisfy {
+            $0.duplicateGroupID == nil && $0.duplicateReviewStatusRaw == nil
+        })
+    }
+
+    func testDuplicateDetectorDoesNotMatchOppositeDirections() {
+        let calendar = Calendar(identifier: .gregorian)
+        let date = calendar.date(from: DateComponents(year: 2026, month: 1, day: 2))!
+        let normalizer = TransactionNormalizer()
+
+        let expense = normalizer.normalize(
+            ParsedRowDTO(
+                externalID: nil,
+                bookingDate: date,
+                valueDate: nil,
+                description: "MERCADONA VALENCIA",
+                amount: Decimal(-42.60),
+                currencyCode: "EUR",
+                accountName: nil
+            )
+        )
+        let income = normalizer.normalize(
+            ParsedRowDTO(
+                externalID: nil,
+                bookingDate: date,
+                valueDate: nil,
+                description: "MERCADONA DEVOLUCION",
+                amount: Decimal(42.60),
+                currencyCode: "EUR",
+                accountName: nil
+            )
+        )
+
+        let matches = DuplicateMovementDetector().findMatches(
+            for: [DuplicateMovementCandidate(normalized: income)],
+            against: [DuplicateMovementCandidate(normalized: expense)]
+        )
+
+        XCTAssertTrue(matches.isEmpty)
+    }
+
     func testPDFParserDoesNotAdvertiseUnimplementedBanksAsSupported() {
         let santanderText = """
         Banco Santander
