@@ -4,8 +4,12 @@ import Observation
 @MainActor
 @Observable
 final class SettingsViewModel {
-    var aiEnabled = FeatureFlags.aiSuggestionsEnabled
-    var foundationModelsEnabled = FeatureFlags.foundationModelsEnabled
+    var aiEnabled = FeatureFlags.aiSuggestionsEnabled {
+        didSet { FeatureFlags.aiSuggestionsEnabled = aiEnabled }
+    }
+    var foundationModelsEnabled = FeatureFlags.foundationModelsEnabled {
+        didSet { FeatureFlags.foundationModelsEnabled = foundationModelsEnabled }
+    }
     var autoAcceptThreshold = AppConfig.autoCategorizationThreshold
     var softAcceptThreshold = AppConfig.softAutoCategorizationThreshold
     var reviewThreshold = AppConfig.suggestionThreshold

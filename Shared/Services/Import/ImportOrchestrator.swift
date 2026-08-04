@@ -90,11 +90,12 @@ final class ImportOrchestrator: ImportOrchestrating {
 
     func importFile(from url: URL, language: AppLanguage) async throws -> ImportSummary {
         let preview = try previewFile(at: url)
-        return try await importRows(
+        let fileData = try fileImportService.readData(from: url)
+        return try await importPreview(
             preview,
             sourceFileName: url.lastPathComponent,
             sourceType: "file",
-            fileFingerprint: fileImportService.fingerprint(for: fileImportService.readData(from: url)),
+            fileFingerprint: fileImportService.fingerprint(for: fileData),
             language: language
         )
     }

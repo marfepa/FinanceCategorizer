@@ -22,7 +22,8 @@ final class InsightEngine {
         let categoryMap = Dictionary(uniqueKeysWithValues: categories.map { ($0.id, $0.name) })
         var insights: [Insight] = []
 
-        let recentExpenses = transactions.filter { $0.amount < 0 }
+        let recentCutoff = Calendar.current.date(byAdding: .month, value: -12, to: Date()) ?? .distantPast
+        let recentExpenses = transactions.filter { $0.amount < 0 && $0.accountingDate >= recentCutoff }
         let groupedByCategory = Dictionary(grouping: recentExpenses) { tx in
             tx.categoryID.flatMap { categoryMap[$0] } ?? String(localized: "Sin categorizar")
         }
@@ -78,8 +79,8 @@ final class InsightEngine {
         let monthStart = calendar.date(from: calendar.dateComponents([.year, .month], from: today)) ?? today
         let last6Months = calendar.date(byAdding: .month, value: -6, to: monthStart) ?? Date.distantPast
         
-        let historicalTx = transactions.filter { $0.bookingDate < monthStart && $0.bookingDate > last6Months }
-        let currentMonthTx = transactions.filter { $0.bookingDate >= monthStart }
+        let historicalTx = transactions.filter { $0.amount < 0 && $0.bookingDate < monthStart && $0.bookingDate > last6Months }
+        let currentMonthTx = transactions.filter { $0.amount < 0 && $0.bookingDate >= monthStart }
         
         var anomalies: [Insight] = []
         

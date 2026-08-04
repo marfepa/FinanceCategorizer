@@ -10,17 +10,15 @@ struct MerchantCategoryStats {
 
 @MainActor
 final class MerchantMemoryEngine {
-    private let merchantRepository: MerchantRepository
     private let transactionRepository: TransactionRepository
 
-    init(merchantRepository: MerchantRepository, transactionRepository: TransactionRepository) {
-        self.merchantRepository = merchantRepository
+    init(transactionRepository: TransactionRepository) {
         self.transactionRepository = transactionRepository
     }
 
     func match(_ input: NormalizedTransactionDTO) -> CategorizationDecision? {
         if let merchant = input.merchantCanonicalName,
-           let categoryID = try? merchantRepository.preferredCategoryID(for: merchant) {
+           let categoryID = preferredCategoryID(for: merchant, sign: input.sign) {
             return CategorizationDecision(
                 categoryID: categoryID,
                 subcategoryID: nil,
@@ -32,7 +30,7 @@ final class MerchantMemoryEngine {
             )
         }
 
-        guard let previous = try? transactionRepository.fetchFirst(byFingerprint: input.fingerprint),
+        guard let previous = try? transactionRepository.fetchFirst(byFingerprint: input.fingerprint, sign: input.sign),
               let categoryID = previous.categoryID else {
             return nil
         }
@@ -46,5 +44,20 @@ final class MerchantMemoryEngine {
             isRecurringCandidate: previous.isRecurringCandidate,
             reason: "Matched a previous normalized transaction fingerprint."
         )
+    }
+
+    private func preferredCategoryID(for merchant: String, sign: Int) -> UUID? {
+        guard let transactions = try? transactionRepository.fetchByMerchant(merchant, limit: 100) else {
+            return nil
+        }
+
+        let matchingDirection = transactions.filter {
+            guard $0.categoryID != nil, !$0.needsReview else { return false }
+            return sign >= 0 ? $0.amount > .zero : $0.amount < .zero
+        }
+
+        return Dictionary(grouping: matchingDirection, by: { $0.categoryID! })
+            .max { lhs, rhs in lhs.value.count < rhs.value.count }?
+            .key
     }
 }

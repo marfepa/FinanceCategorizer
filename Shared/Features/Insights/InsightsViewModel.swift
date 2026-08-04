@@ -19,11 +19,9 @@ final class InsightsViewModel {
         do {
             let transactions = try container.transactionRepository.fetchAll()
             let categories = try container.categoryRepository.fetchAll()
-            let pendingCount = try container.transactionRepository.fetchPendingReview().count
             let snapshot = container.financialAnalysisService.analyze(
                 transactions: transactions,
                 categories: categories,
-                pendingReviewCount: pendingCount,
                 range: selectedRange
             )
             self.snapshot = snapshot

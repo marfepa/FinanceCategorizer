@@ -65,19 +65,16 @@ final class AppContainer {
 
         let ruleEngine = RuleEngine(ruleRepository: ruleRepository)
         let merchantMemory = MerchantMemoryEngine(
-            merchantRepository: merchantRepository,
             transactionRepository: transactionRepository
         )
         let classifier = StatisticalClassifier(
             categoryRepository: categoryRepository,
             localModelManager: localModelManager
         )
-        let foundationResolver = FoundationModelsAvailability.isUsable()
-            ? FoundationModelsResolver(
-                categoryRepository: categoryRepository,
-                transactionRepository: transactionRepository
-            )
-            : nil
+        let foundationResolver = FoundationModelsResolver(
+            categoryRepository: categoryRepository,
+            transactionRepository: transactionRepository
+        )
         let categorizationOrchestrator = CategorizationOrchestrator(
             ruleEngine: ruleEngine,
             merchantMemory: merchantMemory,

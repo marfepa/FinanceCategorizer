@@ -61,17 +61,24 @@ final class TransactionRepository {
         return counts
     }
 
-    func fetchFirst(byFingerprint fingerprint: String) throws -> Transaction? {
+    func fetchFirst(byFingerprint fingerprint: String, sign: Int? = nil) throws -> Transaction? {
         let context = makeContext()
         let descriptor = FetchDescriptor<Transaction>(
             predicate: #Predicate { $0.fingerprint == fingerprint && $0.categoryID != nil }
         )
-        return try context.fetch(descriptor).first
+        let transactions = try context.fetch(descriptor)
+        guard let sign else { return transactions.first }
+        return transactions.first {
+            sign >= 0 ? $0.amount > .zero : $0.amount < .zero
+        }
     }
 
     func fetchPendingReview() throws -> [Transaction] {
         try fetchAll()
-            .filter { $0.needsReview || $0.categoryID == nil || $0.reviewStatusRaw == ReviewStatus.pending.rawValue }
+            .filter {
+                $0.resolvedKind != .transfer &&
+                ($0.needsReview || $0.categoryID == nil || $0.reviewStatusRaw == ReviewStatus.pending.rawValue)
+            }
             .sorted {
                 if $0.confidence == $1.confidence {
                     return $0.bookingDate > $1.bookingDate
@@ -152,6 +159,15 @@ final class TransactionRepository {
 
         transaction.kindRaw = kind.rawValue
         transaction.amount = signedAmount
+        if kind == .transfer {
+            transaction.categoryID = nil
+            transaction.subcategoryID = nil
+            transaction.categorizationSourceRaw = CategorizationSource.manual.rawValue
+            transaction.confidence = 1
+            transaction.needsReview = false
+            transaction.reviewStatusRaw = ReviewStatus.accepted.rawValue
+            transaction.categorizationReason = "Marked manually as transfer."
+        }
         transaction.updatedAt = .now
         try context.save()
     }

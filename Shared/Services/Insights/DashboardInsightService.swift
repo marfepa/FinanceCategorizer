@@ -51,10 +51,18 @@ struct DashboardInsightService {
         }
 
         let currentMonthTransactions = transactions
-            .filter { $0.accountingDate >= currentMonthStart && $0.accountingDate < nextMonthStart }
+            .filter {
+                $0.resolvedKind != .transfer &&
+                $0.accountingDate >= currentMonthStart &&
+                $0.accountingDate < nextMonthStart
+            }
             .sorted { $0.accountingDate < $1.accountingDate }
         let previousMonthTransactions = transactions
-            .filter { $0.accountingDate >= previousMonthStart && $0.accountingDate < currentMonthStart }
+            .filter {
+                $0.resolvedKind != .transfer &&
+                $0.accountingDate >= previousMonthStart &&
+                $0.accountingDate < currentMonthStart
+            }
 
         let totalIncome = currentMonthTransactions
             .filter { decimalValue($0.amount) > 0 }
