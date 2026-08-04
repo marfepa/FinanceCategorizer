@@ -18,6 +18,13 @@ final class Transaction {
     var accountName: String?
     var categoryID: UUID?
     var subcategoryID: UUID?
+    // Re-categorization proposals are kept apart from the accepted category
+    // so an analysis run can never overwrite a user's previous decision.
+    var suggestedCategoryID: UUID?
+    var suggestedSubcategoryID: UUID?
+    var suggestedConfidence: Double?
+    var suggestedSourceRaw: String?
+    var suggestedReason: String?
     var categorizationSourceRaw: String
     var confidence: Double
     var needsReview: Bool
@@ -52,6 +59,11 @@ final class Transaction {
         accountName: String? = nil,
         categoryID: UUID? = nil,
         subcategoryID: UUID? = nil,
+        suggestedCategoryID: UUID? = nil,
+        suggestedSubcategoryID: UUID? = nil,
+        suggestedConfidence: Double? = nil,
+        suggestedSourceRaw: String? = nil,
+        suggestedReason: String? = nil,
         categorizationSourceRaw: String = CategorizationSource.unknown.rawValue,
         confidence: Double = 0,
         needsReview: Bool = true,
@@ -83,6 +95,11 @@ final class Transaction {
         self.accountName = accountName
         self.categoryID = categoryID
         self.subcategoryID = subcategoryID
+        self.suggestedCategoryID = suggestedCategoryID
+        self.suggestedSubcategoryID = suggestedSubcategoryID
+        self.suggestedConfidence = suggestedConfidence
+        self.suggestedSourceRaw = suggestedSourceRaw
+        self.suggestedReason = suggestedReason
         self.categorizationSourceRaw = categorizationSourceRaw
         self.confidence = confidence
         self.needsReview = needsReview
@@ -102,6 +119,10 @@ final class Transaction {
 }
 
 extension Transaction {
+    var hasRecategorizationSuggestion: Bool {
+        suggestedCategoryID != nil
+    }
+
     var resolvedKind: TransactionKind {
         if let raw = kindRaw, let kind = TransactionKind(rawValue: raw) {
             return kind

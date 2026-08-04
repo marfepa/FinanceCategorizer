@@ -24,6 +24,7 @@ final class AppContainer {
     let importOrchestrator: ImportOrchestrator
     let fileImportService: FileImportService
     let categorizationOrchestrator: CategorizationOrchestrator
+    let recategorizationService: RecategorizationService
     let correctionLearningService: CorrectionLearningService
     let localModelManager: LocalModelManager
     let aiAvailabilityService: AIAvailabilityService
@@ -105,6 +106,10 @@ final class AppContainer {
         self.normalizer = normalizer
         self.fileImportService = fileImportService
         self.categorizationOrchestrator = categorizationOrchestrator
+        self.recategorizationService = RecategorizationService(
+            transactionRepository: transactionRepository,
+            categorizationOrchestrator: categorizationOrchestrator
+        )
         self.localModelManager = localModelManager
         self.foundationResolver = foundationResolver
         self.correctionLearningService = correctionLearningService

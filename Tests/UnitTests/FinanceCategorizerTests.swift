@@ -18,6 +18,86 @@ final class FinanceCategorizerTests: XCTestCase {
         XCTAssertGreaterThan(AppConfig.softAutoCategorizationThreshold, AppConfig.suggestionThreshold)
     }
 
+    func testDashboardSnapshotSurfacesMonthlyProgressAndCategoryGrowth() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let currentMonth = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 6, day: 10)))
+        let previousMonth = try XCTUnwrap(calendar.date(byAdding: .month, value: -1, to: currentMonth))
+        let groceries = Category(
+            name: "Groceries",
+            iconName: "cart",
+            colorHex: "#4CAF50"
+        )
+
+        let transactions = [
+            Transaction(
+                bookingDate: currentMonth,
+                rawDescription: "SALARY",
+                cleanedDescription: "SALARY",
+                amount: Decimal(1_800),
+                kindRaw: TransactionKind.income.rawValue,
+                categorizationSourceRaw: CategorizationSource.manual.rawValue,
+                confidence: 1,
+                needsReview: false,
+                reviewStatusRaw: ReviewStatus.accepted.rawValue,
+                fingerprint: "salary-current"
+            ),
+            Transaction(
+                bookingDate: currentMonth.addingTimeInterval(86_400),
+                rawDescription: "GROCERY CURRENT",
+                cleanedDescription: "GROCERY CURRENT",
+                amount: Decimal(-150),
+                categoryID: groceries.id,
+                categorizationSourceRaw: CategorizationSource.manual.rawValue,
+                confidence: 1,
+                needsReview: false,
+                reviewStatusRaw: ReviewStatus.accepted.rawValue,
+                fingerprint: "groceries-current"
+            ),
+            Transaction(
+                bookingDate: previousMonth,
+                rawDescription: "SALARY",
+                cleanedDescription: "SALARY",
+                amount: Decimal(1_800),
+                kindRaw: TransactionKind.income.rawValue,
+                categorizationSourceRaw: CategorizationSource.manual.rawValue,
+                confidence: 1,
+                needsReview: false,
+                reviewStatusRaw: ReviewStatus.accepted.rawValue,
+                fingerprint: "salary-previous"
+            ),
+            Transaction(
+                bookingDate: previousMonth.addingTimeInterval(86_400),
+                rawDescription: "GROCERY PREVIOUS",
+                cleanedDescription: "GROCERY PREVIOUS",
+                amount: Decimal(-100),
+                categoryID: groceries.id,
+                categorizationSourceRaw: CategorizationSource.manual.rawValue,
+                confidence: 1,
+                needsReview: false,
+                reviewStatusRaw: ReviewStatus.accepted.rawValue,
+                fingerprint: "groceries-previous"
+            )
+        ]
+
+        let snapshot = try XCTUnwrap(
+            DashboardInsightService().buildSnapshot(
+                transactions: transactions,
+                categories: [groceries],
+                recentImports: [],
+                locale: Locale(identifier: "en")
+            )
+        )
+        let groceriesItem = try XCTUnwrap(snapshot.categoryChanges.first(where: { $0.name == "Groceries" }))
+
+        XCTAssertEqual(snapshot.monthlyCashflow.count, 2)
+        XCTAssertEqual(snapshot.totalIncome, Decimal(1_800))
+        XCTAssertEqual(snapshot.totalExpenses, Decimal(150))
+        XCTAssertEqual(groceriesItem.deltaFromPreviousMonth, Decimal(50))
+        XCTAssertEqual(groceriesItem.deltaPercentage, 0.5)
+        XCTAssertEqual(snapshot.monthlyCashflow.last?.expense, Decimal(150))
+    }
+
     func testLocalizedStringFilesHaveTheSameKeys() throws {
         let englishKeys = try localizationKeys(in: projectRootURL().appendingPathComponent("Resources/en.lproj/Localizable.strings"))
         let spanishKeys = try localizationKeys(in: projectRootURL().appendingPathComponent("Resources/es.lproj/Localizable.strings"))
@@ -48,6 +128,122 @@ final class FinanceCategorizerTests: XCTestCase {
         XCTAssertTrue(ConfidenceScore(value: 0.95).shouldAutoAccept)
         XCTAssertTrue(ConfidenceScore(value: 0.81).shouldAutoAcceptButMarkSoft)
         XCTAssertTrue(ConfidenceScore(value: 0.40).shouldSendToReview)
+    }
+
+    func testHeuristicsRecognizeMerchantsObservedInNumbersFiles() throws {
+        let container = AppContainer(inMemory: true)
+        try container.categoryRepository.ensureBaseCategories()
+        let model = LocalModelManager(
+            transactionRepository: container.transactionRepository,
+            storageDirectory: FileManager.default.temporaryDirectory
+                .appendingPathComponent("finance-categorizer-test-\(UUID().uuidString)")
+        )
+        let classifier = StatisticalClassifier(
+            categoryRepository: container.categoryRepository,
+            localModelManager: model
+        )
+
+        let cases: [(description: String, category: String)] = [
+            ("MERCADONA MISLATA", "Alimentacion"),
+            ("BARBERIA JAVI ALGEMESI", "Cuidado personal"),
+            ("DECATHLON CARCAIXENT", "Deportes"),
+            ("APPLE BILL ITUNES", "Suscripciones"),
+            ("PARROQUIA SAN PIO X ALGEMESI", "Donaciones")
+        ]
+
+        for testCase in cases {
+            let input = NormalizedTransactionDTO(
+                externalID: nil,
+                bookingDate: .now,
+                valueDate: nil,
+                rawDescription: testCase.description,
+                cleanedDescription: testCase.description,
+                merchantDisplayName: nil,
+                merchantCanonicalName: nil,
+                amount: Decimal(-20),
+                currencyCode: "EUR",
+                accountName: nil,
+                sign: -1,
+                fingerprint: UUID().uuidString
+            )
+
+            let decision = try XCTUnwrap(classifier.predict(input))
+            let category = try XCTUnwrap(try container.categoryRepository.fetch(categoryID: try XCTUnwrap(decision.categoryID)))
+            XCTAssertEqual(category.name, testCase.category, "Unexpected category for \(testCase.description)")
+            XCTAssertGreaterThanOrEqual(decision.confidence, AppConfig.suggestionThreshold)
+        }
+    }
+
+    func testRecategorizationStoresSuggestionWithoutOverwritingCurrentCategory() async throws {
+        let container = AppContainer(inMemory: true)
+        try container.categoryRepository.ensureBaseCategories()
+        let currentCategory = try XCTUnwrap(
+            try container.categoryRepository.fetchAll().first(where: { $0.name == "Compras" })
+        )
+        let suggestedCategory = try XCTUnwrap(
+            try container.categoryRepository.fetchAll().first(where: { $0.name == "Deportes" })
+        )
+        let transaction = Transaction(
+            bookingDate: .now,
+            rawDescription: "DECATHLON CARCAIXENT",
+            cleanedDescription: "DECATHLON CARCAIXENT",
+            merchantDisplayName: "Decathlon",
+            merchantCanonicalName: "Decathlon",
+            amount: Decimal(-65),
+            categoryID: currentCategory.id,
+            categorizationSourceRaw: CategorizationSource.localML.rawValue,
+            confidence: 0.78,
+            needsReview: false,
+            reviewStatusRaw: ReviewStatus.accepted.rawValue,
+            fingerprint: "decathlon-audit"
+        )
+        try container.transactionRepository.insert(transaction)
+
+        let result = try await container.recategorizationService.analyze([transaction])
+        let saved = try XCTUnwrap(try container.transactionRepository.fetch(transactionID: transaction.id))
+
+        XCTAssertEqual(result.suggestionsCreated, 1)
+        XCTAssertEqual(saved.categoryID, currentCategory.id)
+        XCTAssertEqual(saved.suggestedCategoryID, suggestedCategory.id)
+        XCTAssertTrue(try container.transactionRepository.fetchPendingReview().contains(where: { $0.id == transaction.id }))
+    }
+
+    func testRecategorizationSuggestionCanBeAcceptedAsManualCorrection() async throws {
+        let container = AppContainer(inMemory: true)
+        try container.categoryRepository.ensureBaseCategories()
+        let currentCategory = try XCTUnwrap(
+            try container.categoryRepository.fetchAll().first(where: { $0.name == "Compras" })
+        )
+        let suggestedCategory = try XCTUnwrap(
+            try container.categoryRepository.fetchAll().first(where: { $0.name == "Deportes" })
+        )
+        let transaction = Transaction(
+            bookingDate: .now,
+            rawDescription: "DECATHLON CARCAIXENT",
+            cleanedDescription: "DECATHLON CARCAIXENT",
+            merchantDisplayName: "Decathlon",
+            merchantCanonicalName: "Decathlon",
+            amount: Decimal(-65),
+            categoryID: currentCategory.id,
+            categorizationSourceRaw: CategorizationSource.localML.rawValue,
+            confidence: 0.78,
+            needsReview: false,
+            reviewStatusRaw: ReviewStatus.accepted.rawValue,
+            fingerprint: "decathlon-accept"
+        )
+        try container.transactionRepository.insert(transaction)
+        _ = try await container.recategorizationService.analyze([transaction])
+
+        let viewModel = ReviewQueueViewModel()
+        viewModel.load(using: container)
+        viewModel.select(try XCTUnwrap(viewModel.transactions.first))
+        viewModel.acceptSuggestedCategory(using: container)
+
+        let saved = try XCTUnwrap(try container.transactionRepository.fetch(transactionID: transaction.id))
+        XCTAssertEqual(saved.categoryID, suggestedCategory.id)
+        XCTAssertNil(saved.suggestedCategoryID)
+        XCTAssertEqual(saved.categorizationSourceRaw, CategorizationSource.manual.rawValue)
+        XCTAssertFalse(saved.needsReview)
     }
 
     func testCSVPreviewDetectsSemicolonDelimitedBankExport() throws {
