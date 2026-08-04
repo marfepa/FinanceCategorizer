@@ -19,7 +19,10 @@ struct MacCategoryAuditView: View {
                     transaction: viewModel.selectedTransaction,
                     viewModel: viewModel,
                     onAccept: { viewModel.accept($0, using: appContainer) },
-                    onDismiss: { viewModel.dismiss($0, using: appContainer) }
+                    onDismiss: { viewModel.dismiss($0, using: appContainer) },
+                    onAssign: { transaction, categoryID in
+                        viewModel.assignCategory(categoryID, to: transaction, using: appContainer)
+                    }
                 )
                 .frame(minWidth: 320, idealWidth: AppLayoutMetrics.maxInspectorWidth)
             }

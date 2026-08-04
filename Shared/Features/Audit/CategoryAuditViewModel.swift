@@ -139,6 +139,31 @@ final class CategoryAuditViewModel {
         applySuggestions([transaction], using: container, statusKey: "audit.status.accepted")
     }
 
+    func assignCategory(_ categoryID: UUID, to transaction: Transaction, using container: AppContainer) {
+        guard categories.contains(where: { $0.id == categoryID }) else {
+            errorMessage = AppLanguage.currentSelection.localized("audit.status.categoryUnavailable")
+            return
+        }
+
+        do {
+            try container.correctionLearningService.applyCorrection(
+                for: transaction,
+                categoryID: categoryID,
+                subcategoryID: nil,
+                applyToFuture: false
+            )
+            load(using: container)
+            statusMessage = AppLanguage.currentSelection.localized(
+                "audit.status.assigned",
+                categoryName(for: categoryID)
+            )
+            errorMessage = nil
+            NotificationCenter.default.post(name: AppContainer.importDidFinishNotification, object: nil)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     func acceptAllHighConfidence(using container: AppContainer) {
         let candidates = eligibleTransactions.filter {
             $0.suggestedCategoryID != nil &&

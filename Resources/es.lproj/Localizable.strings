@@ -687,6 +687,12 @@
 "audit.action.more" = "Acciones de auditoría";
 "audit.action.accept" = "Aceptar propuesta";
 "audit.action.dismiss" = "Descartar propuesta";
+"audit.action.chooseDifferentCategory" = "Elegir otra categoría";
+"audit.action.changeCategory" = "Cambiar categoría";
+"audit.category.search" = "Buscar categorías";
+"audit.category.noneFound" = "No hay categorías que coincidan.";
+"audit.status.categoryUnavailable" = "Esa categoría ya no está disponible.";
+"audit.status.assigned" = "Movimiento asignado a %@.";
 "audit.empty.title" = "No hay movimientos que coincidan";
 "audit.empty.message" = "Ejecuta un análisis o cambia el filtro para ver movimientos aquí.";
 "audit.inspector.title" = "Detalle de auditoría";

@@ -5,12 +5,17 @@ struct IOSCategoryAuditDetailView: View {
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.english
 
     let transaction: Transaction
+    let categories: [Category]
     let currentCategory: String
     let suggestedCategory: String?
+    let selectedCategoryID: UUID?
     let confidence: Double
     let reason: String
     let onAccept: () -> Void
     let onDismiss: () -> Void
+    let onAssign: (UUID) -> Void
+
+    @State private var isChoosingCategory = false
 
     var body: some View {
         NavigationStack {
@@ -30,6 +35,29 @@ struct IOSCategoryAuditDetailView: View {
                     LabeledContent(LocalizedStringKey("audit.inspector.current"), value: currentCategory)
                     LabeledContent(LocalizedStringKey("audit.inspector.suggested"), value: suggestedCategory ?? "—")
                     LabeledContent(LocalizedStringKey("audit.column.confidence"), value: appLanguage.formatPercent(confidence))
+
+                    Button {
+                        withAnimation(.snappy) {
+                            isChoosingCategory.toggle()
+                        }
+                    } label: {
+                        Label(
+                            LocalizedStringKey(
+                                suggestedCategory == nil
+                                    ? "audit.action.changeCategory"
+                                    : "audit.action.chooseDifferentCategory"
+                            ),
+                            systemImage: isChoosingCategory ? "chevron.up" : "tag"
+                        )
+                    }
+
+                    if isChoosingCategory {
+                        CategoryOverridePicker(
+                            categories: categories,
+                            selectedCategoryID: selectedCategoryID,
+                            onSelect: onAssign
+                        )
+                    }
                 }
 
                 Section(LocalizedStringKey("audit.inspector.reason")) {
