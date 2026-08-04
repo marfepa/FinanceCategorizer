@@ -23,7 +23,6 @@ struct CategoryTextSignals {
         }
     }
 }
-
 @MainActor
 protocol TransactionClassifying {
     func predict(_ input: NormalizedTransactionDTO) -> CategorizationDecision?
@@ -63,7 +62,7 @@ private struct CategoryHeuristicMatcher {
             name: "Compras",
             strongTerms: [
                 "AMAZON", "WALLAPOP", "SPRINGFIELD", "ZAPATERIA", "ZARA", "PEPCO",
-                "COMPRAS", "MULTIPRECIO"
+                "MANGO", "YILISHA", "XTI FOOTWEAR", "TIENDAS", "COMPRAS", "MULTIPRECIO"
             ],
             supportingTerms: ["TIENDA", "OUTLET", "MARKETPLACE"]
         ),
@@ -79,7 +78,7 @@ private struct CategoryHeuristicMatcher {
             name: "Hogar",
             strongTerms: [
                 "IKEA", "LEROY MERLIN", "FERRETERIA", "INSTALACIONES", "REPARACION",
-                "HOGAR PLUS", "MUEBLES", "ELECTRODOMESTICOS", "SEGURO HOGAR"
+                "HOGAR PLUS", "MUEBLES", "ELECTRODOMESTICOS", "SEGURO HOGAR", "AUREUM", "TEIKA"
             ],
             supportingTerms: ["CASA", "COMUNIDAD", "ALQUILER", "DECORACION"]
         ),
@@ -87,7 +86,7 @@ private struct CategoryHeuristicMatcher {
             name: "Suministros",
             strongTerms: [
                 "REPSOL COMERCIALIZADORA", "ELECTRICIDAD", "ENDESA", "IBERDROLA", "NATURGY",
-                "AGUA", "GAS NATURAL", "MOVISTAR", "VODAFONE", "ORANGE", "TELEFONIA"
+                "AGUA", "AGUAS DE VALENCIA", "DIGI", "GAS NATURAL", "MOVISTAR", "VODAFONE", "ORANGE", "TELEFONIA"
             ],
             supportingTerms: ["LUZ", "GAS", "INTERNET", "SUMINISTRO", "FACTURA ELECTRICA"]
         ),
@@ -103,7 +102,7 @@ private struct CategoryHeuristicMatcher {
             name: "Salud",
             strongTerms: [
                 "HSN STORE", "FARMACIA", "HOSPITAL", "CLINICA", "DENTAL", "SEGURO SALUD",
-                "MEDICO", "SANITAS"
+                "MEDICO", "SANITAS", "NUTRIBEN"
             ],
             supportingTerms: ["SALUD", "MEDICAMENTO", "FISIOTERAPIA", "NUTRICION"]
         ),
@@ -121,6 +120,11 @@ private struct CategoryHeuristicMatcher {
             name: "Viajes",
             strongTerms: ["HOTEL", "AIRBNB", "CAMPING", "IRYO", "VIAJE", "GATE GOURMET"],
             supportingTerms: ["ALOJAMIENTO", "RESERVA", "TURISMO"]
+        ),
+        CategoryHeuristicDefinition(
+            name: "Efectivo",
+            strongTerms: ["DISPOSICION EN CAJERO", "RETIRADA EFECTIVO", "RETIRADA CAJERO", "CAJERO"],
+            supportingTerms: ["EFECTIVO"]
         ),
         CategoryHeuristicDefinition(
             name: "Donaciones",
@@ -142,13 +146,13 @@ private struct CategoryHeuristicMatcher {
         ),
         CategoryHeuristicDefinition(
             name: "Ingresos",
-            strongTerms: ["NOMINA", "SALARIO", "PENSION", "REMUNERACION", "RENTAS"],
-            supportingTerms: ["INGRESO", "DEVOLUCION", "REEMBOLSO"]
+            strongTerms: ["NOMINA", "SALARIO", "PENSION", "REMUNERACION", "RENTAS", "DEVOLUCION", "REEMBOLSO", "ABONO", "BONIFICACION", "BIZUM DE"],
+            supportingTerms: ["INGRESO", "TRANSFERENCIA DE DEVOLUCIONES", "RETENCION HACIENDA"]
         ),
         CategoryHeuristicDefinition(
             name: "Transferencias",
-            strongTerms: ["TRASPASO", "TRANSFERENCIA ENTRE CUENTAS", "ORDEN TRANSFERENCIA"],
-            supportingTerms: ["BIZUM", "TRANSFERENCIA", "MARIO FERNANDEZ PARDO"]
+            strongTerms: ["TRASPASO", "TRANSFERENCIA ENTRE CUENTAS", "ORDEN TRANSFERENCIA", "RECARGA TARJETA PREPAGO", "DESCARGA TARJETA PREPAGO", "ABONO EN LA TARJETA", "BIZUM A FAVOR"],
+            supportingTerms: ["BIZUM", "TRANSFERENCIA", "FERNANDEZ PARDO MARIO"]
         )
     ]
 
@@ -167,6 +171,10 @@ private struct CategoryHeuristicMatcher {
 
         guard let best = scored.first else { return nil }
         if best.0.name == "Ingresos", input.sign < 0 {
+            return nil
+        }
+
+        if input.resolvedKind == .transfer, best.0.name != "Transferencias" {
             return nil
         }
 

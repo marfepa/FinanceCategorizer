@@ -13,7 +13,6 @@ enum PDFImportError: LocalizedError, Equatable {
         }
     }
 }
-
 struct PDFParsingService {
     
     private let strategies: [PDFBankStrategy] = [
@@ -35,6 +34,32 @@ struct PDFParsingService {
         }
 
         let transactions = bestStrategy.extractTransactions(from: rawLines)
+
+        guard !transactions.isEmpty else {
+            return ImportPreviewResult(
+                rows: [],
+                invalidRows: [ImportRowIssue(
+                    rowNumber: 0,
+                    severity: .error,
+                    message: "No complete Openbank movement was found. The statement must expose an operation date and amount; redacted or scanned columns cannot be imported safely.",
+                    rawValuesSummary: ""
+                )],
+                diagnostics: ImportDiagnostics(
+                    sourceType: "pdf - \(bestStrategy.bankName)",
+                    worksheetName: "\(bestStrategy.bankName) PDF",
+                    delimiter: nil,
+                    headerRowIndex: nil,
+                    mappedColumnsDescription: "Openbank date/concept/amount columns",
+                    rawRowCount: rawLines.count,
+                    validRowCount: 0,
+                    invalidRowCount: 1,
+                    importableRowCount: 0
+                ),
+                mapping: nil,
+                requiresManualMapping: true,
+                duplicateInfo: nil
+            )
+        }
 
         var validRows: [ImportPreviewRow] = []
         var invalidRows: [ImportRowIssue] = []
@@ -87,14 +112,14 @@ struct PDFParsingService {
                 worksheetName: "\(bestStrategy.bankName) PDF",
                 delimiter: nil,
                 headerRowIndex: nil,
-                mappedColumnsDescription: "PDF Block Extraction",
+            mappedColumnsDescription: "Openbank date/concept/amount columns",
                 rawRowCount: rawLines.count,
                 validRowCount: validRows.count,
                 invalidRowCount: invalidRows.count,
                 importableRowCount: validRows.count
             ),
             mapping: nil,
-            requiresManualMapping: false,
+            requiresManualMapping: invalidRows.contains { $0.severity == .error },
             duplicateInfo: nil
         )
     }

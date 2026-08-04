@@ -78,6 +78,7 @@ final class AppContainer {
             transactionRepository: transactionRepository
         )
         let categorizationOrchestrator = CategorizationOrchestrator(
+            categoryRepository: categoryRepository,
             ruleEngine: ruleEngine,
             merchantMemory: merchantMemory,
             classifier: classifier,
@@ -137,7 +138,6 @@ final class AppContainer {
         )
     }
 }
-
 private struct AppContainerKey: EnvironmentKey {
     static let defaultValue: AppContainer = MainActor.assumeIsolated {
         AppContainer.shared

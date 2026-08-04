@@ -3,7 +3,6 @@ import Foundation
 protocol ImportOrchestrating {
     func importFile(from url: URL, language: AppLanguage) async throws -> ImportSummary
 }
-
 enum DuplicateImportError: LocalizedError {
     case alreadyImported(ImportDuplicateInfo)
 
@@ -194,7 +193,7 @@ final class ImportOrchestrator: ImportOrchestrating {
                 merchantCanonicalName: normalized.merchantCanonicalName,
                 amount: normalized.amount,
                 currencyCode: normalized.currencyCode,
-                kindRaw: normalized.sign > 0 ? TransactionKind.income.rawValue : TransactionKind.expense.rawValue,
+                kindRaw: normalized.resolvedKind.rawValue,
                 accountName: normalized.accountName,
                 categoryID: decision.categoryID,
                 subcategoryID: decision.subcategoryID,

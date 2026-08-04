@@ -24,7 +24,13 @@ struct MerchantCanonicalizer {
         "UBER TRIP": "Uber",
         "UBER EATS": "Uber Eats",
         "NETFLIX": "Netflix",
-        "SPOTIFY": "Spotify"
+        "SPOTIFY": "Spotify",
+        "DIGI SPAIN TELECOM": "Digi",
+        "BALLENOIL": "Ballenoil",
+        "REPSOL WAYLET": "Repsol",
+        "MANGO": "Mango",
+        "WALLAPOP": "Wallapop",
+        "OPENAI CHATGPT": "OpenAI ChatGPT"
     ]
 
     func canonicalize(_ merchant: String?) -> (displayName: String?, canonicalName: String?) {
@@ -67,6 +73,24 @@ struct MerchantCanonicalizer {
         if normalized.contains("UBER") {
             return ("Uber", "Uber")
         }
+        if normalized.contains("DIGI") {
+            return ("Digi", "Digi")
+        }
+        if normalized.contains("BALLENOIL") {
+            return ("Ballenoil", "Ballenoil")
+        }
+        if normalized.contains("REPSOL") {
+            return ("Repsol", "Repsol")
+        }
+        if normalized.contains("MANGO") {
+            return ("Mango", "Mango")
+        }
+        if normalized.contains("WALLAPOP") {
+            return ("Wallapop", "Wallapop")
+        }
+        if normalized.contains("OPENAI") || normalized.contains("CHATGPT") {
+            return ("OpenAI ChatGPT", "OpenAI ChatGPT")
+        }
 
         let display = normalized
             .split(separator: " ")
@@ -77,7 +101,6 @@ struct MerchantCanonicalizer {
         return (display, display)
     }
 }
-
 struct MerchantExtractionService {
     func extract(from cleanedDescription: String) -> String {
         var tokens = cleanedDescription.split(separator: " ").map(String.init)
@@ -97,6 +120,14 @@ struct MerchantExtractionService {
             if tokens.first == "EN" || tokens.first == "DE" {
                 tokens.removeFirst()
             }
+        }
+
+        let bankPrefixes = ["RECIBO", "CARGO", "ABONO", "DISPOSICION"]
+        if bankPrefixes.contains(tokens.first ?? "") {
+            tokens.removeFirst()
+        }
+        if tokens.first == "EN" || tokens.first == "DE" {
+            tokens.removeFirst()
         }
 
         return tokens

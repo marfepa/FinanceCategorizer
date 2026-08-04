@@ -735,6 +735,66 @@ final class FinanceCategorizerTests: XCTestCase {
         }
     }
 
+    func testOpenbankPDFParserHandlesSeparatedColumnsAndMultilineConcepts() throws {
+        let openbankText = """
+        Openbank
+        Fecha Operación Fecha Valor Concepto Importe Saldo
+        01/02/2026 01/02/2026 TRANSFERENCIA DE GENERALITAT VALENCIANA,
+        335,39 EUR 751,37 EUR
+        CONCEPTO NOMINA EDUCACION C.PRIVADOS 01-2026
+        02/02/2026 02/02/2026 Apple pay: COMPRA EN LIDL ALGEMESI,
+        -6,45 EUR 744,92 EUR
+        TARJETA : 5154520019563402 EL 2026-02-02
+        Página: 1 / 1
+        """
+
+        let preview = try PDFParsingService().preview(text: openbankText)
+
+        XCTAssertEqual(preview.rows.count, 2)
+        XCTAssertTrue(preview.invalidRows.isEmpty)
+        XCTAssertFalse(preview.requiresManualMapping)
+        XCTAssertEqual(preview.rows.first?.amount, Decimal(string: "335.39"))
+        XCTAssertEqual(preview.rows.last?.amount, Decimal(string: "-6.45"))
+        XCTAssertTrue(preview.rows.last?.concept.contains("LIDL ALGEMESI") == true)
+    }
+
+    func testRedactedOpenbankPDFIsBlockedInsteadOfImportingPartialRows() throws {
+        let redactedText = """
+        OpenBank, S.A.
+        Fecha Operación Fecha Valor Concepto Importe Saldo
+        Apple pay: COMPRA EN LIDL ALGEMESI EL 2026-02-02
+        Página: 1 / 1
+        """
+
+        let preview = try PDFParsingService().preview(text: redactedText)
+
+        XCTAssertTrue(preview.rows.isEmpty)
+        XCTAssertTrue(preview.requiresManualMapping)
+        XCTAssertEqual(preview.diagnostics.importableRowCount, 0)
+        XCTAssertEqual(preview.invalidRows.first?.severity, .error)
+    }
+
+    func testTransactionKindResolverRecognizesOpenbankMovementSemantics() {
+        let resolver = TransactionKindResolver()
+
+        XCTAssertEqual(
+            resolver.resolve(rawDescription: "RECARGA TARJETA PREPAGO", cleanedDescription: "RECARGA TARJETA PREPAGO", amount: -41.47),
+            .transfer
+        )
+        XCTAssertEqual(
+            resolver.resolve(rawDescription: "TRANSFERENCIA DE FERNANDEZ PARDO MARIO", cleanedDescription: "TRANSFERENCIA DE FERNANDEZ PARDO MARIO", amount: 500),
+            .transfer
+        )
+        XCTAssertEqual(
+            resolver.resolve(rawDescription: "BIZUM DE MARIA C M", cleanedDescription: "BIZUM DE MARIA C M", amount: 18.70),
+            .income
+        )
+        XCTAssertEqual(
+            resolver.resolve(rawDescription: "BIZUM A FAVOR DE MARIA C M", cleanedDescription: "BIZUM A FAVOR DE MARIA C M", amount: -10),
+            .expense
+        )
+    }
+
     func testCSVPreviewClosesQuotedMultilineRowsIndependently() throws {
         let csv = """
         Fecha;F. valor;Concepto;Importe;Saldo
@@ -1425,7 +1485,7 @@ final class FinanceCategorizerTests: XCTestCase {
         XCTAssertEqual(snapshot?.totalIncome, Decimal(2_000))
         XCTAssertEqual(snapshot?.totalExpenses, Decimal.zero)
         XCTAssertEqual(snapshot?.netBalance, Decimal(2_000))
-        XCTAssertTrue(snapshot?.monthTitle.lowercased().contains("ago") == true)
+        XCTAssertTrue(snapshot?.monthTitle.lowercased().contains(currentMonthName(for: date(year: 2026, month: 8, day: 1))) == true)
     }
 
     func testPayrollAfterCutoffMovesEveryMonthForward() {
@@ -1498,7 +1558,7 @@ final class FinanceCategorizerTests: XCTestCase {
 
         XCTAssertEqual(snapshot?.totalIncome, Decimal(2_000))
         XCTAssertEqual(snapshot?.totalExpenses, Decimal.zero)
-        XCTAssertTrue(snapshot?.monthTitle.lowercased().contains("ago") == true)
+        XCTAssertTrue(snapshot?.monthTitle.lowercased().contains(currentMonthName(for: date(year: 2026, month: 8, day: 1))) == true)
     }
 
     func testDashboardShowsLegacySupermarketSpendAsFoodAndReportsItForReview() {
@@ -1652,6 +1712,13 @@ final class FinanceCategorizerTests: XCTestCase {
         components.month = month
         components.day = day
         return components.date ?? .now
+    }
+
+    private func currentMonthName(for date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = .current
+        formatter.dateFormat = "LLLL"
+        return formatter.string(from: date).lowercased()
     }
 
     private func currentMonthYearForTests(referenceDate: Date = Date()) -> String {
