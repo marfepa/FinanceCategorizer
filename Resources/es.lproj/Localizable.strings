@@ -37,8 +37,8 @@
 
 /* Settings - Payroll */
 "Payroll" = "Nómina";
-"Payroll cutoff day: %lld" = "Día de corte de nómina: %lld";
-"Payroll income received from day %lld onwards is attributed to the following month's budget for accurate monthly reporting." = "Los ingresos de nómina recibidos a partir del día %lld se atribuyen al presupuesto del mes siguiente para un informe mensual preciso.";
+"Payroll alert day: %lld" = "Día de aviso de nómina: %lld";
+"Income gap alerts start after day %lld. Budget reports move ordinary late payroll to the next month and keep estimated extras in the booking month." = "Los avisos de falta de ingresos empiezan después del día %lld. Los informes presupuestarios pasan la nómina ordinaria de fin de mes al mes siguiente y mantienen los extras estimados en el mes del abono.";
 
 /* Settings - Automation */
 "Automation" = "Automatización";
@@ -711,6 +711,7 @@
 "A visual overview of household cashflow, category pressure, recurring charges and medium-term projection." = "Una vista visual del flujo familiar, la presión por categorías, los cargos recurrentes y la proyección a medio plazo.";
 "Net household position" = "Posición neta familiar";
 "A single reading of the selected financial horizon." = "Una lectura única del periodo seleccionado.";
+"Actual result for the selected period." = "Resultado real del periodo seleccionado.";
 "Cashflow remains resilient over the selected period." = "El flujo de caja se mantiene sólido en el periodo seleccionado.";
 "Spending pressure is starting to outweigh incoming cashflow." = "La presión del gasto empieza a superar al dinero que entra.";
 "Category concentration" = "Concentración por categoría";
@@ -779,3 +780,56 @@
 "categories.detail.average" = "Media mensual";
 "categories.detail.peak" = "Mes máximo";
 "categories.detail.months" = "Meses visibles";
+
+/* Posición financiera y Huchas */
+"Savings Goals" = "Huchas";
+"Accumulated position" = "Posición acumulada";
+"Accumulated balance" = "Saldo acumulado";
+"Current balance" = "Saldo actual";
+"Total balance" = "Saldo total";
+"Assigned to goals" = "Asignado a huchas";
+"Available to assign" = "Disponible para asignar";
+"Projected balance 12M" = "Saldo proyectado a 12 meses";
+"Free balance in 12 months" = "Disponible en 12 meses";
+"Balance in 12 months" = "Saldo en 12 meses";
+"Balance forecast" = "Previsión del saldo";
+"Available balance" = "Saldo disponible";
+"How your confirmed balance could evolve with the current saving pace." = "Cómo podría evolucionar tu saldo confirmado manteniendo el ritmo de ahorro actual.";
+"Projected scenario" = "Escenario proyectado";
+"Manage savings goals" = "Gestionar huchas";
+"Separate what you have from what you save and what you are planning." = "Separa lo que tienes, lo que ahorras y lo que estás planificando.";
+"Confirmed" = "Confirmado";
+"Needs confirmation" = "Necesita confirmación";
+"Estimated from imported movements" = "Estimado a partir de movimientos importados";
+"Confirmed balance" = "Saldo confirmado";
+"Confirm balance" = "Confirmar saldo";
+"Confirm current balance" = "Confirmar saldo actual";
+"Balance confirmed from a bank balance or manual snapshot." = "Saldo confirmado desde el banco o mediante una captura manual.";
+"Balance is estimated from imported movements. Confirm it in Savings Goals for realistic projections." = "El saldo se estima a partir de los movimientos importados. Confírmalo en Huchas para obtener proyecciones realistas.";
+"Loading financial position..." = "Cargando posición financiera...";
+"No financial position yet" = "Todavía no hay posición financiera";
+"Import movements or confirm a current bank balance to start planning." = "Importa movimientos o confirma el saldo actual de una cuenta para empezar a planificar.";
+"Create your first savings goal to separate emergency savings, investments or planned purchases." = "Crea tu primera hucha para separar el fondo de emergencia, inversiones o compras previstas.";
+"Projection" = "Proyección";
+"Average monthly saving" = "Ahorro mensual medio";
+"Projection uses the average net saving from available history and planned goal contributions. It is a scenario, not a guaranteed bank balance." = "Este escenario de largo plazo usa ingresos y gastos recurrentes. Es un escenario, no un saldo bancario garantizado.";
+"Recurring monthly saving" = "Ahorro mensual recurrente";
+"planning.historicalComparison" = "Media mensual neta observada en el historial disponible: %@. Los picos puntuales y las compras de instalación se reducen en el escenario a largo plazo.";
+"New Goal" = "Nueva hucha";
+"On track" = "En camino";
+"Needs more saving" = "Necesita más ahorro";
+"This is a liability or debt" = "Es una deuda o pasivo";
+"Type" = "Tipo";
+"Target amount" = "Importe objetivo";
+"Already assigned" = "Ya asignado";
+"Monthly contribution" = "Aportación mensual";
+"Target date" = "Fecha objetivo";
+"Emergency fund" = "Fondo de emergencia";
+"Investment" = "Inversión";
+"Travel" = "Viajes";
+"Home" = "Vivienda";
+"Other" = "Otros";
+"Enter a valid amount." = "Introduce un importe válido.";
+"A goal name and a target greater than zero are required." = "El nombre y un objetivo mayor que cero son obligatorios.";
+"planning.savingsAverage" = "Ahorro mensual recurrente estimado: %@ según %@ meses de historial.";
+"planning.projectionBasis" = "Este escenario parte de tu saldo actual y usa ingresos recurrentes de %@ menos gastos recurrentes de %@, para un ahorro mensual estimado de %@, según %@ meses de historial.";

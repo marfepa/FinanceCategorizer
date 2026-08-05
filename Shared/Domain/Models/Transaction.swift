@@ -13,6 +13,9 @@ final class Transaction {
     var merchantDisplayName: String?
     var merchantCanonicalName: String?
     var amount: Decimal
+    /// Balance after this movement when the bank statement supplied one.
+    /// Older imports leave this nil and can still use a manual account balance.
+    var balanceAfter: Decimal?
     var currencyCode: String
     var kindRaw: String?
     var accountName: String?
@@ -54,6 +57,7 @@ final class Transaction {
         merchantDisplayName: String? = nil,
         merchantCanonicalName: String? = nil,
         amount: Decimal,
+        balanceAfter: Decimal? = nil,
         currencyCode: String = AppConfig.defaultCurrencyCode,
         kindRaw: String? = nil,
         accountName: String? = nil,
@@ -90,6 +94,7 @@ final class Transaction {
         self.merchantDisplayName = merchantDisplayName
         self.merchantCanonicalName = merchantCanonicalName
         self.amount = amount
+        self.balanceAfter = balanceAfter
         self.currencyCode = currencyCode
         self.kindRaw = kindRaw
         self.accountName = accountName
@@ -130,27 +135,9 @@ extension Transaction {
         return amount >= 0 ? .income : .expense
     }
 
-    /// The date used for accounting and reporting.
-    /// Payroll (nómina) received from the configurable cutoff day onwards belongs to the following month's income.
+    /// The date used for accounting and reporting. Income is reported in the
+    /// month in which the bank booked the movement.
     var accountingDate: Date {
-        let cutoffDay = UserDefaults.standard.integer(forKey: "payrollCutoffDay")
-        let effectiveCutoff = cutoffDay >= 22 ? cutoffDay : 25
-
-        let isIncome = amount > 0 || resolvedKind == .income
-        let isPayroll = cleanedDescription.lowercased().contains("nomina") ||
-                        rawDescription.lowercased().contains("nómina") ||
-                        rawDescription.lowercased().contains("nomina")
-
-        if isIncome && isPayroll {
-            let calendar = Calendar.current
-            let day = calendar.component(.day, from: bookingDate)
-            if day >= effectiveCutoff {
-                if let nextMonth = calendar.date(byAdding: .month, value: 1, to: bookingDate),
-                   let startOfNextMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: nextMonth)) {
-                    return startOfNextMonth
-                }
-            }
-        }
         return bookingDate
     }
 }

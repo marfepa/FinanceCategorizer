@@ -27,6 +27,13 @@ struct MacInsightsView: View {
             VStack(alignment: .leading, spacing: AppLayoutMetrics.sectionGap) {
                 if let snapshot = viewModel.snapshot {
                     heroSection(snapshot)
+                    if let planningSnapshot = viewModel.planningSnapshot {
+                        FinancialBalanceProjectionCard(
+                            snapshot: planningSnapshot,
+                            renderAmount: { renderAmount($0) },
+                            appLanguage: appLanguage
+                        )
+                    }
                     insightsContentGrid(snapshot)
                 } else if viewModel.isLoading {
                     LoadingView(title: LocalizedStringKey("Analyzing finances..."))
@@ -155,7 +162,7 @@ struct MacInsightsView: View {
                             Text(LocalizedStringKey("Net household position"))
                                 .font(.headline)
                                 .foregroundStyle(.secondary)
-                            Text(LocalizedStringKey("A single reading of the selected financial horizon."))
+                            Text(LocalizedStringKey("Actual result for the selected period."))
                                 .font(.footnote)
                                 .foregroundStyle(.secondary)
                         }

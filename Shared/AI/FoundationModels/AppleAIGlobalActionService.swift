@@ -304,7 +304,7 @@ struct AppleAIGlobalActionService {
             categories: categories,
             recentImports: recentImports,
             locale: language.locale,
-            dateBasis: .accounting
+            dateBasis: .budget
         )
         let analysisSnapshot = container.financialAnalysisService.analyze(
             transactions: transactions,
@@ -400,11 +400,17 @@ struct AppleAIGlobalActionService {
         .sorted()
 
         let currentMonthBudgets = (try? container.budgetRepository.fetch(forMonthYear: currentMonthYear())) ?? []
+        let reportingScope = FinancialReportingScope(now: Date(), dateBasis: .budget)
+        let reportingEntries = reportingScope.eligibleEntries(
+            from: transactions,
+            classifier: FinancialMovementClassifier(),
+            categoryMap: categoryNameByID
+        )
         let budgetPressureItems = currentMonthBudgets.compactMap { budget in
-            let spent = transactions
-                .filter { $0.categoryID == budget.categoryID }
-                .filter { $0.resolvedKind == .expense }
-                .filter { isCurrentMonth($0.accountingDate, referenceDate: Date()) }
+            let spent = reportingEntries
+                .filter { $0.transaction.categoryID == budget.categoryID }
+                .filter { FinancialMovementClassifier().isExpense($0.transaction) }
+                .filter { isCurrentMonth($0.date, referenceDate: Date()) }
                 .reduce(Decimal.zero) { $0 + absolute($1.amount) }
             let progress = budget.limitAmount == .zero ? 0 : decimalToDouble(spent / budget.limitAmount)
             let categoryName = categoryNameByID[budget.categoryID] ?? language.localized("Unknown Category")

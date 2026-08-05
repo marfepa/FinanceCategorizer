@@ -37,8 +37,8 @@
 
 /* Settings - Payroll */
 "Payroll" = "Payroll";
-"Payroll cutoff day: %lld" = "Payroll cutoff day: %lld";
-"Payroll income received from day %lld onwards is attributed to the following month's budget for accurate monthly reporting." = "Payroll income received from day %lld onwards is attributed to the following month's budget for accurate monthly reporting.";
+"Payroll alert day: %lld" = "Payroll alert day: %lld";
+"Income gap alerts start after day %lld. Budget reports move ordinary late payroll to the next month and keep estimated extras in the booking month." = "Income gap alerts start after day %lld. Budget reports move ordinary late payroll to the next month and keep estimated extras in the booking month.";
 
 /* Settings - Automation */
 "Automation" = "Automation";
@@ -703,6 +703,7 @@
 "A visual overview of household cashflow, category pressure, recurring charges and medium-term projection." = "A visual overview of household cashflow, category pressure, recurring charges and medium-term projection.";
 "Net household position" = "Net household position";
 "A single reading of the selected financial horizon." = "A single reading of the selected financial horizon.";
+"Actual result for the selected period." = "Actual result for the selected period.";
 "Cashflow remains resilient over the selected period." = "Cashflow remains resilient over the selected period.";
 "Spending pressure is starting to outweigh incoming cashflow." = "Spending pressure is starting to outweigh incoming cashflow.";
 "Category concentration" = "Category concentration";
@@ -771,3 +772,56 @@
 "categories.detail.average" = "Monthly average";
 "categories.detail.peak" = "Peak month";
 "categories.detail.months" = "Months shown";
+
+/* Financial Position and Savings Goals */
+"Savings Goals" = "Savings Goals";
+"Accumulated position" = "Accumulated position";
+"Accumulated balance" = "Accumulated balance";
+"Current balance" = "Current balance";
+"Total balance" = "Total balance";
+"Assigned to goals" = "Assigned to goals";
+"Available to assign" = "Available to assign";
+"Projected balance 12M" = "Projected balance 12M";
+"Free balance in 12 months" = "Free balance in 12 months";
+"Balance in 12 months" = "Balance in 12 months";
+"Balance forecast" = "Balance forecast";
+"Available balance" = "Available balance";
+"How your confirmed balance could evolve with the current saving pace." = "How your confirmed balance could evolve with the current saving pace.";
+"Projected scenario" = "Projected scenario";
+"Manage savings goals" = "Manage savings goals";
+"Separate what you have from what you save and what you are planning." = "Separate what you have from what you save and what you are planning.";
+"Confirmed" = "Confirmed";
+"Needs confirmation" = "Needs confirmation";
+"Estimated from imported movements" = "Estimated from imported movements";
+"Confirmed balance" = "Confirmed balance";
+"Confirm balance" = "Confirm balance";
+"Confirm current balance" = "Confirm current balance";
+"Balance confirmed from a bank balance or manual snapshot." = "Balance confirmed from a bank balance or manual snapshot.";
+"Balance is estimated from imported movements. Confirm it in Savings Goals for realistic projections." = "Balance is estimated from imported movements. Confirm it in Savings Goals for realistic projections.";
+"Loading financial position..." = "Loading financial position...";
+"No financial position yet" = "No financial position yet";
+"Import movements or confirm a current bank balance to start planning." = "Import movements or confirm a current bank balance to start planning.";
+"Create your first savings goal to separate emergency savings, investments or planned purchases." = "Create your first savings goal to separate emergency savings, investments or planned purchases.";
+"Projection" = "Projection";
+"Average monthly saving" = "Average monthly saving";
+"Projection uses the average net saving from available history and planned goal contributions. It is a scenario, not a guaranteed bank balance." = "This long-term scenario uses recurring income and recurring expenses. It is a scenario, not a guaranteed bank balance.";
+"Recurring monthly saving" = "Recurring monthly saving";
+"planning.historicalComparison" = "Observed monthly net average over the available history: %@. One-off peaks and home-setup purchases are reduced in the long-term scenario.";
+"New Goal" = "New Goal";
+"On track" = "On track";
+"Needs more saving" = "Needs more saving";
+"This is a liability or debt" = "This is a liability or debt";
+"Type" = "Type";
+"Target amount" = "Target amount";
+"Already assigned" = "Already assigned";
+"Monthly contribution" = "Monthly contribution";
+"Target date" = "Target date";
+"Emergency fund" = "Emergency fund";
+"Investment" = "Investment";
+"Travel" = "Travel";
+"Home" = "Home";
+"Other" = "Other";
+"Enter a valid amount." = "Enter a valid amount.";
+"A goal name and a target greater than zero are required." = "A goal name and a target greater than zero are required.";
+"planning.savingsAverage" = "Estimated recurring monthly saving: %@ based on %@ months of history.";
+"planning.projectionBasis" = "This scenario starts from your current balance and uses recurring income of %@ minus recurring expenses of %@, for estimated monthly saving of %@, based on %@ months of history.";

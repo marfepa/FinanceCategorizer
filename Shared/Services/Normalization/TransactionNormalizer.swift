@@ -39,6 +39,7 @@ struct TransactionNormalizer: TransactionNormalizing {
             merchantDisplayName: canonicalMerchant.displayName,
             merchantCanonicalName: canonicalMerchant.canonicalName,
             amount: row.amount,
+            balance: row.balance,
             currencyCode: row.currencyCode,
             accountName: row.accountName,
             sign: sign,

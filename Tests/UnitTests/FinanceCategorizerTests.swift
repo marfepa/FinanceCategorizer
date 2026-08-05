@@ -1112,7 +1112,7 @@ final class FinanceCategorizerTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(result.bullets.count, 3)
     }
 
-    func testAppleAIFallbackUsesAccountingDateForMonthlyBriefing() async throws {
+    func testAppleAIFallbackUsesBudgetAllocationForMonthlyBriefing() async throws {
         let container = AppContainer(inMemory: true)
         let service = AppleAIGlobalActionService(availabilityService: UnavailableAIAvailabilityServiceStub())
 
@@ -1137,9 +1137,9 @@ final class FinanceCategorizerTests: XCTestCase {
             isRecurringCandidate: false
         )
         let expense = Transaction(
-            bookingDate: date(year: 2026, month: 2, day: 3),
-            rawDescription: "ALQUILER FEBRERO",
-            cleanedDescription: "ALQUILER FEBRERO",
+            bookingDate: date(year: 2026, month: 1, day: 27),
+            rawDescription: "ALQUILER ENERO",
+            cleanedDescription: "ALQUILER ENERO",
             merchantDisplayName: "Casero",
             merchantCanonicalName: "Casero",
             amount: Decimal(-400),
@@ -1153,7 +1153,7 @@ final class FinanceCategorizerTests: XCTestCase {
             needsReview: false,
             reviewStatusRaw: ReviewStatus.accepted.rawValue,
             categorizationReason: nil,
-            fingerprint: "expense-feb",
+            fingerprint: "expense-jan",
             isRecurringCandidate: false
         )
 
@@ -1163,8 +1163,8 @@ final class FinanceCategorizerTests: XCTestCase {
         let digitsOnly = result.summary.filter(\.isNumber)
 
         XCTAssertTrue(digitsOnly.contains("1000"))
-        XCTAssertTrue(digitsOnly.contains("400"))
-        XCTAssertTrue(digitsOnly.contains("600"))
+        XCTAssertFalse(digitsOnly.contains("400"))
+        XCTAssertFalse(digitsOnly.contains("600"))
     }
 
     func testAppleAIFallbackDetectsCategoryCleanupSignals() async throws {
@@ -1492,9 +1492,7 @@ final class FinanceCategorizerTests: XCTestCase {
         XCTAssertEqual(snapshot?.pendingReviewCount, 0)
     }
 
-    func testDashboardPlacesPayrollAfterCutoffInAccountingMonth() {
-        UserDefaults.standard.set(25, forKey: "payrollCutoffDay")
-
+    func testDashboardAttributesLatePayrollToBudgetMonth() {
         let payroll = Transaction(
             bookingDate: date(year: 2026, month: 7, day: 30),
             rawDescription: "NOMINA JULIO",
@@ -1528,19 +1526,8 @@ final class FinanceCategorizerTests: XCTestCase {
         XCTAssertTrue(snapshot?.monthTitle.lowercased().contains(currentMonthName(for: date(year: 2026, month: 8, day: 1))) == true)
     }
 
-    func testPayrollAfterCutoffMovesEveryMonthForward() {
-        let defaults = UserDefaults.standard
-        let previousCutoff = defaults.object(forKey: "payrollCutoffDay")
-        defaults.set(25, forKey: "payrollCutoffDay")
-        defer {
-            if let previousCutoff {
-                defaults.set(previousCutoff, forKey: "payrollCutoffDay")
-            } else {
-                defaults.removeObject(forKey: "payrollCutoffDay")
-            }
-        }
-
-        for (month, expectedMonth) in [(7, 8), (8, 9), (9, 10)] {
+    func testPayrollAccountingDateMatchesBookingDate() {
+        for month in [7, 8, 9] {
             let payroll = Transaction(
                 bookingDate: date(year: 2026, month: month, day: 30),
                 rawDescription: "NOMINA",
@@ -1552,11 +1539,154 @@ final class FinanceCategorizerTests: XCTestCase {
             )
 
             let accountingComponents = Calendar.current.dateComponents(
-                [.month],
+                [.year, .month, .day],
                 from: payroll.accountingDate
             )
-            XCTAssertEqual(accountingComponents.month, expectedMonth)
+            XCTAssertEqual(accountingComponents.year, 2026)
+            XCTAssertEqual(accountingComponents.month, month)
+            XCTAssertEqual(accountingComponents.day, 30)
         }
+    }
+
+    func testJunePayrollRowsWithoutExtraLabelAreIncludedInJune() {
+        let transactions = [
+            Transaction(
+                bookingDate: date(year: 2026, month: 6, day: 29),
+                rawDescription: "TRANSFERENCIA DE EMPRESA, CONCEPTO NOMINA JUNIO",
+                cleanedDescription: "TRANSFERENCIA DE EMPRESA CONCEPTO NOMINA JUNIO",
+                amount: Decimal(1_500),
+                kindRaw: TransactionKind.income.rawValue,
+                needsReview: false,
+                reviewStatusRaw: ReviewStatus.accepted.rawValue
+            ),
+            Transaction(
+                bookingDate: date(year: 2026, month: 6, day: 29),
+                rawDescription: "NOMINA NOMINAS EMPRESA",
+                cleanedDescription: "NOMINA NOMINAS EMPRESA",
+                amount: Decimal(4_200),
+                kindRaw: TransactionKind.income.rawValue,
+                needsReview: false,
+                reviewStatusRaw: ReviewStatus.accepted.rawValue
+            ),
+            Transaction(
+                bookingDate: date(year: 2026, month: 6, day: 29),
+                rawDescription: "NOMINA NOMINAS EMPRESA",
+                cleanedDescription: "NOMINA NOMINAS EMPRESA",
+                amount: Decimal(2_800),
+                kindRaw: TransactionKind.income.rawValue,
+                needsReview: false,
+                reviewStatusRaw: ReviewStatus.accepted.rawValue
+            ),
+            Transaction(
+                bookingDate: date(year: 2026, month: 6, day: 29),
+                rawDescription: "NOMINA NOMINAS EMPRESA",
+                cleanedDescription: "NOMINA NOMINAS EMPRESA",
+                amount: Decimal(380),
+                kindRaw: TransactionKind.income.rawValue,
+                needsReview: false,
+                reviewStatusRaw: ReviewStatus.accepted.rawValue
+            )
+        ]
+        let snapshot = FinancialAnalysisService().analyze(
+            transactions: transactions,
+            categories: [],
+            range: .all,
+            now: date(year: 2026, month: 8, day: 4)
+        )
+
+        XCTAssertEqual(snapshot.totalIncome, Decimal(8_880))
+        XCTAssertEqual(snapshot.monthlyCashflow.first?.income, Decimal(8_880))
+    }
+
+    func testBudgetPayrollAllocationKeepsJuneExtraAndMovesJulyOrdinaryPayroll() {
+        let payrollAmounts: [(Int, Decimal)] = [
+            (3, 4_800),
+            (4, 4_900),
+            (5, 5_000),
+            (6, 9_000),
+            (7, 4_800)
+        ]
+        let transactions = payrollAmounts.map { month, amount in
+            Transaction(
+                bookingDate: date(year: 2026, month: month, day: 29),
+                rawDescription: "NOMINA GENERALITAT",
+                cleanedDescription: "NOMINA GENERALITAT",
+                amount: amount,
+                kindRaw: TransactionKind.income.rawValue,
+                needsReview: false,
+                reviewStatusRaw: ReviewStatus.accepted.rawValue
+            )
+        }
+        let scope = FinancialReportingScope(
+            now: date(year: 2026, month: 8, day: 4),
+            dateBasis: .budget,
+            payrollCutoffDay: 25
+        )
+        let entries = scope.eligibleEntries(
+            from: transactions,
+            classifier: FinancialMovementClassifier()
+        )
+        let calendar = Calendar.current
+        let incomeInMonth: (Int) -> Decimal = { month in
+            entries
+                .filter { calendar.component(.month, from: $0.date) == month }
+                .reduce(Decimal.zero) { $0 + $1.amount }
+        }
+
+        XCTAssertEqual(incomeInMonth(6), Decimal(9_100))
+        XCTAssertEqual(incomeInMonth(7), Decimal(4_900))
+        XCTAssertEqual(incomeInMonth(8), Decimal(4_800))
+        XCTAssertEqual(entries.reduce(Decimal.zero) { $0 + $1.amount }, Decimal(28_500))
+    }
+
+    func testDashboardExcludesInternalMovementCategoryEvenWhenStoredAsIncomeOrExpense() {
+        let internalCategory = Category(
+            name: "Movimiento interno",
+            iconName: "arrow.left.arrow.right",
+            colorHex: "#607D8B",
+            isIncome: false
+        )
+        let externalIncome = Transaction(
+            bookingDate: date(year: 2026, month: 8, day: 3),
+            rawDescription: "DEVOLUCION",
+            cleanedDescription: "DEVOLUCION",
+            amount: 50,
+            kindRaw: TransactionKind.income.rawValue,
+            needsReview: false,
+            reviewStatusRaw: ReviewStatus.accepted.rawValue
+        )
+        let internalIncome = Transaction(
+            bookingDate: date(year: 2026, month: 8, day: 3),
+            rawDescription: "MARIO FERNANDEZ PARDO",
+            cleanedDescription: "MARIO FERNANDEZ PARDO",
+            amount: 1_000,
+            kindRaw: TransactionKind.income.rawValue,
+            categoryID: internalCategory.id,
+            needsReview: false,
+            reviewStatusRaw: ReviewStatus.accepted.rawValue
+        )
+        let internalExpense = Transaction(
+            bookingDate: date(year: 2026, month: 8, day: 3),
+            rawDescription: "TRASPASO",
+            cleanedDescription: "TRASPASO",
+            amount: -1_050,
+            kindRaw: TransactionKind.expense.rawValue,
+            categoryID: internalCategory.id,
+            needsReview: false,
+            reviewStatusRaw: ReviewStatus.accepted.rawValue
+        )
+        let snapshot = DashboardInsightService().buildSnapshot(
+            transactions: [externalIncome, internalIncome, internalExpense],
+            categories: [internalCategory],
+            recentImports: [],
+            locale: .current,
+            now: date(year: 2026, month: 8, day: 4)
+        )
+
+        XCTAssertEqual(snapshot?.totalIncome, Decimal(50))
+        XCTAssertEqual(snapshot?.totalExpenses, Decimal.zero)
+        XCTAssertEqual(snapshot?.netBalance, Decimal(50))
+        XCTAssertEqual(snapshot?.dataQuality.internalTransferCount, 2)
     }
 
     func testDashboardDoesNotUseFutureOrTransferToSelectReferenceMonth() {
@@ -1918,6 +2048,458 @@ final class FinanceCategorizerTests: XCTestCase {
 
         XCTAssertEqual(FeatureFlags.aiSuggestionsEnabled, !originalAI)
         XCTAssertEqual(FeatureFlags.foundationModelsEnabled, !originalFoundationModels)
+    }
+
+    func testFinancialPlanningUsesImportedBalanceAndKeepsGoalsAsAllocation() {
+        let transaction = Transaction(
+            bookingDate: date(year: 2026, month: 8, day: 4),
+            rawDescription: "COMPRA",
+            cleanedDescription: "COMPRA",
+            amount: Decimal(-10),
+            balanceAfter: Decimal(1_990),
+            kindRaw: TransactionKind.expense.rawValue,
+            needsReview: false,
+            reviewStatusRaw: ReviewStatus.accepted.rawValue
+        )
+        let account = Account(name: "Cuenta principal")
+        let goal = SavingsGoal(
+            name: "Emergencia",
+            kind: .emergency,
+            targetAmount: Decimal(5_000),
+            allocatedAmount: Decimal(500),
+            monthlyContribution: Decimal(250),
+            targetDate: date(year: 2027, month: 8, day: 5)
+        )
+
+        let snapshot = FinancialPlanningService().buildSnapshot(
+            transactions: [transaction],
+            accounts: [account],
+            goals: [goal],
+            now: date(year: 2026, month: 8, day: 5)
+        )
+
+        XCTAssertEqual(snapshot.totalBalance, Decimal(1_990))
+        XCTAssertEqual(snapshot.allocatedToGoals, Decimal(500))
+        XCTAssertEqual(snapshot.availableBalance, Decimal(1_490))
+        XCTAssertTrue(snapshot.isBalanceConfirmed)
+        XCTAssertEqual(snapshot.goals.first?.projectedAmount, Decimal(3_500))
+    }
+
+    func testFinancialPlanningFallsBackToEstimatedImportedFlowWhenNoBalanceExists() {
+        let income = Transaction(
+            bookingDate: date(year: 2026, month: 8, day: 1),
+            rawDescription: "NOMINA",
+            cleanedDescription: "NOMINA",
+            amount: Decimal(2_000),
+            kindRaw: TransactionKind.income.rawValue,
+            needsReview: false,
+            reviewStatusRaw: ReviewStatus.accepted.rawValue
+        )
+        let expense = Transaction(
+            bookingDate: date(year: 2026, month: 8, day: 2),
+            rawDescription: "COMPRA",
+            cleanedDescription: "COMPRA",
+            amount: Decimal(-300),
+            kindRaw: TransactionKind.expense.rawValue,
+            needsReview: false,
+            reviewStatusRaw: ReviewStatus.accepted.rawValue
+        )
+
+        let snapshot = FinancialPlanningService().buildSnapshot(
+            transactions: [income, expense],
+            accounts: [],
+            goals: [],
+            now: date(year: 2026, month: 8, day: 5)
+        )
+
+        XCTAssertEqual(snapshot.totalBalance, Decimal(1_700))
+        XCTAssertFalse(snapshot.isBalanceConfirmed)
+        XCTAssertEqual(snapshot.positions.first?.source, .estimated)
+    }
+
+    func testFinancialPlanningProjectsConfirmedBalanceFromAverageMonthlySaving() {
+        let transactions = [
+            Transaction(
+                bookingDate: date(year: 2026, month: 6, day: 1),
+                rawDescription: "NOMINA",
+                cleanedDescription: "NOMINA",
+                amount: Decimal(1_000),
+                kindRaw: TransactionKind.income.rawValue,
+                needsReview: false,
+                reviewStatusRaw: ReviewStatus.accepted.rawValue
+            ),
+            Transaction(
+                bookingDate: date(year: 2026, month: 6, day: 2),
+                rawDescription: "COMPRA",
+                cleanedDescription: "COMPRA",
+                amount: Decimal(-600),
+                kindRaw: TransactionKind.expense.rawValue,
+                needsReview: false,
+                reviewStatusRaw: ReviewStatus.accepted.rawValue
+            ),
+            Transaction(
+                bookingDate: date(year: 2026, month: 6, day: 15),
+                rawDescription: "PAGA EXTRA",
+                cleanedDescription: "PAGA EXTRA",
+                amount: Decimal(10_000),
+                kindRaw: TransactionKind.income.rawValue,
+                needsReview: false,
+                reviewStatusRaw: ReviewStatus.accepted.rawValue
+            ),
+            Transaction(
+                bookingDate: date(year: 2026, month: 7, day: 1),
+                rawDescription: "NOMINA",
+                cleanedDescription: "NOMINA",
+                amount: Decimal(1_000),
+                kindRaw: TransactionKind.income.rawValue,
+                needsReview: false,
+                reviewStatusRaw: ReviewStatus.accepted.rawValue
+            ),
+            Transaction(
+                bookingDate: date(year: 2026, month: 7, day: 2),
+                rawDescription: "COMPRA",
+                cleanedDescription: "COMPRA",
+                amount: Decimal(-600),
+                kindRaw: TransactionKind.expense.rawValue,
+                needsReview: false,
+                reviewStatusRaw: ReviewStatus.accepted.rawValue
+            ),
+            Transaction(
+                bookingDate: date(year: 2026, month: 8, day: 1),
+                rawDescription: "NOMINA",
+                cleanedDescription: "NOMINA",
+                amount: Decimal(1_000),
+                kindRaw: TransactionKind.income.rawValue,
+                needsReview: false,
+                reviewStatusRaw: ReviewStatus.accepted.rawValue
+            ),
+            Transaction(
+                bookingDate: date(year: 2026, month: 8, day: 2),
+                rawDescription: "COMPRA",
+                cleanedDescription: "COMPRA",
+                amount: Decimal(-600),
+                balanceAfter: Decimal(10_000),
+                kindRaw: TransactionKind.expense.rawValue,
+                needsReview: false,
+                reviewStatusRaw: ReviewStatus.accepted.rawValue
+            )
+        ]
+        let goal = SavingsGoal(
+            name: "Emergencia",
+            kind: .emergency,
+            targetAmount: Decimal(5_000),
+            allocatedAmount: Decimal(500),
+            monthlyContribution: Decimal(100)
+        )
+
+        let snapshot = FinancialPlanningService().buildSnapshot(
+            transactions: transactions,
+            accounts: [],
+            goals: [goal],
+            now: date(year: 2026, month: 8, day: 5)
+        )
+
+        XCTAssertEqual(snapshot.totalBalance, Decimal(10_000))
+        XCTAssertEqual(snapshot.recurringMonthlyIncome, Decimal(1_000))
+        XCTAssertEqual(snapshot.recurringMonthlyExpenses, Decimal(600))
+        XCTAssertEqual(snapshot.monthlySavingsAverage, Decimal(400))
+        XCTAssertGreaterThan(snapshot.historicalMonthlySavingsAverage, snapshot.monthlySavingsAverage)
+        XCTAssertEqual(snapshot.projectedBalance12Months, Decimal(14_800))
+        XCTAssertEqual(snapshot.projectedAvailableBalance12Months, Decimal(13_100))
+        XCTAssertEqual(snapshot.balanceProjection.count, 13)
+        XCTAssertEqual(snapshot.balanceProjection.first?.balance, Decimal(10_000))
+        XCTAssertEqual(snapshot.balanceProjection.last?.balance, Decimal(14_800))
+        XCTAssertEqual(snapshot.balanceProjection.first?.isProjected, false)
+        XCTAssertEqual(snapshot.balanceProjection.last?.isProjected, true)
+    }
+
+    func testFinancialPlanningExcludesLoansAndGenericTransfersFromRecurringIncome() {
+        var transactions: [Transaction] = []
+        for month in 3...8 {
+            transactions.append(
+                Transaction(
+                    bookingDate: date(year: 2026, month: month, day: 1),
+                    rawDescription: "NOMINA EMPRESA",
+                    cleanedDescription: "NOMINA EMPRESA",
+                    amount: Decimal(2_000),
+                    kindRaw: TransactionKind.income.rawValue,
+                    needsReview: false,
+                    reviewStatusRaw: ReviewStatus.accepted.rawValue
+                )
+            )
+            transactions.append(
+                Transaction(
+                    bookingDate: date(year: 2026, month: month, day: 2),
+                    rawDescription: "ALQUILER VIVIENDA",
+                    cleanedDescription: "ALQUILER VIVIENDA",
+                    merchantCanonicalName: "Alquiler",
+                    amount: Decimal(-800),
+                    kindRaw: TransactionKind.expense.rawValue,
+                    needsReview: false,
+                    reviewStatusRaw: ReviewStatus.accepted.rawValue
+                )
+            )
+        }
+
+        transactions.append(contentsOf: [
+            Transaction(
+                bookingDate: date(year: 2026, month: 4, day: 10),
+                rawDescription: "DISPOSICION PRESTAMO",
+                cleanedDescription: "DISPOSICION PRESTAMO",
+                amount: Decimal(24_000),
+                kindRaw: TransactionKind.income.rawValue,
+                needsReview: false,
+                reviewStatusRaw: ReviewStatus.accepted.rawValue
+            ),
+            Transaction(
+                bookingDate: date(year: 2026, month: 6, day: 10),
+                rawDescription: "TRANSFERENCIA RECIBIDA PRESTAMO",
+                cleanedDescription: "TRANSFERENCIA RECIBIDA PRESTAMO",
+                amount: Decimal(20_000),
+                kindRaw: TransactionKind.income.rawValue,
+                needsReview: false,
+                reviewStatusRaw: ReviewStatus.accepted.rawValue
+            ),
+            Transaction(
+                bookingDate: date(year: 2026, month: 7, day: 10),
+                rawDescription: "TRANSF INMEDIATA RECIBIDA",
+                cleanedDescription: "TRANSF INMEDIATA RECIBIDA",
+                amount: Decimal(20_000),
+                kindRaw: TransactionKind.income.rawValue,
+                needsReview: false,
+                reviewStatusRaw: ReviewStatus.accepted.rawValue
+            ),
+            Transaction(
+                bookingDate: date(year: 2026, month: 8, day: 10),
+                rawDescription: "TRANSF INMEDIATA RECIBIDA",
+                cleanedDescription: "TRANSF INMEDIATA RECIBIDA",
+                amount: Decimal(10),
+                kindRaw: TransactionKind.income.rawValue,
+                needsReview: false,
+                reviewStatusRaw: ReviewStatus.accepted.rawValue
+            ),
+            Transaction(
+                bookingDate: date(year: 2026, month: 6, day: 15),
+                rawDescription: "S/ORD.TRANSFERENCIA OBRA",
+                cleanedDescription: "S/ORD.TRANSFERENCIA OBRA",
+                amount: Decimal(-7_000),
+                kindRaw: TransactionKind.expense.rawValue,
+                needsReview: false,
+                reviewStatusRaw: ReviewStatus.accepted.rawValue
+            )
+        ])
+
+        let snapshot = FinancialPlanningService().buildSnapshot(
+            transactions: transactions,
+            accounts: [],
+            goals: [],
+            now: date(year: 2026, month: 8, day: 15)
+        )
+
+        XCTAssertEqual(snapshot.recurringMonthlyIncome, Decimal(2_000))
+        XCTAssertEqual(snapshot.recurringMonthlyExpenses, Decimal(800))
+        XCTAssertEqual(snapshot.monthlySavingsAverage, Decimal(1_200))
+    }
+
+    func testFinancialPlanningIgnoresPendingDuplicateAndKeepsExtraSalaryOutOfBaseline() {
+        var transactions: [Transaction] = []
+        for month in 3...8 {
+            transactions.append(
+                Transaction(
+                    bookingDate: date(year: 2026, month: month, day: 1),
+                    rawDescription: "NOMINA",
+                    cleanedDescription: "NOMINA",
+                    amount: Decimal(1_500),
+                    kindRaw: TransactionKind.income.rawValue,
+                    needsReview: false,
+                    reviewStatusRaw: ReviewStatus.accepted.rawValue
+                )
+            )
+            transactions.append(
+                Transaction(
+                    bookingDate: date(year: 2026, month: month, day: 2),
+                    rawDescription: "GASTOS CASA",
+                    cleanedDescription: "GASTOS CASA",
+                    amount: Decimal(-500),
+                    kindRaw: TransactionKind.expense.rawValue,
+                    needsReview: false,
+                    reviewStatusRaw: ReviewStatus.accepted.rawValue
+                )
+            )
+        }
+
+        transactions.append(contentsOf: [
+            Transaction(
+                bookingDate: date(year: 2026, month: 8, day: 3),
+                rawDescription: "PAGA EXTRA",
+                cleanedDescription: "PAGA EXTRA",
+                amount: Decimal(12_000),
+                kindRaw: TransactionKind.income.rawValue,
+                needsReview: false,
+                reviewStatusRaw: ReviewStatus.accepted.rawValue
+            ),
+            Transaction(
+                bookingDate: date(year: 2026, month: 6, day: 1),
+                rawDescription: "NOMINA",
+                cleanedDescription: "NOMINA",
+                amount: Decimal(1_500),
+                kindRaw: TransactionKind.income.rawValue,
+                needsReview: false,
+                reviewStatusRaw: ReviewStatus.accepted.rawValue,
+                duplicateGroupID: "duplicate-salary",
+                duplicateReviewStatusRaw: DuplicateReviewStatus.pending.rawValue
+            )
+        ])
+
+        let snapshot = FinancialPlanningService().buildSnapshot(
+            transactions: transactions,
+            accounts: [],
+            goals: [],
+            now: date(year: 2026, month: 8, day: 15)
+        )
+
+        XCTAssertEqual(snapshot.recurringMonthlyIncome, Decimal(1_500))
+        XCTAssertEqual(snapshot.recurringMonthlyExpenses, Decimal(500))
+        XCTAssertEqual(snapshot.monthlySavingsAverage, Decimal(1_000))
+    }
+
+    func testFinancialPlanningUsesMedianOperatingIncomeWhenLabelsVary() {
+        let incomeCategory = Category(
+            name: "Ingresos",
+            iconName: "arrow.down.circle",
+            colorHex: "#2E7D32",
+            isIncome: true
+        )
+        var transactions: [Transaction] = []
+        let monthlyIncome: [Decimal] = [6_000, 16_000, 6_000]
+
+        for (index, month) in (6...8).enumerated() {
+            transactions.append(
+                Transaction(
+                    bookingDate: date(year: 2026, month: month, day: 1),
+                    rawDescription: "TRANSFERENCIA EMPRESA \(month)",
+                    cleanedDescription: "TRANSFERENCIA EMPRESA \(month)",
+                    amount: monthlyIncome[index],
+                    kindRaw: TransactionKind.income.rawValue,
+                    categoryID: incomeCategory.id,
+                    needsReview: false,
+                    reviewStatusRaw: ReviewStatus.accepted.rawValue
+                )
+            )
+        }
+
+        let snapshot = FinancialPlanningService().buildSnapshot(
+            transactions: transactions,
+            accounts: [],
+            goals: [],
+            categories: [incomeCategory],
+            now: date(year: 2026, month: 8, day: 15)
+        )
+
+        XCTAssertEqual(snapshot.recurringMonthlyIncome, Decimal(6_000))
+    }
+
+    func testFinancialPlanningTreatsNewHomePurchasesAsDecliningTemporaryExpenses() {
+        let incomeCategory = Category(
+            name: "Ingresos",
+            iconName: "arrow.down.circle",
+            colorHex: "#2E7D32",
+            isIncome: true
+        )
+        let shoppingCategory = Category(
+            name: "Compras",
+            iconName: "bag",
+            colorHex: "#7E57C2"
+        )
+        let homeCategory = Category(
+            name: "Hogar",
+            iconName: "house",
+            colorHex: "#8D6E63"
+        )
+        var transactions: [Transaction] = []
+        let homePurchaseAmounts: [Decimal] = [500, 4_000, 6_000, 3_000, 1_500, 500]
+
+        for (index, month) in (3...8).enumerated() {
+            transactions.append(
+                Transaction(
+                    bookingDate: date(year: 2026, month: month, day: 1),
+                    rawDescription: "NOMINA EMPRESA",
+                    cleanedDescription: "NOMINA EMPRESA",
+                    amount: Decimal(3_000),
+                    kindRaw: TransactionKind.income.rawValue,
+                    categoryID: incomeCategory.id,
+                    needsReview: false,
+                    reviewStatusRaw: ReviewStatus.accepted.rawValue
+                )
+            )
+            transactions.append(
+                Transaction(
+                    bookingDate: date(year: 2026, month: month, day: 2),
+                    rawDescription: "ALQUILER VIVIENDA",
+                    cleanedDescription: "ALQUILER VIVIENDA",
+                    merchantCanonicalName: "Alquiler",
+                    amount: Decimal(-1_000),
+                    kindRaw: TransactionKind.expense.rawValue,
+                    categoryID: homeCategory.id,
+                    needsReview: false,
+                    reviewStatusRaw: ReviewStatus.accepted.rawValue
+                )
+            )
+            transactions.append(
+                Transaction(
+                    bookingDate: date(year: 2026, month: month, day: 3),
+                    rawDescription: "MERCADONA",
+                    cleanedDescription: "MERCADONA",
+                    merchantCanonicalName: "Mercadona",
+                    amount: Decimal(-300),
+                    kindRaw: TransactionKind.expense.rawValue,
+                    needsReview: false,
+                    reviewStatusRaw: ReviewStatus.accepted.rawValue
+                )
+            )
+            transactions.append(
+                Transaction(
+                    bookingDate: date(year: 2026, month: month, day: 4),
+                    rawDescription: "AMAZON COMPRA CASA",
+                    cleanedDescription: "AMAZON COMPRA CASA",
+                    merchantCanonicalName: "Amazon",
+                    amount: -homePurchaseAmounts[index],
+                    kindRaw: TransactionKind.expense.rawValue,
+                    categoryID: shoppingCategory.id,
+                    needsReview: false,
+                    reviewStatusRaw: ReviewStatus.accepted.rawValue
+                )
+            )
+        }
+
+        let snapshot = FinancialPlanningService().buildSnapshot(
+            transactions: transactions,
+            accounts: [],
+            goals: [],
+            categories: [incomeCategory, shoppingCategory, homeCategory],
+            now: date(year: 2026, month: 8, day: 15)
+        )
+
+        XCTAssertEqual(snapshot.recurringMonthlyIncome, Decimal(3_000))
+        XCTAssertEqual(snapshot.recurringMonthlyExpenses, Decimal(1_800))
+        XCTAssertEqual(snapshot.monthlySavingsAverage, Decimal(1_200))
+    }
+
+    func testImportBalanceIsCarriedIntoNormalizedTransaction() {
+        let parsed = ParsedRowDTO(
+            externalID: nil,
+            bookingDate: date(year: 2026, month: 8, day: 4),
+            valueDate: nil,
+            description: "COMPRA",
+            amount: Decimal(-10),
+            balance: Decimal(1_990),
+            currencyCode: "EUR",
+            accountName: nil
+        )
+
+        let normalized = TransactionNormalizer().normalize(parsed)
+
+        XCTAssertEqual(normalized.balance, Decimal(1_990))
     }
 
     private func date(year: Int, month: Int, day: Int) -> Date {

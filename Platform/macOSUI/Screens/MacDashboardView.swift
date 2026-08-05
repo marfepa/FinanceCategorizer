@@ -10,6 +10,7 @@ struct MacDashboardView: View {
     let openImports: () -> Void
     let openTransactions: () -> Void
     let openReview: () -> Void
+    let openGoals: () -> Void
 
     private let chartPalette: [Color] = [
         Color(hue: 0.60, saturation: 0.70, brightness: 0.92),
@@ -32,6 +33,15 @@ struct MacDashboardView: View {
                         expenseSummary: expenseSummary(for: snapshot),
                         appLanguage: appLanguage
                     )
+
+                    if let planningSnapshot = viewModel.planningSnapshot {
+                        FinancialPositionCard(
+                            snapshot: planningSnapshot,
+                            renderAmount: renderAmount,
+                            appLanguage: appLanguage,
+                            openGoals: openGoals
+                        )
+                    }
 
                     DashboardActionBar(
                         openImports: openImports,

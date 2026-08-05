@@ -93,65 +93,62 @@ struct FinancialAnalysisService {
         categories: [Category],
         range: AnalysisTimeRange,
         now: Date = .now,
-        dateBasis: DashboardDateBasis = .accounting
+        dateBasis: DashboardDateBasis = .budget
     ) -> FinancialAnalysisSnapshot {
         let reportingScope = FinancialReportingScope(now: now, dateBasis: dateBasis)
-        let validTransactions = reportingScope.eligibleTransactions(
+        let categoryMap = Dictionary(uniqueKeysWithValues: categories.map { ($0.id, $0.name) })
+        let validEntries = reportingScope.eligibleEntries(
             from: transactions,
-            classifier: classifier
+            classifier: classifier,
+            categoryMap: categoryMap
         )
         let anchorMonthStart = reportingScope.activeMonthStart(
             from: transactions,
-            classifier: classifier
+            classifier: classifier,
+            categoryMap: categoryMap
         )
-        let filteredTransactions = reportingScope.transactions(
-            from: validTransactions,
+        let filteredEntries = reportingEntries(
+            from: validEntries,
             in: range,
             anchoredAt: anchorMonthStart
         )
-        let previousTransactions = previousWindowTransactions(
-            from: validTransactions,
+        let previousEntries = previousWindowEntries(
+            from: validEntries,
             for: range,
-            anchorMonthStart: anchorMonthStart,
-            dateBasis: dateBasis
+            anchorMonthStart: anchorMonthStart
         )
-        let filteredSourceTransactions = reportingScope.transactions(
-            from: transactions,
-            in: range,
-            anchoredAt: anchorMonthStart
-        )
-        let dataQuality = classifier.dataQuality(for: filteredSourceTransactions)
+        let filteredSourceTransactions = reportingScope.sourceTransactions(from: filteredEntries)
+        let dataQuality = classifier.dataQuality(for: filteredSourceTransactions, categoryMap: categoryMap)
         let pendingReviewCount = dataQuality.pendingReviewCount
 
-        let totalIncome = filteredTransactions
-            .filter(classifier.isIncome)
+        let totalIncome = filteredEntries
+            .filter { classifier.isIncome($0.transaction) }
             .reduce(Decimal.zero) { $0 + $1.amount }
 
-        let totalExpenses = filteredTransactions
-            .filter(classifier.isExpense)
+        let totalExpenses = filteredEntries
+            .filter { classifier.isExpense($0.transaction) }
             .reduce(Decimal.zero) { partial, transaction in
                 partial + absolute(transaction.amount)
             }
 
         let netBalance = totalIncome - totalExpenses
         let savingsRate = totalIncome.isZero ? 0 : decimalToDouble(netBalance / totalIncome)
-        let categorizedCount = filteredTransactions.filter { $0.categoryID != nil }.count
-        let categorizedPercentage = filteredTransactions.isEmpty ? 0 : Double(categorizedCount) / Double(filteredTransactions.count)
+        let categorizedCount = filteredSourceTransactions.filter { $0.categoryID != nil }.count
+        let categorizedPercentage = filteredSourceTransactions.isEmpty ? 0 : Double(categorizedCount) / Double(filteredSourceTransactions.count)
 
-        let categoryMap = Dictionary(uniqueKeysWithValues: categories.map { ($0.id, $0.name) })
         let categoryBreakdown = buildCategoryBreakdown(
-            transactions: filteredTransactions,
-            previousTransactions: previousTransactions,
+            transactions: filteredEntries,
+            previousTransactions: previousEntries,
             categoryMap: categoryMap,
             totalExpenses: totalExpenses
         )
-        let monthlyCashflow = buildMonthlyCashflow(from: filteredTransactions)
+        let monthlyCashflow = buildMonthlyCashflow(from: filteredEntries)
         let categoryEvolution = buildCategoryEvolution(
-            from: filteredTransactions,
+            from: filteredEntries,
             categoryMap: categoryMap
         )
         let forecast = buildForecast(from: monthlyCashflow)
-        let recurringExpenses = buildRecurringExpenses(from: filteredTransactions)
+        let recurringExpenses = buildRecurringExpenses(from: filteredEntries)
 
         return FinancialAnalysisSnapshot(
             range: range,
@@ -172,12 +169,32 @@ struct FinancialAnalysisService {
         )
     }
 
-    private func previousWindowTransactions(
-        from allTransactions: [Transaction],
+    private func reportingEntries(
+        from allEntries: [FinancialReportingEntry],
+        in range: AnalysisTimeRange,
+        anchoredAt anchorMonthStart: Date?
+    ) -> [FinancialReportingEntry] {
+        guard let monthWindow = range.monthWindow,
+              let anchorMonthStart,
+              let startDate = Calendar.current.date(
+                  byAdding: .month,
+                  value: -(monthWindow - 1),
+                  to: anchorMonthStart
+              ),
+              let endDate = Calendar.current.date(byAdding: .month, value: 1, to: anchorMonthStart) else {
+            return allEntries.sorted { $0.date < $1.date }
+        }
+
+        return allEntries
+            .filter { $0.date >= startDate && $0.date < endDate }
+            .sorted { $0.date < $1.date }
+    }
+
+    private func previousWindowEntries(
+        from allEntries: [FinancialReportingEntry],
         for range: AnalysisTimeRange,
-        anchorMonthStart: Date?,
-        dateBasis: DashboardDateBasis
-    ) -> [Transaction] {
+        anchorMonthStart: Date?
+    ) -> [FinancialReportingEntry] {
         guard let monthWindow = range.monthWindow,
               let anchorMonthStart,
               let currentStart = Calendar.current.date(
@@ -194,25 +211,21 @@ struct FinancialAnalysisService {
             return []
         }
 
-        let reportingScope = FinancialReportingScope(dateBasis: dateBasis)
-        return allTransactions.filter {
-            let date = reportingScope.date(for: $0)
-            return date >= previousStart && date <= previousEnd
-        }
+        return allEntries.filter { $0.date >= previousStart && $0.date <= previousEnd }
     }
 
     private func buildCategoryBreakdown(
-        transactions: [Transaction],
-        previousTransactions: [Transaction],
+        transactions: [FinancialReportingEntry],
+        previousTransactions: [FinancialReportingEntry],
         categoryMap: [UUID: String],
         totalExpenses: Decimal
     ) -> [CategoryBreakdownItem] {
-        let currentExpenses = Dictionary(grouping: transactions.filter(classifier.isExpense)) { transaction in
-            classifier.categoryName(for: transaction, categoryMap: categoryMap) ?? "Sin categorizar"
+        let currentExpenses = Dictionary(grouping: transactions.filter { classifier.isExpense($0.transaction) }) { entry in
+            classifier.categoryName(for: entry.transaction, categoryMap: categoryMap) ?? "Sin categorizar"
         }.mapValues { $0.reduce(Decimal.zero) { $0 + absolute($1.amount) } }
 
-        let previousExpenses = Dictionary(grouping: previousTransactions.filter(classifier.isExpense)) { transaction in
-            classifier.categoryName(for: transaction, categoryMap: categoryMap) ?? "Sin categorizar"
+        let previousExpenses = Dictionary(grouping: previousTransactions.filter { classifier.isExpense($0.transaction) }) { entry in
+            classifier.categoryName(for: entry.transaction, categoryMap: categoryMap) ?? "Sin categorizar"
         }.mapValues { $0.reduce(Decimal.zero) { $0 + absolute($1.amount) } }
 
         return currentExpenses
@@ -231,12 +244,12 @@ struct FinancialAnalysisService {
     }
 
     private func buildCategoryEvolution(
-        from transactions: [Transaction],
+        from transactions: [FinancialReportingEntry],
         categoryMap: [UUID: String]
     ) -> [CategoryEvolutionItem] {
-        let expenseTransactions = transactions.filter(classifier.isExpense)
-        guard let firstDate = expenseTransactions.map(\.accountingDate).min(),
-              let lastDate = expenseTransactions.map(\.accountingDate).max() else {
+        let expenseTransactions = transactions.filter { classifier.isExpense($0.transaction) }
+        guard let firstDate = expenseTransactions.map(\.date).min(),
+              let lastDate = expenseTransactions.map(\.date).max() else {
             return []
         }
 
@@ -248,10 +261,10 @@ struct FinancialAnalysisService {
         formatter.locale = Locale.current
 
         let monthlyAmounts = Dictionary(grouping: expenseTransactions) {
-            startOfMonth(for: $0.accountingDate)
+            startOfMonth(for: $0.date)
         }.mapValues { monthTransactions in
             Dictionary(grouping: monthTransactions) { transaction in
-                classifier.categoryName(for: transaction, categoryMap: categoryMap) ?? "Sin categorizar"
+                classifier.categoryName(for: transaction.transaction, categoryMap: categoryMap) ?? "Sin categorizar"
             }.mapValues { items in
                 items.reduce(Decimal.zero) { $0 + absolute($1.amount) }
             }
@@ -292,8 +305,8 @@ struct FinancialAnalysisService {
         }
     }
 
-    private func buildMonthlyCashflow(from transactions: [Transaction]) -> [MonthlyCashflowPoint] {
-        let grouped = Dictionary(grouping: transactions, by: { startOfMonth(for: $0.accountingDate) })
+    private func buildMonthlyCashflow(from transactions: [FinancialReportingEntry]) -> [MonthlyCashflowPoint] {
+        let grouped = Dictionary(grouping: transactions, by: { startOfMonth(for: $0.date) })
         let formatter = DateFormatter()
         formatter.dateFormat = "MMM yyyy"
         formatter.locale = Locale.current
@@ -301,10 +314,10 @@ struct FinancialAnalysisService {
         return grouped.keys.sorted().map { month in
             let monthTransactions = grouped[month] ?? []
             let income = monthTransactions
-                .filter(classifier.isIncome)
+                .filter { classifier.isIncome($0.transaction) }
                 .reduce(Decimal.zero) { $0 + $1.amount }
             let expense = monthTransactions
-                .filter(classifier.isExpense)
+                .filter { classifier.isExpense($0.transaction) }
                 .reduce(Decimal.zero) { $0 + absolute($1.amount) }
 
             return MonthlyCashflowPoint(
@@ -337,15 +350,15 @@ struct FinancialAnalysisService {
         )
     }
 
-    private func buildRecurringExpenses(from transactions: [Transaction]) -> [RecurringExpenseItem] {
-        Dictionary(grouping: transactions.filter(classifier.isExpense), by: \.cleanedDescription)
+    private func buildRecurringExpenses(from transactions: [FinancialReportingEntry]) -> [RecurringExpenseItem] {
+        Dictionary(grouping: transactions.filter { classifier.isExpense($0.transaction) }, by: { $0.transaction.cleanedDescription })
             .compactMap { concept, items in
                 guard items.count >= 2 else { return nil }
                 let averageAmount = items.reduce(Decimal.zero) { $0 + absolute($1.amount) } / Decimal(items.count)
-                let latestDate = items.map(\.bookingDate).max() ?? .now
+                let latestDate = items.map(\.date).max() ?? .now
                 return RecurringExpenseItem(
                     id: concept,
-                    concept: items.first?.rawDescription ?? concept,
+                    concept: items.first?.transaction.rawDescription ?? concept,
                     averageAmount: averageAmount,
                     occurrences: items.count,
                     latestDate: latestDate

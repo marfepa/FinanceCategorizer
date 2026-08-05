@@ -19,6 +19,8 @@ final class AppContainer {
     let correctionRepository: CorrectionRepository
     let insightRepository: InsightRepository
     let budgetRepository: BudgetRepository
+    let accountRepository: AccountRepository
+    let savingsGoalRepository: SavingsGoalRepository
 
     let normalizer: TransactionNormalizer
     let importOrchestrator: ImportOrchestrator
@@ -36,6 +38,7 @@ final class AppContainer {
     let financialAnalysisService: FinancialAnalysisService
     let insightEngine: InsightEngine
     let duplicateAuditService: DuplicateAuditService
+    let financialPlanningService: FinancialPlanningService
 
     init(inMemory: Bool = false) {
         modelContainer = ModelContainerFactory.make(inMemory: inMemory)
@@ -48,6 +51,8 @@ final class AppContainer {
         correctionRepository = CorrectionRepository(modelContainer: modelContainer)
         insightRepository = InsightRepository(modelContainer: modelContainer)
         budgetRepository = BudgetRepository(modelContainer: modelContainer)
+        accountRepository = AccountRepository(modelContainer: modelContainer)
+        savingsGoalRepository = SavingsGoalRepository(modelContainer: modelContainer)
 
         let fileImportService = FileImportService()
         let csvParsingService = CSVParsingService()
@@ -122,6 +127,7 @@ final class AppContainer {
         self.financialAnalysisService = financialAnalysisService
         self.insightEngine = insightEngine
         self.duplicateAuditService = DuplicateAuditService()
+        self.financialPlanningService = FinancialPlanningService()
         self.importOrchestrator = ImportOrchestrator(
             transactionRepository: transactionRepository,
             categoryRepository: categoryRepository,

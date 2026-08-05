@@ -2,10 +2,32 @@ import Foundation
 
 enum FinancialReportingDateBasis {
     case booking
+    /// Family-budget view: ordinary payroll booked after the cutoff is assigned
+    /// to the following month, while an estimated extraordinary excess stays
+    /// in the month in which the bank booked it.
+    case budget
+    /// Kept as a source-compatible name for callers from the first reporting
+    /// implementation. It now means the same as `.budget`.
     case accounting
+
+    var usesBudgetAllocation: Bool {
+        switch self {
+        case .booking: return false
+        case .budget, .accounting: return true
+        }
+    }
 }
 
 typealias DashboardDateBasis = FinancialReportingDateBasis
+
+/// A reporting line may represent all or only part of a source transaction.
+/// This is required for a payroll month that contains both ordinary payroll
+/// and an estimated extraordinary supplement.
+struct FinancialReportingEntry {
+    let transaction: Transaction
+    let date: Date
+    let amount: Decimal
+}
 
 enum FinancialTrendDirection: String, Equatable {
     case increasing
@@ -62,8 +84,8 @@ struct FinancialMovementClassifier {
         )
     }
 
-    func isIncluded(_ transaction: Transaction) -> Bool {
-        kind(for: transaction) != .transfer
+    func isIncluded(_ transaction: Transaction, categoryMap: [UUID: String] = [:]) -> Bool {
+        !isInternalTransfer(transaction, categoryMap: categoryMap)
     }
 
     func isIncome(_ transaction: Transaction) -> Bool {
@@ -91,8 +113,28 @@ struct FinancialMovementClassifier {
         } ?? "Alimentacion"
     }
 
-    func dataQuality(for transactions: [Transaction]) -> FinancialDataQuality {
-        let included = transactions.filter(isIncluded)
+    func isInternalTransfer(_ transaction: Transaction, categoryMap: [UUID: String] = [:]) -> Bool {
+        if kind(for: transaction) == .transfer {
+            return true
+        }
+
+        guard let categoryID = transaction.categoryID,
+              let categoryName = categoryMap[categoryID] else {
+            return false
+        }
+
+        let normalizedCategory = categoryName
+            .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
+            .uppercased()
+            .replacingOccurrences(of: "[^A-Z0-9]+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        return normalizedCategory == "MOVIMIENTO INTERNO" ||
+            normalizedCategory == "INTERNAL MOVEMENT"
+    }
+
+    func dataQuality(for transactions: [Transaction], categoryMap: [UUID: String] = [:]) -> FinancialDataQuality {
+        let included = transactions.filter { isIncluded($0, categoryMap: categoryMap) }
         let expenses = included.filter(isExpense)
         let categorizedExpenses = expenses.filter { $0.categoryID != nil }
         let pending = included.filter {
@@ -125,63 +167,233 @@ struct FinancialMovementClassifier {
 
 /// Shared temporal scope for every financial surface.
 ///
-/// Dashboard and Analysis must agree on the accounting month they are showing.
+/// Dashboard and Analysis must agree on the reporting month they are showing.
 /// Keeping this decision here prevents a future-dated movement from silently
 /// moving one screen to a different month than the other.
 struct FinancialReportingScope {
     let now: Date
     let dateBasis: DashboardDateBasis
     let calendar: Calendar
+    let payrollCutoffDay: Int
 
     init(
         now: Date = .now,
-        dateBasis: DashboardDateBasis = .accounting,
-        calendar: Calendar = .current
+        dateBasis: DashboardDateBasis = .budget,
+        calendar: Calendar = .current,
+        payrollCutoffDay: Int? = nil
     ) {
         self.now = now
         self.dateBasis = dateBasis
         self.calendar = calendar
+        let storedCutoff = UserDefaults.standard.integer(forKey: "payrollCutoffDay")
+        let requestedCutoff = payrollCutoffDay ?? (storedCutoff == 0 ? 25 : storedCutoff)
+        self.payrollCutoffDay = min(max(requestedCutoff, 22), 31)
     }
 
     func date(for transaction: Transaction) -> Date {
-        switch dateBasis {
-        case .booking:
-            return transaction.bookingDate
-        case .accounting:
-            return transaction.accountingDate
-        }
+        // A source transaction has one bank date. Budget allocations are
+        // represented by FinancialReportingEntry rather than by mutating this
+        // source-level date.
+        return transaction.bookingDate
     }
 
     func isVisible(_ transaction: Transaction) -> Bool {
-        calendar.startOfDay(for: date(for: transaction)) <= calendar.startOfDay(for: now)
+        calendar.startOfDay(for: transaction.bookingDate) <= calendar.startOfDay(for: now)
     }
 
     func eligibleTransactions(
         from transactions: [Transaction],
-        classifier: FinancialMovementClassifier
+        classifier: FinancialMovementClassifier,
+        categoryMap: [UUID: String] = [:]
     ) -> [Transaction] {
         transactions
-            .filter(classifier.isIncluded)
+            .filter { classifier.isIncluded($0, categoryMap: categoryMap) }
             .filter(isVisible)
+    }
+
+    func eligibleEntries(
+        from transactions: [Transaction],
+        classifier: FinancialMovementClassifier,
+        categoryMap: [UUID: String] = [:]
+    ) -> [FinancialReportingEntry] {
+        let eligible = eligibleTransactions(
+            from: transactions,
+            classifier: classifier,
+            categoryMap: categoryMap
+        )
+
+        guard dateBasis.usesBudgetAllocation else {
+            return eligible.map {
+                FinancialReportingEntry(transaction: $0, date: $0.bookingDate, amount: $0.amount)
+            }
+        }
+
+        return budgetEntries(from: eligible, classifier: classifier)
+    }
+
+    func sourceTransactions(from entries: [FinancialReportingEntry]) -> [Transaction] {
+        var seen = Set<UUID>()
+        return entries.compactMap { entry in
+            guard seen.insert(entry.transaction.id).inserted else { return nil }
+            return entry.transaction
+        }
     }
 
     func activeMonthStart(
         from transactions: [Transaction],
-        classifier: FinancialMovementClassifier
+        classifier: FinancialMovementClassifier,
+        categoryMap: [UUID: String] = [:]
     ) -> Date? {
-        let eligible = eligibleTransactions(from: transactions, classifier: classifier)
-        guard let latestKnownDate = eligible.map({ date(for: $0) }).max() else { return nil }
+        let eligible = eligibleTransactions(
+            from: transactions,
+            classifier: classifier,
+            categoryMap: categoryMap
+        )
+        let latestKnownDate: Date?
+        if dateBasis.usesBudgetAllocation {
+            let reportingEntries = eligibleEntries(
+                from: eligible,
+                classifier: classifier,
+                categoryMap: categoryMap
+            )
+            latestKnownDate = reportingEntries
+                .filter { calendar.startOfDay(for: $0.date) <= calendar.startOfDay(for: now) }
+                .map(\.date)
+                .max()
+        } else {
+            latestKnownDate = eligible.map({ date(for: $0) }).max()
+        }
+        guard let latestKnownDate else { return nil }
 
         let calendarMonthStart = startOfMonth(for: now)
         let nextCalendarMonth = calendar.date(byAdding: .month, value: 1, to: calendarMonthStart)
-        if eligible.contains(where: { transaction in
-            let date = date(for: transaction)
-            return date >= calendarMonthStart && date < (nextCalendarMonth ?? .distantFuture)
-        }) {
+        let currentMonthHasEntries: Bool
+        if dateBasis.usesBudgetAllocation {
+            currentMonthHasEntries = eligibleEntries(
+                from: eligible,
+                classifier: classifier,
+                categoryMap: categoryMap
+            ).contains { entry in
+                let date = entry.date
+                return date >= calendarMonthStart &&
+                    date < (nextCalendarMonth ?? .distantFuture) &&
+                    calendar.startOfDay(for: date) <= calendar.startOfDay(for: now)
+            }
+        } else {
+            currentMonthHasEntries = eligible.contains { transaction in
+                let date = date(for: transaction)
+                return date >= calendarMonthStart && date < (nextCalendarMonth ?? .distantFuture)
+            }
+        }
+        if currentMonthHasEntries {
             return calendarMonthStart
         }
 
         return startOfMonth(for: latestKnownDate)
+    }
+
+    private func budgetEntries(
+        from transactions: [Transaction],
+        classifier: FinancialMovementClassifier
+    ) -> [FinancialReportingEntry] {
+        let latePayroll = transactions.filter { transaction in
+            guard isPayroll(transaction, classifier: classifier) else { return false }
+            return calendar.component(.day, from: transaction.bookingDate) >= payrollCutoffDay
+        }
+
+        let groupedPayroll = Dictionary(grouping: latePayroll) {
+            startOfMonth(for: $0.bookingDate)
+        }
+        let payrollTotals = groupedPayroll.values.map { items in
+            items.reduce(Decimal.zero) { $0 + $1.amount }
+        }
+        let typicalPayroll = median(payrollTotals)
+        let canDetectExtraordinaryIncome = payrollTotals.count >= 3 && typicalPayroll > .zero
+
+        var entries = transactions
+            .filter { transaction in
+                !latePayroll.contains { payrollTransaction in
+                    payrollTransaction.id == transaction.id
+                }
+            }
+            .map { FinancialReportingEntry(transaction: $0, date: $0.bookingDate, amount: $0.amount) }
+
+        for (month, items) in groupedPayroll {
+            let total = items.reduce(Decimal.zero) { $0 + $1.amount }
+            let isExtraordinary = canDetectExtraordinaryIncome && total > typicalPayroll * Decimal(string: "1.5")!
+            let ordinaryAmount = isExtraordinary ? min(total, typicalPayroll) : total
+            let ordinaryDate = calendar.date(byAdding: .month, value: 1, to: month) ?? month
+
+            var ordinaryRemaining = ordinaryAmount
+            let sortedItems = items.sorted {
+                if $0.bookingDate != $1.bookingDate { return $0.bookingDate < $1.bookingDate }
+                return $0.id.uuidString < $1.id.uuidString
+            }
+
+            for (index, transaction) in sortedItems.enumerated() {
+                let ordinaryShare: Decimal
+                if index == sortedItems.count - 1 {
+                    ordinaryShare = ordinaryRemaining
+                } else if total == .zero {
+                    ordinaryShare = .zero
+                } else {
+                    let proportional = roundedToCents(transaction.amount * ordinaryAmount / total)
+                    ordinaryShare = min(max(proportional, .zero), ordinaryRemaining)
+                }
+                ordinaryRemaining -= ordinaryShare
+
+                if ordinaryShare > .zero {
+                    entries.append(
+                        FinancialReportingEntry(
+                            transaction: transaction,
+                            date: ordinaryDate,
+                            amount: ordinaryShare
+                        )
+                    )
+                }
+
+                let extraordinaryShare = transaction.amount - ordinaryShare
+                if extraordinaryShare > .zero {
+                    entries.append(
+                        FinancialReportingEntry(
+                            transaction: transaction,
+                            date: transaction.bookingDate,
+                            amount: extraordinaryShare
+                        )
+                    )
+                }
+            }
+        }
+
+        return entries.sorted { lhs, rhs in
+            if lhs.date != rhs.date { return lhs.date < rhs.date }
+            return lhs.transaction.bookingDate < rhs.transaction.bookingDate
+        }
+    }
+
+    private func isPayroll(_ transaction: Transaction, classifier: FinancialMovementClassifier) -> Bool {
+        guard classifier.isIncome(transaction) else { return false }
+        let text = "\(transaction.rawDescription) \(transaction.cleanedDescription)"
+            .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
+            .uppercased()
+        return text.contains("NOMINA")
+    }
+
+    private func median(_ values: [Decimal]) -> Decimal {
+        let sorted = values.filter { $0 > .zero }.sorted()
+        guard !sorted.isEmpty else { return .zero }
+        if sorted.count % 2 == 1 {
+            return sorted[sorted.count / 2]
+        }
+        let upper = sorted.count / 2
+        return (sorted[upper - 1] + sorted[upper]) / Decimal(2)
+    }
+
+    private func roundedToCents(_ value: Decimal) -> Decimal {
+        var value = value
+        var rounded = Decimal.zero
+        NSDecimalRound(&rounded, &value, 2, .bankers)
+        return rounded
     }
 
     func transactions(

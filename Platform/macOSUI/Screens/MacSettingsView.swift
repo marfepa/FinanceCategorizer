@@ -69,11 +69,11 @@ struct MacSettingsView: View {
 
             Section(LocalizedStringKey("Payroll")) {
                 Stepper(
-                    appLanguage.localized("Payroll cutoff day: %lld", payrollCutoffDay),
+                    appLanguage.localized("Payroll alert day: %lld", payrollCutoffDay),
                     value: $payrollCutoffDay,
                     in: 22...31
                 )
-                Text(appLanguage.localized("Payroll income received from day %lld onwards is attributed to the following month's budget for accurate monthly reporting.", payrollCutoffDay))
+                Text(appLanguage.localized("Income gap alerts start after day %lld. Budget reports move ordinary late payroll to the next month and keep estimated extras in the booking month.", payrollCutoffDay))
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }

@@ -6,8 +6,9 @@ import SwiftData
 final class BudgetsViewModel {
     var budgets: [Budget] = []
     var categories: [Category] = []
-    var transactions: [Transaction] = []
+    var reportingEntries: [FinancialReportingEntry] = []
     var errorMessage: String?
+    private let classifier = FinancialMovementClassifier()
     
     var currentMonthYear: String {
         let formatter = DateFormatter()
@@ -20,16 +21,25 @@ final class BudgetsViewModel {
             budgets = try container.budgetRepository.fetch(forMonthYear: currentMonthYear)
             categories = try container.categoryRepository.fetchAll()
             
-            // Limit transactions to the current month for calculation
+            // Budgets use the same family-budget allocation as the Dashboard
+            // and Analysis surfaces, while keeping internal movements out.
             let allTransactions = try container.transactionRepository.fetchAll()
-            let calendar = Calendar.current
             let now = Date()
-            
-            transactions = allTransactions.filter { 
-                let isSameMonth = calendar.isDate($0.accountingDate, equalTo: now, toGranularity: .month)
-                let isSameYear = calendar.isDate($0.accountingDate, equalTo: now, toGranularity: .year)
-                return isSameMonth && isSameYear
+            let categoryMap = Dictionary(uniqueKeysWithValues: categories.map { ($0.id, $0.name) })
+            let scope = FinancialReportingScope(now: now, dateBasis: .budget)
+            let calendar = scope.calendar
+            guard let monthStart = calendar.date(from: calendar.dateComponents([.year, .month], from: now)),
+                  let nextMonthStart = calendar.date(byAdding: .month, value: 1, to: monthStart) else {
+                reportingEntries = []
+                errorMessage = nil
+                return
             }
+            reportingEntries = scope.eligibleEntries(
+                from: allTransactions,
+                classifier: classifier,
+                categoryMap: categoryMap
+            )
+            .filter { $0.date >= monthStart && $0.date < nextMonthStart }
             errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
@@ -64,8 +74,11 @@ final class BudgetsViewModel {
     }
     
     func spent(for categoryID: UUID) -> Decimal {
-        transactions
-            .filter { $0.categoryID == categoryID && $0.resolvedKind == .expense }
+        reportingEntries
+            .filter {
+                $0.transaction.categoryID == categoryID &&
+                    classifier.isExpense($0.transaction)
+            }
             .reduce(0) { $0 + abs($1.amount) }
     }
 }

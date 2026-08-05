@@ -521,19 +521,25 @@ struct MacCategoriesView: View {
     }
 
     private func detailMonthlySpendPoints(for category: CategoryListItem) -> [DetailMonthlySpendPoint] {
-        let transactions = transactionsViewModel.transactions
-            .filter { $0.categoryID == category.id }
-            .filter { $0.resolvedKind != .transfer && NSDecimalNumber(decimal: $0.amount).doubleValue < 0 }
+        let categoryMap = Dictionary(uniqueKeysWithValues: transactionsViewModel.categories.map { ($0.id, $0.name) })
+        let reportingEntries = FinancialReportingScope(now: Date(), dateBasis: .budget)
+            .eligibleEntries(
+                from: transactionsViewModel.transactions,
+                classifier: FinancialMovementClassifier(),
+                categoryMap: categoryMap
+            )
+            .filter { $0.transaction.categoryID == category.id }
+            .filter { FinancialMovementClassifier().isExpense($0.transaction) }
 
-        let filtered = filterTransactions(transactions, for: selectedDetailRange)
-        guard let latestDate = transactions.map(\.accountingDate).max() else { return [] }
+        let filtered = filterEntries(reportingEntries, for: selectedDetailRange)
+        guard let latestDate = reportingEntries.map(\.date).max() else { return [] }
         let endMonth = startOfMonth(for: latestDate)
         let startMonth: Date = if let monthWindow = selectedDetailRange.monthWindow {
             Calendar.current.date(byAdding: .month, value: -(monthWindow - 1), to: endMonth) ?? endMonth
         } else {
-            transactions.map(\.accountingDate).min().map(startOfMonth(for:)) ?? endMonth
+            reportingEntries.map(\.date).min().map(startOfMonth(for:)) ?? endMonth
         }
-        let grouped = Dictionary(grouping: filtered, by: { startOfMonth(for: $0.accountingDate) })
+        let grouped = Dictionary(grouping: filtered, by: { startOfMonth(for: $0.date) })
         let formatter = DateFormatter()
         formatter.setLocalizedDateFormatFromTemplate("MMM")
         formatter.locale = Locale.current
@@ -548,8 +554,8 @@ struct MacCategoriesView: View {
 
         return months.map { month in
             let items = grouped[month] ?? []
-            let amount = items.reduce(Decimal.zero) { partial, transaction in
-                partial + absolute(transaction.amount)
+            let amount = items.reduce(Decimal.zero) { partial, entry in
+                partial + absolute(entry.amount)
             }
 
             return DetailMonthlySpendPoint(
@@ -561,16 +567,16 @@ struct MacCategoriesView: View {
         }
     }
 
-    private func filterTransactions(_ transactions: [Transaction], for range: AnalysisTimeRange) -> [Transaction] {
+    private func filterEntries(_ transactions: [FinancialReportingEntry], for range: AnalysisTimeRange) -> [FinancialReportingEntry] {
         guard let monthWindow = range.monthWindow,
-              let latestDate = transactions.map(\.accountingDate).max(),
+              let latestDate = transactions.map(\.date).max(),
               let startDate = Calendar.current.date(byAdding: .month, value: -(monthWindow - 1), to: startOfMonth(for: latestDate)) else {
-            return transactions.sorted { $0.accountingDate < $1.accountingDate }
+            return transactions.sorted { $0.date < $1.date }
         }
 
         return transactions
-            .filter { $0.accountingDate >= startDate }
-            .sorted { $0.accountingDate < $1.accountingDate }
+            .filter { $0.date >= startDate }
+            .sorted { $0.date < $1.date }
     }
 
     private func xAxisStride(for pointCount: Int) -> Int {
