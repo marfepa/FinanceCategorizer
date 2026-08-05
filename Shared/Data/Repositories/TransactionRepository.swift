@@ -124,36 +124,39 @@ final class TransactionRepository {
 
     func fetchMatchingNameTransactions(for transaction: Transaction) throws -> [Transaction] {
         let targetID = transaction.id
+        let targetKind = transaction.resolvedKind
+        let targetIsIncome = transaction.amount >= 0
         let targetMerchant = transaction.merchantCanonicalName?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let targetCleaned = transaction.cleanedDescription.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let targetRaw = transaction.rawDescription.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let targetFingerprint = transaction.fingerprint.trimmingCharacters(in: .whitespacesAndNewlines)
 
         return try fetchAll().filter { t in
-            guard t.id != targetID && t.resolvedKind != .transfer else { return false }
+            guard t.id != targetID else { return false }
+            guard t.resolvedKind == targetKind else { return false }
+            guard (t.amount >= 0) == targetIsIncome else { return false }
 
-            if let targetMerchant, !targetMerchant.isEmpty,
+            if let targetMerchant, !targetMerchant.isEmpty, !targetMerchant.isGenericBankingNoise,
                let merchant = t.merchantCanonicalName?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
-               !merchant.isEmpty,
-               merchant == targetMerchant {
+               !merchant.isEmpty, merchant == targetMerchant {
                 return true
             }
 
-            if !targetCleaned.isEmpty {
+            if !targetCleaned.isEmpty, !targetCleaned.isGenericBankingNoise {
                 let cleaned = t.cleanedDescription.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-                if !cleaned.isEmpty && cleaned == targetCleaned {
+                if cleaned == targetCleaned {
                     return true
                 }
             }
 
-            if !targetRaw.isEmpty {
+            if !targetRaw.isEmpty, !targetRaw.isGenericBankingNoise {
                 let raw = t.rawDescription.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-                if !raw.isEmpty && raw == targetRaw {
+                if raw == targetRaw {
                     return true
                 }
             }
 
-            if !targetFingerprint.isEmpty && t.fingerprint == targetFingerprint {
+            if !targetFingerprint.isEmpty, !targetCleaned.isGenericBankingNoise, t.fingerprint == targetFingerprint {
                 return true
             }
 
