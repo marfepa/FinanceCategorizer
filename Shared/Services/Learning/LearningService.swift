@@ -115,7 +115,7 @@ final class CorrectionLearningService {
         let cleanedDesc = transaction.cleanedDescription.trimmingCharacters(in: .whitespacesAndNewlines)
         let rawDesc = transaction.rawDescription.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        if let merchantName, !merchantName.isEmpty {
+        if let merchantName, !merchantName.isEmpty, !merchantName.isGenericBankingNoise {
             let normalized = merchantName.lowercased()
             try merchantLearningStore.record(
                 normalizedName: normalized,
@@ -141,17 +141,19 @@ final class CorrectionLearningService {
             let targetText = !cleanedDesc.isEmpty ? cleanedDesc : rawDesc
             let normalized = targetText.lowercased()
 
-            if applyToFuture || ruleSuggestionEngine.shouldSuggestRule(for: transaction, categoryID: categoryID) {
-                try ruleRepository.createRule(
-                    name: "Rule for \(targetText)",
-                    merchantContains: nil,
-                    descriptionContains: normalized,
-                    amountMin: nil,
-                    amountMax: nil,
-                    amountSign: transaction.amount < 0 ? -1 : 1,
-                    targetCategoryID: categoryID,
-                    createdFromUserCorrection: true
-                )
+            if !normalized.isGenericBankingNoise {
+                if applyToFuture || ruleSuggestionEngine.shouldSuggestRule(for: transaction, categoryID: categoryID) {
+                    try ruleRepository.createRule(
+                        name: "Rule for \(targetText)",
+                        merchantContains: nil,
+                        descriptionContains: normalized,
+                        amountMin: nil,
+                        amountMax: nil,
+                        amountSign: transaction.amount < 0 ? -1 : 1,
+                        targetCategoryID: categoryID,
+                        createdFromUserCorrection: true
+                    )
+                }
             }
         }
 
