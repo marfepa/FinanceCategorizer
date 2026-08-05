@@ -52,12 +52,13 @@ final class CorrectionLearningService {
         self.localModelManager = localModelManager
     }
 
+    @discardableResult
     func applyCorrection(
         for transaction: Transaction,
         categoryID: UUID,
         subcategoryID: UUID? = nil,
-        applyToFuture: Bool
-    ) throws {
+        applyToFuture: Bool = true
+    ) throws -> Int {
         let correction = UserCorrection(
             transactionID: transaction.id,
             previousCategoryID: transaction.categoryID,
@@ -81,21 +82,70 @@ final class CorrectionLearningService {
             isRecurringCandidate: transaction.isRecurringCandidate
         )
 
-        if let canonicalName = transaction.merchantCanonicalName, !canonicalName.isEmpty {
-            let normalized = canonicalName.lowercased()
+        let matchingTransactions = (try? transactionRepository.fetchMatchingNameTransactions(for: transaction)) ?? []
+        var cascadedCount = 1
+
+        for match in matchingTransactions {
+            let matchCorrection = UserCorrection(
+                transactionID: match.id,
+                previousCategoryID: match.categoryID,
+                newCategoryID: categoryID,
+                previousSubcategoryID: match.subcategoryID,
+                newSubcategoryID: subcategoryID,
+                previousConfidence: match.confidence,
+                originalSourceRaw: match.categorizationSourceRaw
+            )
+            try correctionRepository.insert(matchCorrection)
+
+            try transactionRepository.applyDecision(
+                transactionID: match.id,
+                categoryID: categoryID,
+                subcategoryID: subcategoryID,
+                source: .manual,
+                confidence: 1.0,
+                needsReview: false,
+                reviewStatus: .corrected,
+                reason: "Automatically updated from user recategorization of matching transaction.",
+                isRecurringCandidate: match.isRecurringCandidate
+            )
+            cascadedCount += 1
+        }
+
+        let merchantName = transaction.merchantCanonicalName?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanedDesc = transaction.cleanedDescription.trimmingCharacters(in: .whitespacesAndNewlines)
+        let rawDesc = transaction.rawDescription.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if let merchantName, !merchantName.isEmpty {
+            let normalized = merchantName.lowercased()
             try merchantLearningStore.record(
                 normalizedName: normalized,
-                displayName: transaction.merchantDisplayName ?? canonicalName,
-                canonicalName: canonicalName,
+                displayName: transaction.merchantDisplayName ?? merchantName,
+                canonicalName: merchantName,
                 categoryID: categoryID,
                 confidence: 1.0
             )
 
             if applyToFuture || ruleSuggestionEngine.shouldSuggestRule(for: transaction, categoryID: categoryID) {
                 try ruleRepository.createRule(
-                    name: "Rule for \(canonicalName)",
+                    name: "Rule for \(merchantName)",
                     merchantContains: normalized,
                     descriptionContains: nil,
+                    amountMin: nil,
+                    amountMax: nil,
+                    amountSign: transaction.amount < 0 ? -1 : 1,
+                    targetCategoryID: categoryID,
+                    createdFromUserCorrection: true
+                )
+            }
+        } else if !cleanedDesc.isEmpty || !rawDesc.isEmpty {
+            let targetText = !cleanedDesc.isEmpty ? cleanedDesc : rawDesc
+            let normalized = targetText.lowercased()
+
+            if applyToFuture || ruleSuggestionEngine.shouldSuggestRule(for: transaction, categoryID: categoryID) {
+                try ruleRepository.createRule(
+                    name: "Rule for \(targetText)",
+                    merchantContains: nil,
+                    descriptionContains: normalized,
                     amountMin: nil,
                     amountMax: nil,
                     amountSign: transaction.amount < 0 ? -1 : 1,
@@ -106,5 +156,6 @@ final class CorrectionLearningService {
         }
 
         try localModelManager.rebuildModelIfNeeded()
+        return cascadedCount
     }
 }

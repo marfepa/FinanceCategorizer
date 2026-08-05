@@ -233,7 +233,7 @@ final class TransactionsViewModel {
         }
 
         do {
-            try container.correctionLearningService.applyCorrection(
+            let updatedCount = try container.correctionLearningService.applyCorrection(
                 for: transaction,
                 categoryID: categoryID,
                 applyToFuture: createRule
@@ -243,9 +243,11 @@ final class TransactionsViewModel {
                 selectedTransaction = refreshed
                 selectedCategoryID = refreshed.categoryID
             }
-            statusMessage = createRule
-                ? "Category updated and rule created from this movement."
-                : "Category updated for the selected movement."
+            if updatedCount > 1 {
+                statusMessage = "Category updated for \(updatedCount) matching movements and saved for future imports."
+            } else {
+                statusMessage = "Category updated and rule saved for future imports."
+            }
             errorMessage = nil
             NotificationCenter.default.post(name: AppContainer.importDidFinishNotification, object: nil)
         } catch {

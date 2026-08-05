@@ -688,6 +688,7 @@
 "audit.category.noneFound" = "No categories match this search.";
 "audit.status.categoryUnavailable" = "That category is no longer available.";
 "audit.status.assigned" = "Movement assigned to %@.";
+"audit.status.assignedMultiple" = "Category %@ assigned to %@ movements and saved for future movements.";
 "audit.empty.title" = "No movements match";
 "audit.empty.message" = "Run an analysis or change the filter to see movements here.";
 "audit.inspector.title" = "Audit detail";

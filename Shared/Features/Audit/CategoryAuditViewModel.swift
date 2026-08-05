@@ -149,17 +149,20 @@ final class CategoryAuditViewModel {
         }
 
         do {
-            try container.correctionLearningService.applyCorrection(
+            let updatedCount = try container.correctionLearningService.applyCorrection(
                 for: transaction,
                 categoryID: categoryID,
                 subcategoryID: nil,
-                applyToFuture: false
+                applyToFuture: true
             )
             load(using: container)
-            statusMessage = AppLanguage.currentSelection.localized(
-                "audit.status.assigned",
-                categoryName(for: categoryID)
-            )
+            let catName = categoryName(for: categoryID)
+            let language = AppLanguage.currentSelection
+            if updatedCount > 1 {
+                statusMessage = language.localized("audit.status.assignedMultiple", catName, language.formatInteger(updatedCount))
+            } else {
+                statusMessage = language.localized("audit.status.assigned", catName)
+            }
             errorMessage = nil
             NotificationCenter.default.post(name: AppContainer.importDidFinishNotification, object: nil)
         } catch {

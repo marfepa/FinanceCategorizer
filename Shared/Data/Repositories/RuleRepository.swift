@@ -88,11 +88,34 @@ final class RuleRepository {
         let normalizedMerchant = merchantContains?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let normalizedDescription = descriptionContains?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
 
-        if rules.contains(where: {
-            ($0.merchantContains?.lowercased() == normalizedMerchant) &&
-            ($0.descriptionContains?.lowercased() == normalizedDescription) &&
-            $0.targetCategoryID == targetCategoryID
+        if let existing = rules.first(where: {
+            let merchantMatch: Bool
+            if let normalizedMerchant, !normalizedMerchant.isEmpty {
+                merchantMatch = $0.merchantContains?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == normalizedMerchant
+            } else {
+                merchantMatch = $0.merchantContains == nil || $0.merchantContains?.isEmpty == true
+            }
+
+            let descriptionMatch: Bool
+            if let normalizedDescription, !normalizedDescription.isEmpty {
+                descriptionMatch = $0.descriptionContains?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == normalizedDescription
+            } else {
+                descriptionMatch = $0.descriptionContains == nil || $0.descriptionContains?.isEmpty == true
+            }
+
+            return merchantMatch && descriptionMatch
         }) {
+            existing.targetCategoryID = targetCategoryID
+            existing.name = name
+            existing.isEnabled = true
+            if createdFromUserCorrection {
+                existing.priority = 200
+                existing.createdFromUserCorrection = true
+            }
+            if let amountSign { existing.amountSign = amountSign }
+            if let amountMin { existing.amountMin = amountMin }
+            if let amountMax { existing.amountMax = amountMax }
+            try context.save()
             return
         }
 
