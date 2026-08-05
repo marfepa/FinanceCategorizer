@@ -17,9 +17,13 @@ final class InsightEngine {
     }
 
     func refreshInsights(language: AppLanguage) async throws {
-        let transactions = try transactionRepository.fetchAll().filter { $0.resolvedKind != .transfer }
+        let allTransactions = try transactionRepository.fetchAll()
         let categories = try categoryRepository.fetchAll()
         let categoryMap = Dictionary(uniqueKeysWithValues: categories.map { ($0.id, $0.name) })
+        let classifier = FinancialMovementClassifier()
+        let transactions = allTransactions.filter {
+            classifier.isIncluded($0, categoryMap: categoryMap)
+        }
         var insights: [Insight] = []
 
         let recentCutoff = Calendar.current.date(byAdding: .month, value: -12, to: Date()) ?? .distantPast

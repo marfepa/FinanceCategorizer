@@ -5,9 +5,10 @@ import Observation
 @Observable
 final class InsightsViewModel {
     // Give the analysis enough context to make trends and scenarios legible.
-    // The service still anchors the range at the latest accounting month.
+    // The service anchors the range at the latest reporting month.
     var selectedRange: AnalysisTimeRange = .sixMonths
     var snapshot: FinancialAnalysisSnapshot?
+    var planningSnapshot: FinancialPlanningSnapshot?
     var aiNarrative: String?
     var insights: [Insight] = []
     var isLoading = false
@@ -21,16 +22,26 @@ final class InsightsViewModel {
         do {
             let transactions = try container.transactionRepository.fetchAll()
             let categories = try container.categoryRepository.fetchAll()
+            let accounts = try container.accountRepository.fetchAll()
+            let goals = try container.savingsGoalRepository.fetchAll()
             let snapshot = container.financialAnalysisService.analyze(
                 transactions: transactions,
                 categories: categories,
                 range: selectedRange
             )
             self.snapshot = snapshot
+            self.planningSnapshot = container.financialPlanningService.buildSnapshot(
+                transactions: transactions,
+                accounts: accounts,
+                goals: goals,
+                categories: categories
+            )
             self.insights = try container.insightRepository.fetchAll()
             self.errorMessage = nil
             await loadNarrative(using: container, snapshot: snapshot, language: language)
         } catch {
+            snapshot = nil
+            planningSnapshot = nil
             errorMessage = error.localizedDescription
         }
     }

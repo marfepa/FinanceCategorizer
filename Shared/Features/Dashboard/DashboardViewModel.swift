@@ -5,6 +5,7 @@ import Observation
 @Observable
 final class DashboardViewModel {
     var snapshot: DashboardSnapshot?
+    var planningSnapshot: FinancialPlanningSnapshot?
     var copilotSummary: String?
     var alerts: [String] = []
     var actions: [String] = []
@@ -22,6 +23,8 @@ final class DashboardViewModel {
         do {
             let transactions = try container.transactionRepository.fetchAll()
             let categories = try container.categoryRepository.fetchAll()
+            let accounts = try container.accountRepository.fetchAll()
+            let goals = try container.savingsGoalRepository.fetchAll()
             let recentImports = try container.importBatchRepository.fetchRecentBatches(limit: 6)
 
             snapshot = container.dashboardInsightService.buildSnapshot(
@@ -29,7 +32,13 @@ final class DashboardViewModel {
                 categories: categories,
                 recentImports: recentImports,
                 locale: language.locale,
-                dateBasis: .accounting
+                dateBasis: .budget
+            )
+            planningSnapshot = container.financialPlanningService.buildSnapshot(
+                transactions: transactions,
+                accounts: accounts,
+                goals: goals,
+                categories: categories
             )
             errorMessage = nil
 
@@ -47,6 +56,7 @@ final class DashboardViewModel {
             actions = copilot.recommendedActions
         } catch {
             snapshot = nil
+            planningSnapshot = nil
             copilotSummary = nil
             alerts = []
             actions = []

@@ -50,21 +50,24 @@ struct DashboardInsightService {
         recentImports: [ImportBatch],
         locale: Locale,
         now: Date = .now,
-        dateBasis: DashboardDateBasis = .accounting
+        dateBasis: DashboardDateBasis = .budget
     ) -> DashboardSnapshot? {
-        // The dashboard follows the accounting month used by the app's
-        // reporting rules. A payroll booked on 30/07 therefore belongs to
-        // August when the configured payroll cutoff moves it forward.
+        // The dashboard follows the selected reporting basis. The default
+        // budget basis assigns ordinary late-month payroll to the next month
+        // without mutating the bank transaction itself.
         let reportingScope = FinancialReportingScope(now: now, dateBasis: dateBasis)
-        let validTransactions = reportingScope.eligibleTransactions(
+        let categoryMap = Dictionary(uniqueKeysWithValues: categories.map { ($0.id, $0.name) })
+        let validEntries = reportingScope.eligibleEntries(
             from: transactions,
-            classifier: classifier
+            classifier: classifier,
+            categoryMap: categoryMap
         )
         let calendar = reportingScope.calendar
         let today = calendar.startOfDay(for: now)
         guard let currentMonthStart = reportingScope.activeMonthStart(
             from: transactions,
-            classifier: classifier
+            classifier: classifier,
+            categoryMap: categoryMap
         ) else {
             return nil
         }
@@ -74,62 +77,61 @@ struct DashboardInsightService {
             return nil
         }
 
-        let currentMonthTransactions = validTransactions
-            .filter { transaction in
-                let date = reportingScope.date(for: transaction)
+        let currentMonthEntries = validEntries
+            .filter { entry in
+                let date = entry.date
                 return date >= currentMonthStart && date < nextMonthStart
             }
-            .sorted { reportingScope.date(for: $0) < reportingScope.date(for: $1) }
-        let currentMonthSourceTransactions = transactions.filter { transaction in
-            let date = reportingScope.date(for: transaction)
-            return date >= currentMonthStart &&
-                date < nextMonthStart &&
-                reportingScope.isVisible(transaction)
-        }
-        let previousMonthTransactions = validTransactions
+            .sorted { $0.date < $1.date }
+        let currentMonthSourceTransactions = sourceTransactionsForCurrentMonth(
+            from: transactions,
+            entries: currentMonthEntries,
+            scope: reportingScope,
+            monthStart: currentMonthStart,
+            nextMonthStart: nextMonthStart
+        )
+        let previousMonthEntries = validEntries
             .filter {
-                let date = dashboardDate(for: $0, basis: dateBasis)
+                let date = $0.date
                 return date >= previousMonthStart &&
                     date < currentMonthStart &&
                     calendar.startOfDay(for: date) <= today
             }
 
-        let totalIncome = currentMonthTransactions
-            .filter(isIncome)
+        let totalIncome = currentMonthEntries
+            .filter { isIncome($0.transaction) }
             .reduce(Decimal.zero) { $0 + $1.amount }
-        let totalExpenses = currentMonthTransactions
-            .filter(isExpense)
+        let totalExpenses = currentMonthEntries
+            .filter { isExpense($0.transaction) }
             .reduce(Decimal.zero) { $0 + absolute($1.amount) }
         let netBalance = totalIncome - totalExpenses
         let savingsRate = totalIncome == .zero ? 0 : doubleValue(netBalance / totalIncome)
-        let categorizedCount = currentMonthTransactions.filter { $0.categoryID != nil }.count
-        let categorizedPercentage = currentMonthTransactions.isEmpty ? 0 : Double(categorizedCount) / Double(currentMonthTransactions.count)
-        let dataQuality = classifier.dataQuality(for: currentMonthSourceTransactions)
+        let categorizedCount = currentMonthSourceTransactions.filter { $0.categoryID != nil }.count
+        let categorizedPercentage = currentMonthSourceTransactions.isEmpty ? 0 : Double(categorizedCount) / Double(currentMonthSourceTransactions.count)
+        let dataQuality = classifier.dataQuality(for: currentMonthSourceTransactions, categoryMap: categoryMap)
         let pendingReviewCount = dataQuality.pendingReviewCount
 
-        let previousExpenses = previousMonthTransactions
-            .filter(isExpense)
+        let previousExpenses = previousMonthEntries
+            .filter { isExpense($0.transaction) }
             .reduce(Decimal.zero) { $0 + absolute($1.amount) }
         let expenseDelta = totalExpenses - previousExpenses
         let expenseDeltaPercentage = previousExpenses == .zero ? nil : doubleValue(expenseDelta / previousExpenses)
 
-        let categoryMap = Dictionary(uniqueKeysWithValues: categories.map { ($0.id, $0.name) })
-        let uncategorizedExpenses = currentMonthTransactions.filter {
-            isExpense($0) && storedCategoryName(for: $0, categoryMap: categoryMap) == nil
+        let uncategorizedExpenses = currentMonthEntries.filter {
+            isExpense($0.transaction) && storedCategoryName(for: $0.transaction, categoryMap: categoryMap) == nil
         }
         let categoryItems = buildCategoryItems(
-            from: currentMonthTransactions,
-            comparedTo: previousMonthTransactions,
+            from: currentMonthEntries,
+            comparedTo: previousMonthEntries,
             categoryMap: categoryMap,
             totalExpenses: totalExpenses
         )
-        let trend = buildTrend(from: currentMonthTransactions, locale: locale, dateBasis: dateBasis)
+        let trend = buildTrend(from: currentMonthEntries, locale: locale)
         let monthlyCashflow = buildMonthlyCashflow(
-            from: validTransactions,
+            from: validEntries,
             currentMonthStart: currentMonthStart,
             nextMonthStart: nextMonthStart,
             locale: locale,
-            dateBasis: dateBasis,
             today: today
         )
 
@@ -162,8 +164,8 @@ struct DashboardInsightService {
     }
 
     private func buildCategoryItems(
-        from transactions: [Transaction],
-        comparedTo previousTransactions: [Transaction],
+        from transactions: [FinancialReportingEntry],
+        comparedTo previousTransactions: [FinancialReportingEntry],
         categoryMap: [UUID: String],
         totalExpenses: Decimal
     ) -> [DashboardCategoryItem] {
@@ -187,9 +189,9 @@ struct DashboardInsightService {
             .sorted { $0.amount > $1.amount }
     }
 
-    private func amountsByCategory(from transactions: [Transaction], categoryMap: [UUID: String]) -> [String: Decimal] {
-        Dictionary(grouping: transactions.filter(isExpense)) { transaction in
-            categoryName(for: transaction, categoryMap: categoryMap) ?? String(localized: "Sin categorizar")
+    private func amountsByCategory(from transactions: [FinancialReportingEntry], categoryMap: [UUID: String]) -> [String: Decimal] {
+        Dictionary(grouping: transactions.filter { isExpense($0.transaction) }) { entry in
+            categoryName(for: entry.transaction, categoryMap: categoryMap) ?? String(localized: "Sin categorizar")
         }
         .mapValues { items in
             items.reduce(Decimal.zero) { $0 + absolute($1.amount) }
@@ -204,12 +206,11 @@ struct DashboardInsightService {
     }
 
     private func buildTrend(
-        from transactions: [Transaction],
-        locale: Locale,
-        dateBasis: DashboardDateBasis
+        from transactions: [FinancialReportingEntry],
+        locale: Locale
     ) -> [DashboardTrendPoint] {
         let grouped = Dictionary(grouping: transactions) {
-            Calendar.current.startOfDay(for: dashboardDate(for: $0, basis: dateBasis))
+            Calendar.current.startOfDay(for: $0.date)
         }
         let formatter = DateFormatter()
         formatter.locale = locale
@@ -218,10 +219,10 @@ struct DashboardInsightService {
         return grouped.keys.sorted().map { day in
             let dayTransactions = grouped[day] ?? []
             let income = dayTransactions
-                .filter(isIncome)
+                .filter { isIncome($0.transaction) }
                 .reduce(Decimal.zero) { $0 + $1.amount }
             let expense = dayTransactions
-                .filter(isExpense)
+                .filter { isExpense($0.transaction) }
                 .reduce(Decimal.zero) { $0 + absolute($1.amount) }
 
             return DashboardTrendPoint(
@@ -236,11 +237,10 @@ struct DashboardInsightService {
     }
 
     private func buildMonthlyCashflow(
-        from transactions: [Transaction],
+        from transactions: [FinancialReportingEntry],
         currentMonthStart: Date,
         nextMonthStart: Date,
         locale: Locale,
-        dateBasis: DashboardDateBasis,
         today: Date
     ) -> [MonthlyCashflowPoint] {
         let calendar = Calendar.current
@@ -249,13 +249,13 @@ struct DashboardInsightService {
         }
 
         let historyTransactions = transactions.filter {
-            let date = dashboardDate(for: $0, basis: dateBasis)
+            let date = $0.date
             return date >= historyStart &&
                 date < nextMonthStart &&
                 Calendar.current.startOfDay(for: date) <= today
         }
         guard let firstTransactionDate = historyTransactions
-            .map({ dashboardDate(for: $0, basis: dateBasis) })
+            .map(\.date)
             .min() else {
             return []
         }
@@ -269,14 +269,14 @@ struct DashboardInsightService {
         return months.map { monthStart in
             let monthEnd = calendar.date(byAdding: .month, value: 1, to: monthStart) ?? monthStart
             let monthTransactions = historyTransactions.filter {
-                let date = dashboardDate(for: $0, basis: dateBasis)
+                let date = $0.date
                 return date >= monthStart && date < monthEnd
             }
             let income = monthTransactions
-                .filter(isIncome)
+                .filter { isIncome($0.transaction) }
                 .reduce(Decimal.zero) { $0 + $1.amount }
             let expense = monthTransactions
-                .filter(isExpense)
+                .filter { isExpense($0.transaction) }
                 .reduce(Decimal.zero) { $0 + absolute($1.amount) }
 
             return MonthlyCashflowPoint(
@@ -310,15 +310,6 @@ struct DashboardInsightService {
         return Calendar.current.date(from: components) ?? date
     }
 
-    private func dashboardDate(for transaction: Transaction, basis: DashboardDateBasis) -> Date {
-        switch basis {
-        case .booking:
-            return transaction.bookingDate
-        case .accounting:
-            return transaction.accountingDate
-        }
-    }
-
     private func decimalValue(_ decimal: Decimal) -> Double {
         NSDecimalNumber(decimal: decimal).doubleValue
     }
@@ -346,5 +337,28 @@ struct DashboardInsightService {
 
     private func categoryName(for transaction: Transaction, categoryMap: [UUID: String]) -> String? {
         classifier.categoryName(for: transaction, categoryMap: categoryMap)
+    }
+
+    private func sourceTransactionsForCurrentMonth(
+        from transactions: [Transaction],
+        entries: [FinancialReportingEntry],
+        scope: FinancialReportingScope,
+        monthStart: Date,
+        nextMonthStart: Date
+    ) -> [Transaction] {
+        var result: [Transaction] = []
+        var seen = Set<UUID>()
+
+        for transaction in transactions where scope.isVisible(transaction) {
+            guard transaction.bookingDate >= monthStart && transaction.bookingDate < nextMonthStart,
+                  seen.insert(transaction.id).inserted else { continue }
+            result.append(transaction)
+        }
+
+        for transaction in scope.sourceTransactions(from: entries) where seen.insert(transaction.id).inserted {
+            result.append(transaction)
+        }
+
+        return result
     }
 }
