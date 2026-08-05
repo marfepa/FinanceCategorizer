@@ -6,6 +6,11 @@ struct MacAppRootView: View {
     @State private var selectedSection: MacSection? = .dashboard
     @State private var isShowingAppleAISheet = false
 
+    @State private var dashboardTab: MacDashboardTab = .overview
+    @State private var activityTab: MacActivityTab = .transactions
+    @State private var reviewTab: MacReviewTab = .reviewQueue
+    @State private var planningTab: MacPlanningTab = .budgets
+
     var body: some View {
         NavigationSplitView {
             List(MacSection.allCases, selection: $selectedSection) { section in
@@ -18,28 +23,31 @@ struct MacAppRootView: View {
             Group {
                 switch selectedSection ?? .dashboard {
                 case .dashboard:
-                    MacDashboardView(
-                        openImports: { selectedSection = .imports },
-                        openTransactions: { selectedSection = .transactions },
-                        openReview: { selectedSection = .review },
-                        openGoals: { selectedSection = .goals }
+                    MacDashboardContainerView(
+                        selectedTab: $dashboardTab,
+                        openImports: {
+                            selectedSection = .activity
+                            activityTab = .imports
+                        },
+                        openTransactions: {
+                            selectedSection = .activity
+                            activityTab = .transactions
+                        },
+                        openReview: {
+                            selectedSection = .reviewAndAudit
+                            reviewTab = .reviewQueue
+                        },
+                        openGoals: {
+                            selectedSection = .planning
+                            planningTab = .goals
+                        }
                     )
-                case .analysis:
-                    MacInsightsView()
-                case .imports:
-                    MacImportsView(openTransactions: { selectedSection = .transactions })
-                case .transactions:
-                    MacTransactionsView()
-                case .review:
-                    MacReviewQueueView()
-                case .audit:
-                    MacCategoryAuditView()
-                case .categories:
-                    MacCategoriesView()
-                case .budgets:
-                    MacBudgetsView()
-                case .goals:
-                    MacSavingsGoalsView()
+                case .activity:
+                    MacActivityView(selectedTab: $activityTab)
+                case .reviewAndAudit:
+                    MacReviewAndAuditView(selectedTab: $reviewTab)
+                case .planning:
+                    MacPlanningView(selectedTab: $planningTab)
                 case .settings:
                     MacSettingsView()
                 }
@@ -67,22 +75,16 @@ struct MacAppRootView: View {
     private func aiSurface(for section: MacSection) -> AppleAISurface {
         switch section {
         case .dashboard:
-            return .dashboard
-        case .analysis:
-            return .analysis
-        case .imports:
-            return .imports
-        case .transactions:
-            return .transactions
-        case .review:
-            return .review
-        case .audit:
-            return .review
-        case .categories:
-            return .categories
-        case .budgets:
-            return .budgets
-        case .goals:
+            return dashboardTab == .overview ? .dashboard : .analysis
+        case .activity:
+            return activityTab == .transactions ? .transactions : .imports
+        case .reviewAndAudit:
+            switch reviewTab {
+            case .reviewQueue: return .review
+            case .audit: return .review
+            case .categories: return .categories
+            }
+        case .planning:
             return .budgets
         case .settings:
             return .settings
@@ -92,14 +94,9 @@ struct MacAppRootView: View {
 
 private enum MacSection: String, CaseIterable, Identifiable {
     case dashboard
-    case analysis
-    case imports
-    case transactions
-    case review
-    case audit
-    case categories
-    case budgets
-    case goals
+    case activity
+    case reviewAndAudit
+    case planning
     case settings
 
     var id: String { rawValue }
@@ -107,14 +104,9 @@ private enum MacSection: String, CaseIterable, Identifiable {
     var title: LocalizedStringKey {
         switch self {
         case .dashboard: return "Dashboard"
-        case .analysis: return "Analysis"
-        case .imports: return "Import"
-        case .transactions: return "Transactions"
-        case .review: return "Review"
-        case .audit: return "audit.title"
-        case .categories: return "Categories"
-        case .budgets: return "Budgets"
-        case .goals: return "Savings Goals"
+        case .activity: return "Activity"
+        case .reviewAndAudit: return "Review & Quality"
+        case .planning: return "Planning"
         case .settings: return "Settings"
         }
     }
@@ -122,14 +114,9 @@ private enum MacSection: String, CaseIterable, Identifiable {
     var systemImage: String {
         switch self {
         case .dashboard: return "chart.bar"
-        case .analysis: return "chart.xyaxis.line"
-        case .imports: return "square.and.arrow.down"
-        case .transactions: return "tablecells"
-        case .review: return "checklist"
-        case .audit: return "rectangle.and.text.magnifyingglass"
-        case .categories: return "tag"
-        case .budgets: return "target"
-        case .goals: return "archivebox"
+        case .activity: return "tablecells"
+        case .reviewAndAudit: return "checklist"
+        case .planning: return "target"
         case .settings: return "gearshape"
         }
     }
