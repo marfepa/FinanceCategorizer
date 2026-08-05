@@ -903,6 +903,90 @@ final class FinanceCategorizerTests: XCTestCase {
         XCTAssertFalse(saved.needsReview)
     }
 
+    func testCascadingRecategorizationAndFutureLearning() async throws {
+        let container = AppContainer(inMemory: true)
+        try container.categoryRepository.ensureBaseCategories()
+        let categories = try container.categoryRepository.fetchAll()
+        let oldCategory = try XCTUnwrap(categories.first(where: { $0.name == "Alimentacion" }))
+        let newCategory = try XCTUnwrap(categories.first(where: { $0.name == "Ocio" }))
+
+        let tx1 = Transaction(
+            bookingDate: .now,
+            rawDescription: "NETFLIX ENTERTAINMENT",
+            cleanedDescription: "NETFLIX ENTERTAINMENT",
+            merchantDisplayName: "Netflix",
+            merchantCanonicalName: "Netflix",
+            amount: Decimal(-15.99),
+            categoryID: oldCategory.id,
+            categorizationSourceRaw: CategorizationSource.rule.rawValue,
+            confidence: 0.8,
+            fingerprint: "netflix-1"
+        )
+        let tx2 = Transaction(
+            bookingDate: .now.addingTimeInterval(-86400),
+            rawDescription: "NETFLIX ENTERTAINMENT",
+            cleanedDescription: "NETFLIX ENTERTAINMENT",
+            merchantDisplayName: "Netflix",
+            merchantCanonicalName: "Netflix",
+            amount: Decimal(-15.99),
+            categoryID: oldCategory.id,
+            categorizationSourceRaw: CategorizationSource.rule.rawValue,
+            confidence: 0.8,
+            fingerprint: "netflix-2"
+        )
+        let tx3 = Transaction(
+            bookingDate: .now.addingTimeInterval(-172800),
+            rawDescription: "NETFLIX ENTERTAINMENT",
+            cleanedDescription: "NETFLIX ENTERTAINMENT",
+            merchantDisplayName: "Netflix",
+            merchantCanonicalName: "Netflix",
+            amount: Decimal(-15.99),
+            categoryID: nil,
+            categorizationSourceRaw: CategorizationSource.unknown.rawValue,
+            confidence: 0.0,
+            fingerprint: "netflix-3"
+        )
+
+        try container.transactionRepository.insert(tx1)
+        try container.transactionRepository.insert(tx2)
+        try container.transactionRepository.insert(tx3)
+
+        let count = try container.correctionLearningService.applyCorrection(
+            for: tx1,
+            categoryID: newCategory.id,
+            applyToFuture: true
+        )
+
+        XCTAssertEqual(count, 3)
+
+        let savedTx1 = try XCTUnwrap(container.transactionRepository.fetch(transactionID: tx1.id))
+        let savedTx2 = try XCTUnwrap(container.transactionRepository.fetch(transactionID: tx2.id))
+        let savedTx3 = try XCTUnwrap(container.transactionRepository.fetch(transactionID: tx3.id))
+
+        XCTAssertEqual(savedTx1.categoryID, newCategory.id)
+        XCTAssertEqual(savedTx2.categoryID, newCategory.id)
+        XCTAssertEqual(savedTx3.categoryID, newCategory.id)
+
+        let futureDTO = NormalizedTransactionDTO(
+            externalID: nil,
+            bookingDate: .now,
+            valueDate: nil,
+            rawDescription: "NETFLIX ENTERTAINMENT",
+            cleanedDescription: "NETFLIX ENTERTAINMENT",
+            merchantDisplayName: "Netflix",
+            merchantCanonicalName: "Netflix",
+            amount: Decimal(-15.99),
+            currencyCode: "EUR",
+            accountName: nil,
+            sign: -1,
+            fingerprint: "netflix-future"
+        )
+
+        let decision = await container.categorizationOrchestrator.categorize(futureDTO)
+        XCTAssertEqual(decision.categoryID, newCategory.id)
+        XCTAssertGreaterThanOrEqual(decision.confidence, 0.9)
+    }
+
     func testReviewQueueCanCreateCustomCategory() throws {
         let container = AppContainer(inMemory: true)
         let viewModel = ReviewQueueViewModel()
