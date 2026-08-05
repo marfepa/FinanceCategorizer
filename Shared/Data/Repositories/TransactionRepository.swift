@@ -122,6 +122,46 @@ final class TransactionRepository {
             .map { $0 }
     }
 
+    func fetchMatchingNameTransactions(for transaction: Transaction) throws -> [Transaction] {
+        let targetID = transaction.id
+        let targetMerchant = transaction.merchantCanonicalName?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let targetCleaned = transaction.cleanedDescription.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let targetRaw = transaction.rawDescription.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let targetFingerprint = transaction.fingerprint.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        return try fetchAll().filter { t in
+            guard t.id != targetID && t.resolvedKind != .transfer else { return false }
+
+            if let targetMerchant, !targetMerchant.isEmpty,
+               let merchant = t.merchantCanonicalName?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
+               !merchant.isEmpty,
+               merchant == targetMerchant {
+                return true
+            }
+
+            if !targetCleaned.isEmpty {
+                let cleaned = t.cleanedDescription.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                if !cleaned.isEmpty && cleaned == targetCleaned {
+                    return true
+                }
+            }
+
+            if !targetRaw.isEmpty {
+                let raw = t.rawDescription.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                if !raw.isEmpty && raw == targetRaw {
+                    return true
+                }
+            }
+
+            if !targetFingerprint.isEmpty && t.fingerprint == targetFingerprint {
+                return true
+            }
+
+            return false
+        }
+    }
+
+
     func applyDecision(
         transactionID: UUID,
         categoryID: UUID?,
