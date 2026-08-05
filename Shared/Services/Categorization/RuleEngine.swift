@@ -19,9 +19,16 @@ final class RuleEngine {
                 continue
             }
 
-            if let descriptionContains = rule.descriptionContains,
-               !input.cleanedDescription.lowercased().contains(descriptionContains.lowercased()) {
-                continue
+            if let descriptionContains = rule.descriptionContains {
+                let normPattern = descriptionContains.lowercased()
+                let cleaned = input.cleanedDescription.lowercased()
+                if normPattern.isGenericBankingNoise {
+                    if cleaned != normPattern {
+                        continue
+                    }
+                } else if !cleaned.contains(normPattern) {
+                    continue
+                }
             }
 
             let comparableAmount = abs(input.amount)
