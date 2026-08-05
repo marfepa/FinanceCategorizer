@@ -158,6 +158,7 @@ final class ImportOrchestrator: ImportOrchestrating {
                 valueDate: row.valueDate,
                 description: row.concept,
                 amount: row.amount,
+                balance: row.balance,
                 currencyCode: row.currencyCode ?? AppConfig.defaultCurrencyCode,
                 accountName: nil
             )
@@ -192,6 +193,7 @@ final class ImportOrchestrator: ImportOrchestrating {
                 merchantDisplayName: normalized.merchantDisplayName,
                 merchantCanonicalName: normalized.merchantCanonicalName,
                 amount: normalized.amount,
+                balanceAfter: normalized.balance,
                 currencyCode: normalized.currencyCode,
                 kindRaw: normalized.resolvedKind.rawValue,
                 accountName: normalized.accountName,

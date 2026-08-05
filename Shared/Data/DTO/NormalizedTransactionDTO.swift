@@ -9,6 +9,7 @@ struct NormalizedTransactionDTO {
     let merchantDisplayName: String?
     let merchantCanonicalName: String?
     let amount: Decimal
+    let balance: Decimal?
     let currencyCode: String
     let accountName: String?
     let sign: Int
@@ -24,6 +25,7 @@ struct NormalizedTransactionDTO {
         merchantDisplayName: String?,
         merchantCanonicalName: String?,
         amount: Decimal,
+        balance: Decimal? = nil,
         currencyCode: String,
         accountName: String?,
         sign: Int,
@@ -38,6 +40,7 @@ struct NormalizedTransactionDTO {
         self.merchantDisplayName = merchantDisplayName
         self.merchantCanonicalName = merchantCanonicalName
         self.amount = amount
+        self.balance = balance
         self.currencyCode = currencyCode
         self.accountName = accountName
         self.sign = sign
