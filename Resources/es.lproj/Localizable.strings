@@ -696,6 +696,7 @@
 "audit.category.noneFound" = "No hay categorías que coincidan.";
 "audit.status.categoryUnavailable" = "Esa categoría ya no está disponible.";
 "audit.status.assigned" = "Movimiento asignado a %@.";
+"audit.status.assignedMultiple" = "Categoría %@ asignada a %@ movimientos y guardada para futuros movimientos.";
 "audit.empty.title" = "No hay movimientos que coincidan";
 "audit.empty.message" = "Ejecuta un análisis o cambia el filtro para ver movimientos aquí.";
 "audit.inspector.title" = "Detalle de auditoría";
