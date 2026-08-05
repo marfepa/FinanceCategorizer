@@ -987,6 +987,71 @@ final class FinanceCategorizerTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(decision.confidence, 0.9)
     }
 
+    func testInternalTransferRecategorizationDoesNotTouchRentOrGenericMovements() async throws {
+        let container = AppContainer(inMemory: true)
+        try container.categoryRepository.ensureBaseCategories()
+        let categories = try container.categoryRepository.fetchAll()
+        let transfersCategory = try XCTUnwrap(categories.first(where: { $0.name == "Transferencias" }))
+        let housingCategory = try XCTUnwrap(categories.first(where: { $0.name == "Hogar" }))
+        let leisureCategory = try XCTUnwrap(categories.first(where: { $0.name == "Ocio" }))
+
+        let internalTx = Transaction(
+            bookingDate: .now,
+            rawDescription: "TRANSFERENCIA SEPA TRASPASO CUENTA PROPIA",
+            cleanedDescription: "TRANSFERENCIA SEPA TRASPASO CUENTA PROPIA",
+            amount: Decimal(-200.00),
+            kindRaw: TransactionKind.transfer.rawValue,
+            categoryID: transfersCategory.id,
+            fingerprint: "internal-1"
+        )
+
+        let rentTx = Transaction(
+            bookingDate: .now,
+            rawDescription: "TRANSFERENCIA SEPA ALQUILER SEPTIEMBRE",
+            cleanedDescription: "TRANSFERENCIA SEPA ALQUILER SEPTIEMBRE",
+            amount: Decimal(-850.00),
+            kindRaw: TransactionKind.expense.rawValue,
+            categoryID: housingCategory.id,
+            fingerprint: "rent-1"
+        )
+
+        try container.transactionRepository.insert(internalTx)
+        try container.transactionRepository.insert(rentTx)
+
+        let count = try container.correctionLearningService.applyCorrection(
+            for: internalTx,
+            categoryID: leisureCategory.id,
+            applyToFuture: true
+        )
+
+        XCTAssertEqual(count, 1)
+
+        let savedInternal = try XCTUnwrap(container.transactionRepository.fetch(transactionID: internalTx.id))
+        let savedRent = try XCTUnwrap(container.transactionRepository.fetch(transactionID: rentTx.id))
+
+        XCTAssertEqual(savedInternal.categoryID, leisureCategory.id)
+        XCTAssertEqual(savedRent.categoryID, housingCategory.id)
+
+        let rentDTO = NormalizedTransactionDTO(
+            externalID: nil,
+            bookingDate: .now,
+            valueDate: nil,
+            rawDescription: "TRANSFERENCIA SEPA ALQUILER OCTUBRE",
+            cleanedDescription: "TRANSFERENCIA SEPA ALQUILER OCTUBRE",
+            merchantDisplayName: nil,
+            merchantCanonicalName: nil,
+            amount: Decimal(-850.00),
+            currencyCode: "EUR",
+            accountName: nil,
+            sign: -1,
+            fingerprint: "rent-future",
+            kind: .expense
+        )
+
+        let decision = await container.categorizationOrchestrator.categorize(rentDTO)
+        XCTAssertNotEqual(decision.categoryID, leisureCategory.id)
+    }
+
     func testReviewQueueCanCreateCustomCategory() throws {
         let container = AppContainer(inMemory: true)
         let viewModel = ReviewQueueViewModel()
