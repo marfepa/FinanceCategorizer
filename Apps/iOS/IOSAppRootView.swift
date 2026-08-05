@@ -3,14 +3,25 @@ import SwiftUI
 struct IOSAppRootView: View {
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.english
     @State private var selectedTab: IOSTab = .dashboard
-    
+    @State private var activityTab: IOSActivityTab = .transactions
+    @State private var reviewTab: IOSReviewTab = .reviewQueue
+
     var body: some View {
         TabView(selection: $selectedTab) {
             NavigationStack {
                 IOSDashboardView(
-                    openImports: { selectedTab = .imports },
-                    openTransactions: { selectedTab = .transactions },
-                    openReview: { selectedTab = .review }
+                    openImports: {
+                        selectedTab = .activity
+                        activityTab = .imports
+                    },
+                    openTransactions: {
+                        selectedTab = .activity
+                        activityTab = .transactions
+                    },
+                    openReview: {
+                        selectedTab = .reviewAndAudit
+                        reviewTab = .reviewQueue
+                    }
                 )
             }
             .tag(IOSTab.dashboard)
@@ -19,35 +30,27 @@ struct IOSAppRootView: View {
             }
 
             NavigationStack {
-                IOSImportView()
+                IOSActivityView(selectedTab: $activityTab)
             }
-            .tag(IOSTab.imports)
+            .tag(IOSTab.activity)
             .tabItem {
-                Label(LocalizedStringKey("Import"), systemImage: "square.and.arrow.down")
+                Label(LocalizedStringKey("Activity"), systemImage: "list.bullet.rectangle.portrait")
             }
 
             NavigationStack {
-                IOSTransactionsView()
+                IOSReviewAndAuditView(selectedTab: $reviewTab)
             }
-            .tag(IOSTab.transactions)
+            .tag(IOSTab.reviewAndAudit)
             .tabItem {
-                Label(LocalizedStringKey("Transactions"), systemImage: "list.bullet.rectangle.portrait")
+                Label(LocalizedStringKey("Review & Quality"), systemImage: "checklist")
             }
 
             NavigationStack {
-                IOSReviewQueueView()
+                IOSPlanningView()
             }
-            .tag(IOSTab.review)
+            .tag(IOSTab.planning)
             .tabItem {
-                Label(LocalizedStringKey("Review"), systemImage: "checklist")
-            }
-
-            NavigationStack {
-                IOSCategoryAuditView()
-            }
-            .tag(IOSTab.audit)
-            .tabItem {
-                Label(LocalizedStringKey("audit.title"), systemImage: "rectangle.and.text.magnifyingglass")
+                Label(LocalizedStringKey("Planning"), systemImage: "target")
             }
 
             NavigationStack {
@@ -65,9 +68,8 @@ struct IOSAppRootView: View {
 
 private enum IOSTab: Hashable {
     case dashboard
-    case imports
-    case transactions
-    case review
-    case audit
+    case activity
+    case reviewAndAudit
+    case planning
     case settings
 }
