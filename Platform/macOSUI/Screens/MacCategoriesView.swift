@@ -260,25 +260,39 @@ struct MacCategoriesView: View {
                 .padding(AppSpacing.medium)
                 .background(AppColors.cardBackground.opacity(0.55), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
             } else {
-                Chart(points) { point in
-                    AreaMark(
-                        x: .value("Mes", point.startDate),
-                        y: .value("Gasto", decimalValue(point.amount))
-                    )
-                    .foregroundStyle(AppColors.neutral.opacity(0.16).gradient)
+                Chart {
+                    ForEach(points) { point in
+                        AreaMark(
+                            x: .value("Mes", point.startDate),
+                            y: .value("Gasto", decimalValue(point.amount))
+                        )
+                        .foregroundStyle(AppColors.neutral.opacity(0.16).gradient)
 
-                    LineMark(
-                        x: .value("Mes", point.startDate),
-                        y: .value("Gasto", decimalValue(point.amount))
-                    )
-                    .foregroundStyle(AppColors.neutral.gradient)
-                    .lineStyle(StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
+                        LineMark(
+                            x: .value("Mes", point.startDate),
+                            y: .value("Gasto", decimalValue(point.amount))
+                        )
+                        .foregroundStyle(AppColors.neutral.gradient)
+                        .lineStyle(StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
 
-                    PointMark(
-                        x: .value("Mes", point.startDate),
-                        y: .value("Gasto", decimalValue(point.amount))
-                    )
-                    .foregroundStyle(AppColors.neutral)
+                        PointMark(
+                            x: .value("Mes", point.startDate),
+                            y: .value("Gasto", decimalValue(point.amount))
+                        )
+                        .foregroundStyle(AppColors.neutral)
+                    }
+
+                    if let selectedDetailDate {
+                        RuleMark(x: .value("Mes", selectedDetailDate))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [Color.white.opacity(0.45), Color.white.opacity(0.08)],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                            .lineStyle(StrokeStyle(lineWidth: 1.2, dash: [3, 3]))
+                    }
                 }
                 .frame(height: 210)
                 .chartYAxis {
@@ -298,29 +312,28 @@ struct MacCategoriesView: View {
                             .contentShape(Rectangle())
                             .gesture(
                                 DragGesture(minimumDistance: 0)
+                                    .onChanged { value in
+                                        updateCategoryDetailDateSelection(at: value.location, proxy: proxy, geometry: geometry)
+                                    }
                                     .onEnded { value in
-                                        guard let plotFrameAnchor = proxy.plotFrame else { return }
-                                        let plotFrame = geometry[plotFrameAnchor]
-                                        let xPosition = value.location.x - plotFrame.origin.x
-                                        guard xPosition >= 0,
-                                              xPosition <= plotFrame.size.width,
-                                              let date: Date = proxy.value(atX: xPosition, as: Date.self) else {
-                                            return
-                                        }
-                                        selectedDetailDate = date
+                                        updateCategoryDetailDateSelection(at: value.location, proxy: proxy, geometry: geometry)
                                     }
                             )
                     }
                 }
-
-                if let selectedDetailDate,
-                   let selectedPoint = points.min(by: {
-                       abs($0.startDate.timeIntervalSince(selectedDetailDate)) < abs($1.startDate.timeIntervalSince(selectedDetailDate))
-                   }) {
-                    InteractiveChartReadout(
-                        title: selectedPoint.monthLabel,
-                        values: [("Gasto", formattedAmount(selectedPoint.amount))]
-                    )
+                .overlay(alignment: .topLeading) {
+                    if let selectedDetailDate,
+                       let selectedPoint = points.min(by: {
+                           abs($0.startDate.timeIntervalSince(selectedDetailDate)) < abs($1.startDate.timeIntervalSince(selectedDetailDate))
+                       }) {
+                        InChartCalloutOverlay(
+                            title: selectedPoint.monthLabel,
+                            items: [
+                                InChartCalloutOverlayItem(label: appLanguage == .spanish ? "Gasto" : "Expenses", value: formattedAmount(selectedPoint.amount), color: AppColors.expense)
+                            ],
+                            alignment: .topLeading
+                        )
+                    }
                 }
 
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: AppSpacing.small)], spacing: AppSpacing.small) {
@@ -354,6 +367,15 @@ struct MacCategoriesView: View {
         .onChange(of: selectedDetailRange) { _, _ in
             selectedDetailDate = nil
         }
+    }
+
+    private func updateCategoryDetailDateSelection(at location: CGPoint, proxy: ChartProxy, geometry: GeometryProxy) {
+        guard let plotFrameAnchor = proxy.plotFrame else { return }
+        let plotFrame = geometry[plotFrameAnchor]
+        let xPosition = location.x - plotFrame.origin.x
+        guard xPosition >= 0, xPosition <= plotFrame.size.width,
+              let date: Date = proxy.value(atX: xPosition, as: Date.self) else { return }
+        selectedDetailDate = date
     }
 
     private var detailRangePicker: some View {

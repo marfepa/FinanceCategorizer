@@ -278,28 +278,42 @@ private struct IOSCashflowCard: View {
                 Text(LocalizedStringKey("Not enough monthly history to visualize cashflow."))
                     .foregroundStyle(.secondary)
             } else {
-                Chart(snapshot.monthlyCashflow) { point in
-                    BarMark(
-                        x: .value("Month", point.monthLabel),
-                        y: .value("Amount", decimalValue(point.income))
-                    )
-                    .foregroundStyle(by: .value("Flow", "Income"))
-                    .position(by: .value("Flow", "Income"))
+                Chart {
+                    ForEach(snapshot.monthlyCashflow) { point in
+                        BarMark(
+                            x: .value("Month", point.monthLabel),
+                            y: .value("Amount", decimalValue(point.income))
+                        )
+                        .foregroundStyle(by: .value("Flow", "Income"))
+                        .position(by: .value("Flow", "Income"))
 
-                    BarMark(
-                        x: .value("Month", point.monthLabel),
-                        y: .value("Amount", decimalValue(point.expense))
-                    )
-                    .foregroundStyle(by: .value("Flow", "Expenses"))
-                    .position(by: .value("Flow", "Expenses"))
+                        BarMark(
+                            x: .value("Month", point.monthLabel),
+                            y: .value("Amount", decimalValue(point.expense))
+                        )
+                        .foregroundStyle(by: .value("Flow", "Expenses"))
+                        .position(by: .value("Flow", "Expenses"))
 
-                    LineMark(
-                        x: .value("Month", point.monthLabel),
-                        y: .value("Net", decimalValue(point.net))
-                    )
-                    .interpolationMethod(.catmullRom)
-                    .lineStyle(StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
-                    .foregroundStyle(by: .value("Flow", "Net"))
+                        LineMark(
+                            x: .value("Month", point.monthLabel),
+                            y: .value("Net", decimalValue(point.net))
+                        )
+                        .interpolationMethod(.catmullRom)
+                        .lineStyle(StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
+                        .foregroundStyle(by: .value("Flow", "Net"))
+                    }
+
+                    if let selectedMonthLabel {
+                        RuleMark(x: .value("Month", selectedMonthLabel))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [Color.white.opacity(0.45), Color.white.opacity(0.08)],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                            .lineStyle(StrokeStyle(lineWidth: 1.2, dash: [3, 3]))
+                    }
                 }
                 .frame(height: 220)
                 .chartForegroundStyleScale([
@@ -318,31 +332,28 @@ private struct IOSCashflowCard: View {
                             .contentShape(Rectangle())
                             .gesture(
                                 DragGesture(minimumDistance: 0)
+                                    .onChanged { value in
+                                        updateIOSMonthSelection(at: value.location, proxy: proxy, geometry: geometry)
+                                    }
                                     .onEnded { value in
-                                        guard let plotFrameAnchor = proxy.plotFrame else { return }
-                                        let plotFrame = geometry[plotFrameAnchor]
-                                        let xPosition = value.location.x - plotFrame.origin.x
-                                        guard xPosition >= 0,
-                                              xPosition <= plotFrame.size.width,
-                                              let label: String = proxy.value(atX: xPosition, as: String.self) else {
-                                            return
-                                        }
-                                        selectedMonthLabel = label
+                                        updateIOSMonthSelection(at: value.location, proxy: proxy, geometry: geometry)
                                     }
                             )
                     }
                 }
-
-                if let selectedMonthLabel,
-                   let selectedPoint = snapshot.monthlyCashflow.first(where: { $0.monthLabel == selectedMonthLabel }) {
-                    InteractiveChartReadout(
-                        title: selectedPoint.monthLabel,
-                        values: [
-                            (appLanguage.localized("Income"), renderAmount(selectedPoint.income)),
-                            (appLanguage.localized("Expenses"), renderAmount(selectedPoint.expense)),
-                            (appLanguage.localized("Net"), renderAmount(selectedPoint.net))
-                        ]
-                    )
+                .overlay(alignment: .topLeading) {
+                    if let selectedMonthLabel,
+                       let selectedPoint = snapshot.monthlyCashflow.first(where: { $0.monthLabel == selectedMonthLabel }) {
+                        InChartCalloutOverlay(
+                            title: selectedPoint.monthLabel,
+                            items: [
+                                InChartCalloutOverlayItem(label: appLanguage.localized("Income"), value: renderAmount(selectedPoint.income), color: AppColors.income),
+                                InChartCalloutOverlayItem(label: appLanguage.localized("Expenses"), value: renderAmount(selectedPoint.expense), color: AppColors.expense),
+                                InChartCalloutOverlayItem(label: appLanguage.localized("Net"), value: renderAmount(selectedPoint.net), color: selectedPoint.net >= 0 ? AppColors.neutral : AppColors.warning)
+                            ],
+                            alignment: .topLeading
+                        )
+                    }
                 }
             }
 
@@ -368,12 +379,21 @@ private struct IOSCashflowCard: View {
                 .font(.caption2)
                 .foregroundStyle(.secondary)
             Text(value)
-                .font(.caption.weight(.semibold))
+                .font(.subheadline.weight(.semibold))
                 .foregroundStyle(tint)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func updateIOSMonthSelection(at location: CGPoint, proxy: ChartProxy, geometry: GeometryProxy) {
+        guard let plotFrameAnchor = proxy.plotFrame else { return }
+        let plotFrame = geometry[plotFrameAnchor]
+        let xPosition = location.x - plotFrame.origin.x
+        guard xPosition >= 0, xPosition <= plotFrame.size.width,
+              let label: String = proxy.value(atX: xPosition, as: String.self) else { return }
+        selectedMonthLabel = label
     }
 
     private func decimalValue(_ value: Decimal) -> Double {

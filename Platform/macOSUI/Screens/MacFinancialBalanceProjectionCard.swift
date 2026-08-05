@@ -161,6 +161,17 @@ struct FinancialBalanceProjectionCard: View {
                 .foregroundStyle(AppColors.income)
                 .symbolSize(90)
             }
+            if let selectedDate {
+                RuleMark(x: .value("Month", selectedDate))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [Color.white.opacity(0.45), Color.white.opacity(0.08)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .lineStyle(StrokeStyle(lineWidth: 1.2, dash: [3, 3]))
+            }
         }
         .frame(height: 280)
         .chartYAxis {
@@ -180,20 +191,36 @@ struct FinancialBalanceProjectionCard: View {
                     .contentShape(Rectangle())
                     .gesture(
                         DragGesture(minimumDistance: 0)
+                            .onChanged { value in
+                                updateProjectionDateSelection(at: value.location, proxy: proxy, geometry: geometry)
+                            }
                             .onEnded { value in
-                                guard let plotFrameAnchor = proxy.plotFrame else { return }
-                                let plotFrame = geometry[plotFrameAnchor]
-                                let xPosition = value.location.x - plotFrame.origin.x
-                                guard xPosition >= 0,
-                                      xPosition <= plotFrame.size.width,
-                                      let date: Date = proxy.value(atX: xPosition, as: Date.self) else {
-                                    return
-                                }
-                                selectedDate = date
+                                updateProjectionDateSelection(at: value.location, proxy: proxy, geometry: geometry)
                             }
                     )
             }
         }
+        .overlay(alignment: .topLeading) {
+            if let selectedPoint {
+                InChartCalloutOverlay(
+                    title: appLanguage.format(date: selectedPoint.date, dateStyle: .medium),
+                    items: [
+                        InChartCalloutOverlayItem(label: appLanguage.localized("Total balance"), value: renderAmount(selectedPoint.balance), color: AppColors.income),
+                        InChartCalloutOverlayItem(label: appLanguage.localized("Available balance"), value: renderAmount(selectedPoint.availableBalance), color: AppColors.neutral)
+                    ],
+                    alignment: .topLeading
+                )
+            }
+        }
+    }
+
+    private func updateProjectionDateSelection(at location: CGPoint, proxy: ChartProxy, geometry: GeometryProxy) {
+        guard let plotFrameAnchor = proxy.plotFrame else { return }
+        let plotFrame = geometry[plotFrameAnchor]
+        let xPosition = location.x - plotFrame.origin.x
+        guard xPosition >= 0, xPosition <= plotFrame.size.width,
+              let date: Date = proxy.value(atX: xPosition, as: Date.self) else { return }
+        selectedDate = date
     }
 
     private func legendItem(title: String, tint: Color) -> some View {
