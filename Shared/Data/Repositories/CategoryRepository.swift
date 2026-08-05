@@ -49,6 +49,10 @@ final class CategoryRepository {
 
     func ensureBaseCategories() throws {
         let context = makeContext()
+        let count = try context.fetchCount(FetchDescriptor<Category>())
+        if count >= baseCategories.count {
+            return
+        }
         let existing = try context.fetch(FetchDescriptor<Category>())
         let existingNames = Set(existing.map(\.name))
 
