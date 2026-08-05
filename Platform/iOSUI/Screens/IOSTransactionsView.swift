@@ -55,6 +55,28 @@ struct IOSTransactionsView: View {
                         }
                     }
 
+                    Section {
+                        DuplicateReviewPanel(
+                            groups: viewModel.duplicateGroups,
+                            transactions: viewModel.transactions,
+                            isScanning: viewModel.isScanningDuplicates,
+                            onScan: {
+                                viewModel.scanDuplicates(using: appContainer, language: appLanguage)
+                            },
+                            onDismiss: { group in
+                                viewModel.dismissDuplicateGroup(group, using: appContainer, language: appLanguage)
+                            },
+                            onRemove: { group in
+                                viewModel.removeDuplicateGroup(group, using: appContainer, language: appLanguage)
+                            },
+                            onResolveAll: { groups in
+                                viewModel.resolveAllDuplicateGroups(groups, using: appContainer, language: appLanguage)
+                            }
+                        )
+                    } header: {
+                        Text(LocalizedStringKey("duplicate.title"))
+                    }
+
                     Section(LocalizedStringKey("Movements")) {
                         ForEach(viewModel.filteredTransactions) { transaction in
                             VStack(alignment: .leading, spacing: AppSpacing.xSmall) {

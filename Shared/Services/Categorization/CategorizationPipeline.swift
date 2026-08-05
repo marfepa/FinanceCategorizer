@@ -3,9 +3,9 @@ import Foundation
 protocol CategorizationOrchestrating {
     func categorize(_ input: NormalizedTransactionDTO) async -> CategorizationDecision
 }
-
 @MainActor
 final class CategorizationOrchestrator: CategorizationOrchestrating {
+    private let categoryRepository: CategoryRepository
     private let ruleEngine: RuleEngine
     private let merchantMemory: MerchantMemoryEngine
     private let classifier: StatisticalClassifier
@@ -13,12 +13,14 @@ final class CategorizationOrchestrator: CategorizationOrchestrating {
     private let confidenceScorer: ConfidenceScorer
 
     init(
+        categoryRepository: CategoryRepository,
         ruleEngine: RuleEngine,
         merchantMemory: MerchantMemoryEngine,
         classifier: StatisticalClassifier,
         foundationResolver: FoundationModelsResolver?,
         confidenceScorer: ConfidenceScorer
     ) {
+        self.categoryRepository = categoryRepository
         self.ruleEngine = ruleEngine
         self.merchantMemory = merchantMemory
         self.classifier = classifier
@@ -27,6 +29,19 @@ final class CategorizationOrchestrator: CategorizationOrchestrating {
     }
 
     func categorize(_ input: NormalizedTransactionDTO) async -> CategorizationDecision {
+        if input.resolvedKind == .transfer,
+           let category = try? categoryRepository.fetchOrCreateBaseCategory(named: "Transferencias", isIncome: false) {
+            return CategorizationDecision(
+                categoryID: category.id,
+                subcategoryID: nil,
+                source: .rule,
+                confidence: 0.99,
+                shouldQueueForReview: false,
+                isRecurringCandidate: false,
+                reason: "Detected an internal account or prepaid-card movement."
+            )
+        }
+
         if let ruleMatch = ruleEngine.match(input) {
             return confidenceScorer.finalize(ruleMatch)
         }
@@ -55,6 +70,34 @@ final class CategorizationOrchestrator: CategorizationOrchestrating {
             shouldQueueForReview: true,
             isRecurringCandidate: false,
             reason: "No reliable match."
+        )
+    }
+
+    /// Runs the deterministic ranking used to audit an existing category.
+    /// It deliberately avoids merchant memory and Foundation Models first:
+    /// both can repeat a previous decision instead of detecting that it is
+    /// inconsistent with the current transaction text.
+    func recommendRecategorization(_ input: NormalizedTransactionDTO) async -> CategorizationDecision {
+        if let ruleMatch = ruleEngine.match(input) {
+            return confidenceScorer.finalize(ruleMatch)
+        }
+
+        if let mlMatch = classifier.predict(input) {
+            return confidenceScorer.finalize(mlMatch)
+        }
+
+        if let merchantMatch = merchantMemory.match(input) {
+            return confidenceScorer.finalize(merchantMatch)
+        }
+
+        return CategorizationDecision(
+            categoryID: nil,
+            subcategoryID: nil,
+            source: .unknown,
+            confidence: 0,
+            shouldQueueForReview: true,
+            isRecurringCandidate: false,
+            reason: "No reliable recategorization signal."
         )
     }
 }

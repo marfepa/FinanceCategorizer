@@ -1,4 +1,7 @@
 import SwiftUI
+import OSLog
+
+private let transactionsLogger = Logger(subsystem: "com.mariofernandez.FinanceCategorizer", category: "transactions")
 
 struct MacTransactionsView: View {
     @Environment(\.appContainer) private var appContainer
@@ -13,6 +16,26 @@ struct MacTransactionsView: View {
             filterBar
                 .padding()
                 .background(.windowBackground)
+
+            DuplicateReviewPanel(
+                groups: viewModel.duplicateGroups,
+                transactions: viewModel.transactions,
+                isScanning: viewModel.isScanningDuplicates,
+                onScan: {
+                    viewModel.scanDuplicates(using: appContainer, language: .currentSelection)
+                },
+                onDismiss: { group in
+                    viewModel.dismissDuplicateGroup(group, using: appContainer, language: .currentSelection)
+                },
+                onRemove: { group in
+                    viewModel.removeDuplicateGroup(group, using: appContainer, language: .currentSelection)
+                },
+                onResolveAll: { groups in
+                    viewModel.resolveAllDuplicateGroups(groups, using: appContainer, language: .currentSelection)
+                }
+            )
+            .padding(.horizontal)
+            .padding(.bottom, AppSpacing.small)
             
             Divider()
 
@@ -79,9 +102,9 @@ struct MacTransactionsView: View {
         ) { result in
             switch result {
             case .success(let url):
-                print("Saved to \(url)")
+                transactionsLogger.info("Exported transactions to \(url.path, privacy: .private)")
             case .failure(let error):
-                print("Export failed: \(error.localizedDescription)")
+                transactionsLogger.error("Transaction export failed: \(error.localizedDescription, privacy: .public)")
             }
         }
         .onAppear {

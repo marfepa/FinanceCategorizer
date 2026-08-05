@@ -19,16 +19,24 @@ final class RuleEngine {
                 continue
             }
 
-            if let descriptionContains = rule.descriptionContains,
-               !input.cleanedDescription.lowercased().contains(descriptionContains.lowercased()) {
+            if let descriptionContains = rule.descriptionContains {
+                let normPattern = descriptionContains.lowercased()
+                let cleaned = input.cleanedDescription.lowercased()
+                if normPattern.isGenericBankingNoise {
+                    if cleaned != normPattern {
+                        continue
+                    }
+                } else if !cleaned.contains(normPattern) {
+                    continue
+                }
+            }
+
+            let comparableAmount = abs(input.amount)
+            if let amountMin = rule.amountMin, comparableAmount < abs(amountMin) {
                 continue
             }
 
-            if let amountMin = rule.amountMin, input.amount < amountMin {
-                continue
-            }
-
-            if let amountMax = rule.amountMax, input.amount > amountMax {
+            if let amountMax = rule.amountMax, comparableAmount > abs(amountMax) {
                 continue
             }
 

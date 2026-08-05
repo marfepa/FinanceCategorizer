@@ -3,7 +3,6 @@ import Foundation
 protocol ImportOrchestrating {
     func importFile(from url: URL, language: AppLanguage) async throws -> ImportSummary
 }
-
 enum DuplicateImportError: LocalizedError {
     case alreadyImported(ImportDuplicateInfo)
 
@@ -35,6 +34,7 @@ final class ImportOrchestrator: ImportOrchestrating {
     private let validationService: ImportValidationService
     private let insightEngine: InsightEngine
     private let localModelManager: LocalModelManager
+    private let duplicateMovementDetector: DuplicateMovementDetector
 
     init(
         transactionRepository: TransactionRepository,
@@ -48,7 +48,8 @@ final class ImportOrchestrator: ImportOrchestrating {
         pdfParsingService: PDFParsingService,
         validationService: ImportValidationService,
         insightEngine: InsightEngine,
-        localModelManager: LocalModelManager
+        localModelManager: LocalModelManager,
+        duplicateMovementDetector: DuplicateMovementDetector = DuplicateMovementDetector()
     ) {
         self.transactionRepository = transactionRepository
         self.categoryRepository = categoryRepository
@@ -62,6 +63,7 @@ final class ImportOrchestrator: ImportOrchestrating {
         self.validationService = validationService
         self.insightEngine = insightEngine
         self.localModelManager = localModelManager
+        self.duplicateMovementDetector = duplicateMovementDetector
     }
 
     func previewCSV(_ text: String, overrideMapping: ImportColumnMapping? = nil) throws -> ImportPreviewResult {
@@ -90,11 +92,12 @@ final class ImportOrchestrator: ImportOrchestrating {
 
     func importFile(from url: URL, language: AppLanguage) async throws -> ImportSummary {
         let preview = try previewFile(at: url)
-        return try await importRows(
+        let fileData = try fileImportService.readData(from: url)
+        return try await importPreview(
             preview,
             sourceFileName: url.lastPathComponent,
             sourceType: "file",
-            fileFingerprint: fileImportService.fingerprint(for: fileImportService.readData(from: url)),
+            fileFingerprint: fileImportService.fingerprint(for: fileData),
             language: language
         )
     }
@@ -140,9 +143,13 @@ final class ImportOrchestrator: ImportOrchestrating {
         var duplicatesSkipped = 0
         var pendingReviewCount = 0
         var importedTransactions: [Transaction] = []
+        let importBatchID = UUID()
 
-        var dbFingerprintCounts = try transactionRepository.fetchFingerprintCounts()
-        var batchFingerprintCounts: [String: Int] = [:]
+        let existingCandidates = try transactionRepository
+            .fetchAll()
+            .map(DuplicateMovementCandidate.init(transaction:))
+        var normalizedRows: [NormalizedTransactionDTO] = []
+        var candidatesForImport: [DuplicateMovementCandidate] = []
 
         for row in preview.rows {
             let parsed = ParsedRowDTO(
@@ -151,22 +158,34 @@ final class ImportOrchestrator: ImportOrchestrating {
                 valueDate: row.valueDate,
                 description: row.concept,
                 amount: row.amount,
+                balance: row.balance,
                 currencyCode: row.currencyCode ?? AppConfig.defaultCurrencyCode,
                 accountName: nil
             )
             let normalized = normalizer.normalize(parsed)
+            normalizedRows.append(normalized)
+            candidatesForImport.append(
+                DuplicateMovementCandidate(normalized: normalized, importBatchID: importBatchID)
+            )
+        }
 
-            batchFingerprintCounts[normalized.fingerprint, default: 0] += 1
-            let occurrenceIndex = batchFingerprintCounts[normalized.fingerprint]!
-            let dbCount = dbFingerprintCounts[normalized.fingerprint, default: 0]
+        let duplicateMatches = duplicateMovementDetector.findMatches(
+            for: candidatesForImport,
+            against: existingCandidates
+        )
 
-            if occurrenceIndex <= dbCount {
+        for index in preview.rows.indices {
+            let candidate = candidatesForImport[index]
+            if duplicateMatches[candidate.id] != nil {
                 duplicatesSkipped += 1
                 continue
             }
 
+            let normalized = normalizedRows[index]
+
             let decision = await categorizer.categorize(normalized)
             let transaction = Transaction(
+                importBatchID: importBatchID,
                 bookingDate: normalized.bookingDate,
                 valueDate: normalized.valueDate,
                 rawDescription: normalized.rawDescription,
@@ -174,8 +193,9 @@ final class ImportOrchestrator: ImportOrchestrating {
                 merchantDisplayName: normalized.merchantDisplayName,
                 merchantCanonicalName: normalized.merchantCanonicalName,
                 amount: normalized.amount,
+                balanceAfter: normalized.balance,
                 currencyCode: normalized.currencyCode,
-                kindRaw: normalized.sign > 0 ? TransactionKind.income.rawValue : TransactionKind.expense.rawValue,
+                kindRaw: normalized.resolvedKind.rawValue,
                 accountName: normalized.accountName,
                 categoryID: decision.categoryID,
                 subcategoryID: decision.subcategoryID,
@@ -190,7 +210,6 @@ final class ImportOrchestrator: ImportOrchestrating {
 
             importedTransactions.append(transaction)
             importedCount += 1
-            dbFingerprintCounts[normalized.fingerprint, default: 0] += 1
 
             if decision.categoryID != nil, !decision.shouldQueueForReview {
                 autoCategorizedCount += 1
@@ -218,6 +237,7 @@ final class ImportOrchestrator: ImportOrchestrating {
         }
 
         try importBatchRepository.saveBatch(
+            id: importBatchID,
             fileName: sourceFileName,
             sourceType: sourceType,
             rawRowCount: preview.diagnostics.rawRowCount,

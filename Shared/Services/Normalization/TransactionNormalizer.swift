@@ -3,12 +3,12 @@ import Foundation
 protocol TransactionNormalizing {
     func normalize(_ row: ParsedRowDTO) -> NormalizedTransactionDTO
 }
-
 struct TransactionNormalizer: TransactionNormalizing {
     private let descriptionCleaner = DescriptionCleaner()
     private let merchantExtractor = MerchantExtractionService()
     private let merchantCanonicalizer = MerchantCanonicalizer()
     private let amountSignResolver = AmountSignResolver()
+    private let kindResolver = TransactionKindResolver()
     private let dateResolver = DateResolver()
     private let fingerprintBuilder = FingerprintBuilder()
 
@@ -18,6 +18,11 @@ struct TransactionNormalizer: TransactionNormalizing {
         let extractedMerchant = merchantExtractor.extract(from: cleanedDescription)
         let canonicalMerchant = merchantCanonicalizer.canonicalize(extractedMerchant)
         let sign = amountSignResolver.resolveSign(amount: row.amount, rawDescription: row.description)
+        let kind = kindResolver.resolve(
+            rawDescription: row.description,
+            cleanedDescription: cleanedDescription,
+            amount: row.amount
+        )
         let fingerprint = fingerprintBuilder.build(
             bookingDate: resolvedDates.bookingDate,
             cleanedDescription: cleanedDescription,
@@ -34,10 +39,12 @@ struct TransactionNormalizer: TransactionNormalizing {
             merchantDisplayName: canonicalMerchant.displayName,
             merchantCanonicalName: canonicalMerchant.canonicalName,
             amount: row.amount,
+            balance: row.balance,
             currencyCode: row.currencyCode,
             accountName: row.accountName,
             sign: sign,
-            fingerprint: fingerprint
+            fingerprint: fingerprint,
+            kind: kind
         )
     }
 }

@@ -4,8 +4,11 @@ import Observation
 @MainActor
 @Observable
 final class InsightsViewModel {
+    // Give the analysis enough context to make trends and scenarios legible.
+    // The service anchors the range at the latest reporting month.
     var selectedRange: AnalysisTimeRange = .sixMonths
     var snapshot: FinancialAnalysisSnapshot?
+    var planningSnapshot: FinancialPlanningSnapshot?
     var aiNarrative: String?
     var insights: [Insight] = []
     var isLoading = false
@@ -19,18 +22,35 @@ final class InsightsViewModel {
         do {
             let transactions = try container.transactionRepository.fetchAll()
             let categories = try container.categoryRepository.fetchAll()
-            let pendingCount = try container.transactionRepository.fetchPendingReview().count
-            let snapshot = container.financialAnalysisService.analyze(
-                transactions: transactions,
-                categories: categories,
-                pendingReviewCount: pendingCount,
-                range: selectedRange
-            )
-            self.snapshot = snapshot
+            let accounts = try container.accountRepository.fetchAll()
+            let goals = try container.savingsGoalRepository.fetchAll()
+            let analysisService = container.financialAnalysisService
+            let planningService = container.financialPlanningService
+            let range = selectedRange
+
+            let (computedSnapshot, computedPlanning) = await Task.detached(priority: .userInitiated) {
+                let snap = analysisService.analyze(
+                    transactions: transactions,
+                    categories: categories,
+                    range: range
+                )
+                let plan = planningService.buildSnapshot(
+                    transactions: transactions,
+                    accounts: accounts,
+                    goals: goals,
+                    categories: categories
+                )
+                return (snap, plan)
+            }.value
+
+            self.snapshot = computedSnapshot
+            self.planningSnapshot = computedPlanning
             self.insights = try container.insightRepository.fetchAll()
             self.errorMessage = nil
-            await loadNarrative(using: container, snapshot: snapshot, language: language)
+            await loadNarrative(using: container, snapshot: computedSnapshot, language: language)
         } catch {
+            snapshot = nil
+            planningSnapshot = nil
             errorMessage = error.localizedDescription
         }
     }

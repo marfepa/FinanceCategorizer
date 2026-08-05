@@ -6,7 +6,7 @@ import FoundationModels
 struct FoundationModelsAvailability {
     static func isUsable() -> Bool {
         #if canImport(FoundationModels)
-        guard FeatureFlags.foundationModelsEnabled else {
+        guard FeatureFlags.aiSuggestionsEnabled, FeatureFlags.foundationModelsEnabled else {
             return false
         }
         if #available(macOS 26.0, iOS 26.0, *) {

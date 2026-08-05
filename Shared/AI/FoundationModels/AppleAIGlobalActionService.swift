@@ -236,17 +236,22 @@ struct AppleAIGlobalActionService {
     ) async -> AppleAIActionResult {
         let facts = loadFacts(using: container, context: context, language: language)
 
+        guard FeatureFlags.aiSuggestionsEnabled else {
+            return deterministicResult(for: intent, facts: facts, language: language)
+        }
+
         #if canImport(FoundationModels)
         if availabilityService.isAvailable() {
             if #available(macOS 26.0, iOS 26.0, *) {
                 do {
                     let session = LanguageModelSession(
                         instructions: """
-                        Eres un copiloto financiero local para una app de finanzas personales.
-                        Usa solo los hechos recibidos.
-                        Sé concreto, prudente y accionable.
-                        Devuelve un título corto, un resumen útil y entre 3 y 5 bullets.
-                        No inventes números ni categorías.
+                        You are a local finance copilot for a personal finance app.
+                        Use only the facts received.
+                        Be concise, cautious and actionable.
+                        Return a short title, a useful summary and 3 to 5 bullets.
+                        Do not invent numbers or categories.
+                        Respond entirely in \(language.title).
                         """
                     )
 
@@ -284,7 +289,11 @@ struct AppleAIGlobalActionService {
         return deterministicResult(for: intent, facts: facts, language: language)
     }
 
-    private func loadFacts(using container: AppContainer, context: AppleAIContext, language: AppLanguage) -> AppleAIFacts {
+    private func loadFacts(
+        using container: AppContainer,
+        context: AppleAIContext,
+        language: AppLanguage
+    ) -> AppleAIFacts {
         let transactions = (try? container.transactionRepository.fetchAll()) ?? []
         let categories = (try? container.categoryRepository.fetchAll()) ?? []
         let recentImports = (try? container.importBatchRepository.fetchRecentBatches(limit: 6)) ?? []
@@ -294,12 +303,12 @@ struct AppleAIGlobalActionService {
             transactions: transactions,
             categories: categories,
             recentImports: recentImports,
-            locale: language.locale
+            locale: language.locale,
+            dateBasis: .budget
         )
         let analysisSnapshot = container.financialAnalysisService.analyze(
             transactions: transactions,
             categories: categories,
-            pendingReviewCount: pendingReview.count,
             range: .sixMonths
         )
 
@@ -391,11 +400,17 @@ struct AppleAIGlobalActionService {
         .sorted()
 
         let currentMonthBudgets = (try? container.budgetRepository.fetch(forMonthYear: currentMonthYear())) ?? []
+        let reportingScope = FinancialReportingScope(now: Date(), dateBasis: .budget)
+        let reportingEntries = reportingScope.eligibleEntries(
+            from: transactions,
+            classifier: FinancialMovementClassifier(),
+            categoryMap: categoryNameByID
+        )
         let budgetPressureItems = currentMonthBudgets.compactMap { budget in
-            let spent = transactions
-                .filter { $0.categoryID == budget.categoryID }
-                .filter { $0.resolvedKind == .expense }
-                .filter { isCurrentMonth($0.accountingDate, referenceDate: Date()) }
+            let spent = reportingEntries
+                .filter { $0.transaction.categoryID == budget.categoryID }
+                .filter { FinancialMovementClassifier().isExpense($0.transaction) }
+                .filter { isCurrentMonth($0.date, referenceDate: Date()) }
                 .reduce(Decimal.zero) { $0 + absolute($1.amount) }
             let progress = budget.limitAmount == .zero ? 0 : decimalToDouble(spent / budget.limitAmount)
             let categoryName = categoryNameByID[budget.categoryID] ?? language.localized("Unknown Category")

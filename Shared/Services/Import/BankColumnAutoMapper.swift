@@ -115,11 +115,11 @@ struct BankColumnAutoMapper {
             worksheetName: worksheetName,
             headerRowIndex: candidate.rowIndex,
             availableHeaders: candidate.headers,
-            bookingDateIndex: firstIndex(in: candidate.normalizedHeaders) { $0 == "fecha" || $0.contains("fecha") && ($0.contains("cble") || $0.contains("ctble") || $0.contains("contable")) },
-            valueDateIndex: firstIndex(in: candidate.normalizedHeaders) { $0.contains("fecha valor") || $0 == "f valor" || $0 == "fvalor" || $0 == "valor" },
+            bookingDateIndex: firstIndex(in: candidate.normalizedHeaders) { $0 == "fecha" || $0 == "date" || $0.contains("fecha") && ($0.contains("cble") || $0.contains("ctble") || $0.contains("contable")) },
+            valueDateIndex: firstIndex(in: candidate.normalizedHeaders) { $0.contains("fecha valor") || $0 == "f valor" || $0 == "fvalor" || $0 == "valor" || $0 == "value date" },
             conceptIndex: firstIndex(in: candidate.normalizedHeaders) { $0 == "concepto" || $0.contains("descripcion") || $0 == "concept" },
             extendedConceptIndex: firstIndex(in: candidate.normalizedHeaders) { $0.contains("concepto ampliado") || $0.contains("descripcion ampliada") || $0 == "detalle" || $0 == "memo" },
-            amountIndex: firstIndex(in: candidate.normalizedHeaders) { $0.contains("importe") || $0 == "amount" || $0 == "cargo abono" },
+            amountIndex: firstIndex(in: candidate.normalizedHeaders) { $0.contains("importe") || $0 == "amount" || $0 == "cargo abono" || $0 == "valor importe" },
             balanceIndex: firstIndex(in: candidate.normalizedHeaders) { $0.contains("saldo") || $0 == "balance" },
             currencyIndex: firstIndex(in: candidate.normalizedHeaders) { $0.contains("moneda") || $0 == "currency" }
         )

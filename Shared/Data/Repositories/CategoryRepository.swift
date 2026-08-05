@@ -14,11 +14,15 @@ final class CategoryRepository {
         ("Suministros", "bolt", "#FBC02D", false),
         ("Suscripciones", "repeat", "#5C6BC0", false),
         ("Salud", "cross.case", "#EF5350", false),
+        ("Cuidado personal", "scissors", "#EC407A", false),
+        ("Deportes", "figure.run", "#00897B", false),
+        ("Donaciones", "heart", "#D81B60", false),
         ("Ocio", "gamecontroller", "#AB47BC", false),
         ("Viajes", "airplane", "#26A69A", false),
         ("Educacion", "book", "#42A5F5", false),
         ("Finanzas", "creditcard", "#78909C", false),
         ("Impuestos", "building.columns", "#8E24AA", false),
+        ("Efectivo", "banknote", "#607D8B", false),
         ("Ingresos", "arrow.down.circle", "#2E7D32", true),
         ("Transferencias", "arrow.left.arrow.right", "#546E7A", false),
         ("Sin categorizar", "questionmark.circle", "#9E9E9E", false)
@@ -45,6 +49,10 @@ final class CategoryRepository {
 
     func ensureBaseCategories() throws {
         let context = makeContext()
+        let count = try context.fetchCount(FetchDescriptor<Category>())
+        if count >= baseCategories.count {
+            return
+        }
         let existing = try context.fetch(FetchDescriptor<Category>())
         let existingNames = Set(existing.map(\.name))
 

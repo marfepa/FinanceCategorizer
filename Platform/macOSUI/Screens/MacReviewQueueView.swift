@@ -3,6 +3,7 @@ import SwiftUI
 struct MacReviewQueueView: View {
     @Environment(\.appContainer) private var appContainer
     @AppStorage("isPrivacyModeEnabled") private var isPrivacyModeEnabled = false
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.english
     @State private var viewModel = ReviewQueueViewModel()
     @State private var isAdvancedExpanded = false
 
@@ -28,6 +29,13 @@ struct MacReviewQueueView: View {
                         }
                     }
                     .disabled(viewModel.isRecategorizing || viewModel.transactions.isEmpty)
+
+                    Divider()
+
+                    Button(LocalizedStringKey("Accept high-confidence suggestions")) {
+                        viewModel.acceptAllHighConfidenceSuggestions(using: appContainer)
+                    }
+                    .disabled(viewModel.transactions.allSatisfy { !$0.hasRecategorizationSuggestion })
                 } label: {
                     Label(LocalizedStringKey("Review Actions"), systemImage: "ellipsis.circle")
                 }
@@ -92,7 +100,7 @@ struct MacReviewQueueView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(LocalizedStringKey("Review Queue"))
                         .font(AppTypography.sectionTitle)
-                    Text(String(localized: "\(viewModel.pendingCount) pending"))
+                    Text(appLanguage.localized("review.pendingCount", appLanguage.formatInteger(viewModel.pendingCount)))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -129,7 +137,7 @@ struct MacReviewQueueView: View {
                             VStack(alignment: .leading, spacing: AppLayoutMetrics.microGap) {
                                 Text(group.title)
                                     .lineLimit(1)
-                                Text(String(localized: "\(group.count) similar pending movements"))
+                                Text(appLanguage.localized("review.similarPendingCount", appLanguage.formatInteger(group.count)))
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
@@ -146,9 +154,19 @@ struct MacReviewQueueView: View {
                         .contextMenu {
                             Button(LocalizedStringKey("Approve Suggestion")) {
                                 viewModel.select(transaction)
-                                viewModel.approveSelected(using: appContainer)
+                                if transaction.hasRecategorizationSuggestion {
+                                    viewModel.acceptSuggestedCategory(using: appContainer)
+                                } else {
+                                    viewModel.approveSelected(using: appContainer)
+                                }
                             }
-                            .disabled(transaction.categoryID == nil)
+                            .disabled(transaction.categoryID == nil && !transaction.hasRecategorizationSuggestion)
+                            if transaction.hasRecategorizationSuggestion {
+                                Button(LocalizedStringKey("Dismiss Category Suggestion")) {
+                                    viewModel.select(transaction)
+                                    viewModel.dismissSuggestedCategory(using: appContainer)
+                                }
+                            }
                             Button(LocalizedStringKey("Mark as Transfer")) {
                                 viewModel.select(transaction)
                                 viewModel.markAsTransfer(using: appContainer)
@@ -189,7 +207,11 @@ struct MacReviewQueueView: View {
                 }
 
                 HStack {
-                    categoryBadge(categoryID: transaction.categoryID)
+                    if transaction.hasRecategorizationSuggestion {
+                        suggestionBadge(for: transaction)
+                    } else {
+                        categoryBadge(categoryID: transaction.categoryID)
+                    }
                     Spacer()
                     Text(transaction.resolvedKind.rawValue.capitalized)
                         .font(.caption2)
@@ -230,22 +252,36 @@ struct MacReviewQueueView: View {
             infoBlock(LocalizedStringKey("Date"), transaction.bookingDate.formatted(date: .complete, time: .omitted))
             infoBlock(LocalizedStringKey("Amount"), transaction.amount.privacyFormatted(hidden: isPrivacyModeEnabled, currencyCode: transaction.currencyCode))
             infoBlock(LocalizedStringKey("Current Category"), categoryName(for: transaction.categoryID))
+            if transaction.hasRecategorizationSuggestion {
+                infoBlock(
+                    LocalizedStringKey("Suggested Category"),
+                    categoryName(for: transaction.suggestedCategoryID)
+                )
+            }
             infoBlock(LocalizedStringKey("Source"), String(localized: LocalizedStringResource(stringLiteral: transaction.categorizationSourceRaw)))
-            infoBlock(LocalizedStringKey("Explanation"), transaction.categorizationReason ?? String(localized: "No explanation available"))
+            infoBlock(
+                LocalizedStringKey("Explanation"),
+                transaction.suggestedReason ?? transaction.categorizationReason ?? String(localized: "No explanation available")
+            )
         }
         .contentCard(padding: AppLayoutMetrics.contentGap, radius: AppRadius.inner)
     }
 
     private func confidenceSection(for transaction: Transaction) -> some View {
-        VStack(alignment: .leading, spacing: AppLayoutMetrics.microGap) {
-            Text(LocalizedStringKey("Confidence"))
+        let confidence = transaction.suggestedConfidence ?? transaction.confidence
+        let title = transaction.hasRecategorizationSuggestion
+            ? LocalizedStringKey("Suggestion confidence")
+            : LocalizedStringKey("Categorization confidence")
+
+        return VStack(alignment: .leading, spacing: AppLayoutMetrics.microGap) {
+            Text(title)
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            ProgressView(value: transaction.confidence)
-                .tint(confidenceColor(transaction.confidence))
-            Text(transaction.confidence.formatted(.percent.precision(.fractionLength(0))))
+            ProgressView(value: confidence)
+                .tint(confidenceColor(confidence))
+            Text(appLanguage.formatPercent(confidence))
                 .font(.caption2)
-                .foregroundStyle(confidenceColor(transaction.confidence))
+                .foregroundStyle(confidenceColor(confidence))
         }
     }
 
@@ -291,6 +327,18 @@ struct MacReviewQueueView: View {
                     }
                     .appSecondaryGlassButton()
 
+                    if transaction.hasRecategorizationSuggestion {
+                        Button(LocalizedStringKey("Accept Category Suggestion")) {
+                            viewModel.acceptSuggestedCategory(using: appContainer)
+                        }
+                        .buttonStyle(.glassProminent)
+
+                        Button(LocalizedStringKey("Dismiss Category Suggestion")) {
+                            viewModel.dismissSuggestedCategory(using: appContainer)
+                        }
+                        .appSecondaryGlassButton()
+                    }
+
                     Button(viewModel.isLoadingAISuggestion ? String(localized: "Asking AI…") : String(localized: "Ask AI Copilot")) {
                         Task { await viewModel.requestAISuggestion(using: appContainer) }
                     }
@@ -306,7 +354,7 @@ struct MacReviewQueueView: View {
 
                     if !viewModel.similarTransactions.isEmpty {
                         VStack(alignment: .leading, spacing: AppLayoutMetrics.microGap) {
-                            Text(String(localized: "\(viewModel.similarTransactions.count) similar pending movements"))
+                            Text(appLanguage.localized("review.similarPendingCount", appLanguage.formatInteger(viewModel.similarTransactions.count)))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                             Button(LocalizedStringKey("Apply Category to Similar")) {
@@ -351,7 +399,7 @@ struct MacReviewQueueView: View {
                 viewModel.reassignSelected(using: appContainer)
             }
         } secondary: {
-            Button("Skip →") {
+            Button(LocalizedStringKey("Skip")) {
                 viewModel.skipSelected()
             }
             .appSecondaryGlassButton()
@@ -422,6 +470,20 @@ struct MacReviewQueueView: View {
                     .foregroundStyle(.orange)
             }
         }
+    }
+
+    private func suggestionBadge(for transaction: Transaction) -> some View {
+        HStack(spacing: 4) {
+            Text(categoryName(for: transaction.categoryID))
+                .foregroundStyle(.secondary)
+            Image(systemName: "arrow.right")
+            Text(categoryName(for: transaction.suggestedCategoryID))
+                .foregroundStyle(.green)
+        }
+        .font(.caption2)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(.green.opacity(0.12), in: Capsule())
     }
 
     private func categoryName(for categoryID: UUID?) -> String {

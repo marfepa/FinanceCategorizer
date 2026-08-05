@@ -21,7 +21,7 @@ enum ModelContainerFactory {
         do {
             return try ModelContainer(for: schema, configurations: [persistentConfiguration])
         } catch {
-            NSLog("FinanceCategorizer: failed to open persistent SwiftData store at %@. Preserving store files and falling back to in-memory container. Error: %@", storeURL.path, String(describing: error))
+            NSLog("FinanceCategorizer: failed to open persistent SwiftData store at %@. Preserving store files and stopping instead of hiding the failure behind an empty store. Error: %@", storeURL.path, String(describing: error))
 
             do {
                 try backupPersistentStoreFiles(at: storeURL)
@@ -29,11 +29,9 @@ enum ModelContainerFactory {
                 NSLog("FinanceCategorizer: failed to create recovery backup for persistent SwiftData store. Error: %@", String(describing: error))
             }
 
-            do {
-                return try ModelContainer(for: schema, configurations: [memoryConfiguration])
-            } catch {
-                fatalError("Failed to create fallback in-memory ModelContainer: \(error)")
-            }
+            // Never hide a persistence/migration failure behind an empty
+            // in-memory store: that makes the user's data appear deleted.
+            fatalError("Failed to open persistent FinanceCategorizer store at \(storeURL.path). A recovery backup was preserved.")
         }
     }
 

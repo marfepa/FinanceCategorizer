@@ -19,11 +19,14 @@ final class AppContainer {
     let correctionRepository: CorrectionRepository
     let insightRepository: InsightRepository
     let budgetRepository: BudgetRepository
+    let accountRepository: AccountRepository
+    let savingsGoalRepository: SavingsGoalRepository
 
     let normalizer: TransactionNormalizer
     let importOrchestrator: ImportOrchestrator
     let fileImportService: FileImportService
     let categorizationOrchestrator: CategorizationOrchestrator
+    let recategorizationService: RecategorizationService
     let correctionLearningService: CorrectionLearningService
     let localModelManager: LocalModelManager
     let aiAvailabilityService: AIAvailabilityService
@@ -34,6 +37,8 @@ final class AppContainer {
     let dashboardInsightService: DashboardInsightService
     let financialAnalysisService: FinancialAnalysisService
     let insightEngine: InsightEngine
+    let duplicateAuditService: DuplicateAuditService
+    let financialPlanningService: FinancialPlanningService
 
     init(inMemory: Bool = false) {
         modelContainer = ModelContainerFactory.make(inMemory: inMemory)
@@ -46,6 +51,8 @@ final class AppContainer {
         correctionRepository = CorrectionRepository(modelContainer: modelContainer)
         insightRepository = InsightRepository(modelContainer: modelContainer)
         budgetRepository = BudgetRepository(modelContainer: modelContainer)
+        accountRepository = AccountRepository(modelContainer: modelContainer)
+        savingsGoalRepository = SavingsGoalRepository(modelContainer: modelContainer)
 
         let fileImportService = FileImportService()
         let csvParsingService = CSVParsingService()
@@ -65,20 +72,18 @@ final class AppContainer {
 
         let ruleEngine = RuleEngine(ruleRepository: ruleRepository)
         let merchantMemory = MerchantMemoryEngine(
-            merchantRepository: merchantRepository,
             transactionRepository: transactionRepository
         )
         let classifier = StatisticalClassifier(
             categoryRepository: categoryRepository,
             localModelManager: localModelManager
         )
-        let foundationResolver = FoundationModelsAvailability.isUsable()
-            ? FoundationModelsResolver(
-                categoryRepository: categoryRepository,
-                transactionRepository: transactionRepository
-            )
-            : nil
+        let foundationResolver = FoundationModelsResolver(
+            categoryRepository: categoryRepository,
+            transactionRepository: transactionRepository
+        )
         let categorizationOrchestrator = CategorizationOrchestrator(
+            categoryRepository: categoryRepository,
             ruleEngine: ruleEngine,
             merchantMemory: merchantMemory,
             classifier: classifier,
@@ -102,11 +107,17 @@ final class AppContainer {
         )
 
         try? categoryRepository.ensureBaseCategories()
-        try? localModelManager.rebuildModelIfNeeded()
+        Task(priority: .utility) { [localModelManager] in
+            try? localModelManager.rebuildModelIfNeeded()
+        }
 
         self.normalizer = normalizer
         self.fileImportService = fileImportService
         self.categorizationOrchestrator = categorizationOrchestrator
+        self.recategorizationService = RecategorizationService(
+            transactionRepository: transactionRepository,
+            categorizationOrchestrator: categorizationOrchestrator
+        )
         self.localModelManager = localModelManager
         self.foundationResolver = foundationResolver
         self.correctionLearningService = correctionLearningService
@@ -117,6 +128,8 @@ final class AppContainer {
         self.dashboardInsightService = dashboardInsightService
         self.financialAnalysisService = financialAnalysisService
         self.insightEngine = insightEngine
+        self.duplicateAuditService = DuplicateAuditService()
+        self.financialPlanningService = FinancialPlanningService()
         self.importOrchestrator = ImportOrchestrator(
             transactionRepository: transactionRepository,
             categoryRepository: categoryRepository,
@@ -133,7 +146,6 @@ final class AppContainer {
         )
     }
 }
-
 private struct AppContainerKey: EnvironmentKey {
     static let defaultValue: AppContainer = MainActor.assumeIsolated {
         AppContainer.shared

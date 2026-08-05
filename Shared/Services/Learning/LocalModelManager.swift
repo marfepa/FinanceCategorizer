@@ -112,6 +112,10 @@ final class LocalModelManager {
         try transactionRepository.fetchAll()
             .filter { !$0.needsReview && $0.categoryID != nil }
             .compactMap { transaction in
+                guard transaction.categorizationSourceRaw == CategorizationSource.manual.rawValue ||
+                        transaction.categorizationSourceRaw == CategorizationSource.rule.rawValue else {
+                    return nil
+                }
                 guard let categoryID = transaction.categoryID else { return nil }
                 return LocalTrainingExample(
                     categoryID: categoryID,

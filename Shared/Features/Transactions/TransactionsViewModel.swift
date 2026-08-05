@@ -9,8 +9,12 @@ final class TransactionsViewModel {
         case oldestFirst
     }
 
-    var searchText = ""
-    var transactions: [Transaction] = []
+    var searchText = "" {
+        didSet { recomputeFilteredResults() }
+    }
+    var transactions: [Transaction] = [] {
+        didSet { recomputeFilteredResults() }
+    }
     var selectedTransaction: Transaction?
     var categories: [Category] = []
     var selectedCategoryID: UUID?
@@ -22,15 +26,36 @@ final class TransactionsViewModel {
     var recategorizationSummary: String?
     var statusMessage: String?
     var errorMessage: String?
+    var duplicateGroups: [DuplicateMovementGroup] = []
+    var isScanningDuplicates = false
 
     // Filters
-    var filterStartDate: Date?
-    var filterEndDate: Date?
-    var filterCategoryID: UUID?
-    var filterKind: TransactionKind?
-    var transactionDateSortOrder: TransactionDateSortOrder = .newestFirst
+    var filterStartDate: Date? {
+        didSet { recomputeFilteredResults() }
+    }
+    var filterEndDate: Date? {
+        didSet { recomputeFilteredResults() }
+    }
+    var filterCategoryID: UUID? {
+        didSet { recomputeFilteredResults() }
+    }
+    var filterKind: TransactionKind? {
+        didSet { recomputeFilteredResults() }
+    }
+    var transactionDateSortOrder: TransactionDateSortOrder = .newestFirst {
+        didSet { recomputeFilteredResults() }
+    }
 
-    var sortedTransactions: [Transaction] {
+    private(set) var sortedTransactions: [Transaction] = []
+    private(set) var filteredIncome: Decimal = 0
+    private(set) var filteredExpense: Decimal = 0
+    private(set) var filteredCount: Int = 0
+
+    var filteredTransactions: [Transaction] {
+        sortedTransactions
+    }
+
+    func recomputeFilteredResults() {
         var result = transactions
 
         if let filterStartDate {
@@ -47,9 +72,10 @@ final class TransactionsViewModel {
         }
 
         if !searchText.isEmpty {
+            let query = searchText
             result = result.filter {
-                $0.rawDescription.localizedCaseInsensitiveContains(searchText) ||
-                $0.cleanedDescription.localizedCaseInsensitiveContains(searchText)
+                $0.rawDescription.localizedCaseInsensitiveContains(query) ||
+                $0.cleanedDescription.localizedCaseInsensitiveContains(query)
             }
         }
 
@@ -60,24 +86,20 @@ final class TransactionsViewModel {
             result.sort { $0.bookingDate < $1.bookingDate }
         }
 
-        return result
-    }
+        sortedTransactions = result
 
-    var filteredTransactions: [Transaction] {
-        sortedTransactions
-    }
-
-    // KPIs based on filtered results
-    var filteredIncome: Decimal {
-        sortedTransactions.filter { $0.resolvedKind == .income }.reduce(0) { $0 + $1.amount }
-    }
-
-    var filteredExpense: Decimal {
-        sortedTransactions.filter { $0.resolvedKind == .expense }.reduce(0) { $0 + $1.amount }
-    }
-
-    var filteredCount: Int {
-        sortedTransactions.count
+        var income: Decimal = 0
+        var expense: Decimal = 0
+        for tx in result {
+            if tx.resolvedKind == .income {
+                income += tx.amount
+            } else if tx.resolvedKind == .expense {
+                expense += tx.amount
+            }
+        }
+        filteredIncome = income
+        filteredExpense = expense
+        filteredCount = result.count
     }
 
 
@@ -85,6 +107,7 @@ final class TransactionsViewModel {
         do {
             transactions = try container.transactionRepository.fetchAll()
             categories = try container.categoryRepository.fetchAll()
+            duplicateGroups = pendingDuplicateGroups(from: transactions)
             if selectedTransaction == nil {
                 selectedTransaction = transactions.first
             } else if let selectedTransaction,
@@ -99,6 +122,70 @@ final class TransactionsViewModel {
             }
             recategorizationSummary = nil
             errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func scanDuplicates(using container: AppContainer, language: AppLanguage = .currentSelection) {
+        guard !isScanningDuplicates else { return }
+
+        isScanningDuplicates = true
+        defer { isScanningDuplicates = false }
+
+        do {
+            let allTransactions = try container.transactionRepository.fetchAll()
+            let groups = container.duplicateAuditService.analyze(transactions: allTransactions)
+            try container.transactionRepository.applyDuplicateAudit(groups)
+            load(using: container)
+            statusMessage = language.localized(
+                "duplicate.status.scanned",
+                language.formatInteger(duplicateGroups.count)
+            )
+            errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func dismissDuplicateGroup(_ group: DuplicateMovementGroup, using container: AppContainer, language: AppLanguage = .currentSelection) {
+        do {
+            try container.transactionRepository.dismissDuplicateGroup(groupID: group.id)
+            load(using: container)
+            statusMessage = language.localized("duplicate.status.dismissed")
+            errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func removeDuplicateGroup(_ group: DuplicateMovementGroup, using container: AppContainer, language: AppLanguage = .currentSelection) {
+        do {
+            try container.transactionRepository.deleteDuplicateGroup(
+                groupID: group.id,
+                keeping: group.recommendedKeepID
+            )
+            load(using: container)
+            statusMessage = language.localized("duplicate.status.resolved")
+            errorMessage = nil
+            NotificationCenter.default.post(name: AppContainer.importDidFinishNotification, object: nil)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func resolveAllDuplicateGroups(_ groups: [DuplicateMovementGroup], using container: AppContainer, language: AppLanguage = .currentSelection) {
+        guard !groups.isEmpty else { return }
+
+        do {
+            try container.transactionRepository.resolveDuplicateGroups(groups)
+            load(using: container)
+            statusMessage = language.localized(
+                "duplicate.status.resolvedAll",
+                language.formatInteger(groups.count)
+            )
+            errorMessage = nil
+            NotificationCenter.default.post(name: AppContainer.importDidFinishNotification, object: nil)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -146,7 +233,7 @@ final class TransactionsViewModel {
         }
 
         do {
-            try container.correctionLearningService.applyCorrection(
+            let updatedCount = try container.correctionLearningService.applyCorrection(
                 for: transaction,
                 categoryID: categoryID,
                 applyToFuture: createRule
@@ -156,9 +243,11 @@ final class TransactionsViewModel {
                 selectedTransaction = refreshed
                 selectedCategoryID = refreshed.categoryID
             }
-            statusMessage = createRule
-                ? "Category updated and rule created from this movement."
-                : "Category updated for the selected movement."
+            if updatedCount > 1 {
+                statusMessage = "Category updated for \(updatedCount) matching movements and saved for future imports."
+            } else {
+                statusMessage = "Category updated and rule saved for future imports."
+            }
             errorMessage = nil
             NotificationCenter.default.post(name: AppContainer.importDidFinishNotification, object: nil)
         } catch {
@@ -200,53 +289,25 @@ final class TransactionsViewModel {
                 .filter { $0.categorizationSourceRaw != CategorizationSource.manual.rawValue }
 
             guard !candidates.isEmpty else {
-                recategorizationSummary = "No \(targetKind.rawValue) movements are eligible for automatic re-categorization."
+                recategorizationSummary = AppLanguage.currentSelection.localized("transactions.noRecategorizationCandidates")
                 return
             }
 
-            var autoResolved = 0
-            var improvedSuggestions = 0
-
-            for transaction in candidates {
-                let decision = await container.categorizationOrchestrator.categorize(normalizedDTO(from: transaction))
-                guard let categoryID = decision.categoryID else { continue }
-
-                let hasBetterCategory = transaction.categoryID != categoryID
-                let hasHigherConfidence = decision.confidence > transaction.confidence
-                let shouldUpdate = hasBetterCategory || hasHigherConfidence || transaction.needsReview
-                guard shouldUpdate else { continue }
-
-                let shouldAutoAccept = !decision.shouldQueueForReview &&
-                    decision.confidence >= AppConfig.softAutoCategorizationThreshold
-
-                try container.transactionRepository.applyDecision(
-                    transactionID: transaction.id,
-                    categoryID: categoryID,
-                    subcategoryID: decision.subcategoryID,
-                    source: decision.source,
-                    confidence: decision.confidence,
-                    needsReview: !shouldAutoAccept,
-                    reviewStatus: shouldAutoAccept ? .accepted : .pending,
-                    reason: "[Type re-categorization] \(decision.reason)",
-                    isRecurringCandidate: decision.isRecurringCandidate
-                )
-
-                if shouldAutoAccept {
-                    autoResolved += 1
-                } else {
-                    improvedSuggestions += 1
-                }
-            }
+            let result = try await container.recategorizationService.analyze(candidates)
 
             load(using: container)
             NotificationCenter.default.post(name: AppContainer.importDidFinishNotification, object: nil)
 
-            if autoResolved == 0 && improvedSuggestions == 0 {
-                recategorizationSummary = "The model has no better \(targetKind.rawValue) categorization proposals yet."
+            if result.autoResolved == 0 && result.suggestionsCreated == 0 {
+                recategorizationSummary = AppLanguage.currentSelection.localized("transactions.noRecategorizationImprovements")
             } else {
-                recategorizationSummary = "Re-categorized \(targetKind.rawValue) movements: \(autoResolved) auto-applied, \(improvedSuggestions) left for review."
+                recategorizationSummary = AppLanguage.currentSelection.localized(
+                    "transactions.recategorizationSummary",
+                    AppLanguage.currentSelection.formatInteger(result.autoResolved),
+                    AppLanguage.currentSelection.formatInteger(result.suggestionsCreated)
+                )
             }
-            statusMessage = "Select the movement type first so the model learns from a cleaner context."
+            statusMessage = AppLanguage.currentSelection.localized("transactions.recategorizationReviewHint")
             errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
@@ -268,6 +329,39 @@ final class TransactionsViewModel {
             sign: transaction.amount >= 0 ? 1 : -1,
             fingerprint: transaction.fingerprint
         )
+    }
+
+    private func pendingDuplicateGroups(from transactions: [Transaction]) -> [DuplicateMovementGroup] {
+        let grouped = Dictionary(grouping: transactions.filter {
+            $0.duplicateReviewStatusRaw == DuplicateReviewStatus.pending.rawValue
+        }) { $0.duplicateGroupID }
+
+        return grouped.compactMap { groupID, members in
+            guard let groupID,
+                  members.count >= 2,
+                  let first = members.first else {
+                return nil
+            }
+
+            let transactionIDs = members.map(\.id).sorted { $0.uuidString < $1.uuidString }
+            return DuplicateMovementGroup(
+                id: groupID,
+                transactionIDs: transactionIDs,
+                confidence: members.compactMap(\.duplicateConfidence).min() ?? 0,
+                reasonKey: members.compactMap(\.duplicateReasonKey).first ?? "duplicate.reason.crossSource",
+                recommendedKeepID: members.first(where: { member in
+                    member.id == member.duplicateRecommendedKeepID
+                })?.id
+                    ?? first.duplicateRecommendedKeepID
+                    ?? first.id
+            )
+        }
+        .sorted { lhs, rhs in
+            if lhs.confidence == rhs.confidence {
+                return lhs.id < rhs.id
+            }
+            return lhs.confidence > rhs.confidence
+        }
     }
 
 

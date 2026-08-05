@@ -4,10 +4,12 @@ import SwiftUI
 struct MacCategoriesView: View {
     @Environment(\.appContainer) private var appContainer
     @Environment(\.isPrivacyModeEnabled) private var isPrivacyModeEnabled
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.english
     @State private var viewModel = CategoriesViewModel()
     @State private var transactionsViewModel = TransactionsViewModel()
     @State private var selectedCategory: CategoryListItem?
     @State private var selectedDetailRange: AnalysisTimeRange = .sixMonths
+    @State private var selectedDetailDate: Date?
 
     private let chartPalette: [Color] = [
         Color(hue: 0.60, saturation: 0.70, brightness: 0.92),
@@ -73,20 +75,20 @@ struct MacCategoriesView: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: AppSpacing.large) {
             VStack(alignment: .leading, spacing: AppSpacing.small) {
-                Text("Categorías")
+                Text(LocalizedStringKey("Categories"))
                     .font(AppTypography.displayTitle)
 
-                Text("Una vista clara del catálogo base y del peso real de cada categoría en tus movimientos.")
+                Text(LocalizedStringKey("categories.subtitle"))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: 520, alignment: .leading)
             }
 
             HStack(alignment: .top, spacing: AppSpacing.small) {
-                SummaryChip(value: "\(categoryCount)", label: "Categorías")
-                SummaryChip(value: "\(transactionCount)", label: "Movimientos")
-                SummaryChip(value: "\(systemCategoryCount)", label: "Sistema")
-                SummaryChip(value: "\(incomeCategoryCount)", label: "Ingresos")
+                SummaryChip(value: appLanguage.formatInteger(categoryCount), label: "Categories")
+                SummaryChip(value: appLanguage.formatInteger(transactionCount), label: "Movements")
+                SummaryChip(value: appLanguage.formatInteger(systemCategoryCount), label: "System")
+                SummaryChip(value: appLanguage.formatInteger(incomeCategoryCount), label: "Income")
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -111,10 +113,10 @@ struct MacCategoriesView: View {
                 .frame(width: 72, height: 72)
 
                 VStack(spacing: AppSpacing.small) {
-                    Text("Aún no hay categorías")
+                        Text(LocalizedStringKey("categories.empty.title"))
                         .font(.title3.weight(.semibold))
 
-                    Text("Importa movimientos para sembrar el catálogo base y empezar a ver cómo se distribuye tu actividad.")
+                    Text(LocalizedStringKey("categories.empty.message"))
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
@@ -127,10 +129,10 @@ struct MacCategoriesView: View {
             .glassCard(material: AppMaterials.groupedGlass)
 
             HStack(spacing: AppSpacing.small) {
-                SummaryChip(value: "0", label: "Categorías")
-                SummaryChip(value: "0", label: "Movimientos")
-                SummaryChip(value: "0", label: "Sistema")
-                SummaryChip(value: "0", label: "Ingresos")
+                SummaryChip(value: "0", label: "Categories")
+                SummaryChip(value: "0", label: "Movements")
+                SummaryChip(value: "0", label: "System")
+                SummaryChip(value: "0", label: "Income")
             }
             .frame(maxWidth: 720)
         }
@@ -221,10 +223,10 @@ struct MacCategoriesView: View {
         VStack(alignment: .leading, spacing: AppSpacing.medium) {
             HStack(alignment: .top, spacing: AppSpacing.medium) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Evolución mensual")
+                    Text(LocalizedStringKey("categories.monthlyTrend.title"))
                         .font(AppTypography.sectionTitle)
 
-                    Text("Observa cómo cambia el gasto de \(category.name) en el rango seleccionado.")
+                    Text(appLanguage.localized("categories.monthlyTrend.subtitle", category.name))
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -234,7 +236,9 @@ struct MacCategoriesView: View {
 
             detailRangePicker
 
-            if detailMonthlySpendPoints(for: category).isEmpty {
+            let points = detailMonthlySpendPoints(for: category)
+
+            if points.isEmpty {
                 HStack(spacing: AppSpacing.medium) {
                     Image(systemName: "chart.line.uptrend.xyaxis")
                         .font(.system(size: 20, weight: .semibold))
@@ -243,10 +247,10 @@ struct MacCategoriesView: View {
                         .background(AppColors.neutral.opacity(0.10), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
 
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("No hay gasto en este rango")
+                        Text(LocalizedStringKey("categories.monthlyTrend.empty.title"))
                             .font(.headline)
 
-                        Text("Prueba con un periodo más amplio para ver la evolución mensual de esta categoría.")
+                        Text(LocalizedStringKey("categories.monthlyTrend.empty.message"))
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
@@ -256,68 +260,154 @@ struct MacCategoriesView: View {
                 .padding(AppSpacing.medium)
                 .background(AppColors.cardBackground.opacity(0.55), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
             } else {
-                Chart(detailMonthlySpendPoints(for: category)) { point in
-                    AreaMark(
-                        x: .value("Mes", point.startDate),
-                        y: .value("Gasto", decimalValue(point.amount))
-                    )
-                    .foregroundStyle(AppColors.neutral.opacity(0.16).gradient)
+                Chart {
+                    ForEach(points) { point in
+                        AreaMark(
+                            x: .value("Mes", point.startDate),
+                            y: .value("Gasto", decimalValue(point.amount))
+                        )
+                        .foregroundStyle(AppColors.neutral.opacity(0.16).gradient)
 
-                    LineMark(
-                        x: .value("Mes", point.startDate),
-                        y: .value("Gasto", decimalValue(point.amount))
-                    )
-                    .foregroundStyle(AppColors.neutral.gradient)
-                    .lineStyle(StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
+                        LineMark(
+                            x: .value("Mes", point.startDate),
+                            y: .value("Gasto", decimalValue(point.amount))
+                        )
+                        .foregroundStyle(AppColors.neutral.gradient)
+                        .lineStyle(StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
 
-                    PointMark(
-                        x: .value("Mes", point.startDate),
-                        y: .value("Gasto", decimalValue(point.amount))
-                    )
-                    .foregroundStyle(AppColors.neutral)
+                        PointMark(
+                            x: .value("Mes", point.startDate),
+                            y: .value("Gasto", decimalValue(point.amount))
+                        )
+                        .foregroundStyle(AppColors.neutral)
+                    }
+
+                    if let selectedDetailDate {
+                        RuleMark(x: .value("Mes", selectedDetailDate))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [Color.white.opacity(0.45), Color.white.opacity(0.08)],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                            .lineStyle(StrokeStyle(lineWidth: 1.2, dash: [3, 3]))
+                    }
                 }
                 .frame(height: 210)
                 .chartYAxis {
                     AxisMarks(position: .leading)
                 }
                 .chartXAxis {
-                    AxisMarks(values: .stride(by: .month)) { value in
+                    AxisMarks(values: .stride(by: .month, count: xAxisStride(for: points.count))) { value in
                         AxisGridLine()
                         AxisTick()
                         AxisValueLabel(format: .dateTime.month(.abbreviated), centered: true)
                     }
                 }
-
-                HStack(spacing: AppSpacing.medium) {
-                    if let latest = detailMonthlySpendPoints(for: category).last {
-                        detailMetric(title: "Último mes", value: formattedAmount(latest.amount))
+                .chartOverlay { proxy in
+                    GeometryReader { geometry in
+                        Rectangle()
+                            .fill(.clear)
+                            .contentShape(Rectangle())
+                            .gesture(
+                                DragGesture(minimumDistance: 0)
+                                    .onChanged { value in
+                                        updateCategoryDetailDateSelection(at: value.location, proxy: proxy, geometry: geometry)
+                                    }
+                                    .onEnded { value in
+                                        updateCategoryDetailDateSelection(at: value.location, proxy: proxy, geometry: geometry)
+                                    }
+                            )
                     }
+                }
+                .overlay(alignment: .topLeading) {
+                    if let selectedDetailDate,
+                       let selectedPoint = points.min(by: {
+                           abs($0.startDate.timeIntervalSince(selectedDetailDate)) < abs($1.startDate.timeIntervalSince(selectedDetailDate))
+                       }) {
+                        InChartCalloutOverlay(
+                            title: selectedPoint.monthLabel,
+                            items: [
+                                InChartCalloutOverlayItem(label: appLanguage == .spanish ? "Gasto" : "Expenses", value: formattedAmount(selectedPoint.amount), color: AppColors.expense)
+                            ],
+                            alignment: .topLeading
+                        )
+                    }
+                }
 
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: AppSpacing.small)], spacing: AppSpacing.small) {
                     detailMetric(
-                        title: "Meses visibles",
-                        value: "\(detailMonthlySpendPoints(for: category).count)"
+                        title: LocalizedStringKey("categories.detail.total"),
+                        value: formattedAmount(points.reduce(.zero) { $0 + $1.amount })
                     )
 
                     detailMetric(
-                        title: "Total rango",
-                        value: formattedAmount(detailMonthlySpendPoints(for: category).reduce(.zero) { $0 + $1.amount })
+                        title: LocalizedStringKey("categories.detail.average"),
+                        value: formattedAmount(points.reduce(.zero) { $0 + $1.amount } / Decimal(points.count))
+                    )
+
+                    if let peak = points.max(by: { $0.amount < $1.amount }) {
+                        detailMetric(
+                            title: LocalizedStringKey("categories.detail.peak"),
+                            value: formattedAmount(peak.amount),
+                            detail: peak.monthLabel
+                        )
+                    }
+
+                    detailMetric(
+                        title: LocalizedStringKey("categories.detail.months"),
+                        value: appLanguage.formatInteger(points.count)
                     )
                 }
             }
         }
+        .padding(AppSpacing.medium)
+        .glassCard(material: AppMaterials.groupedGlass)
+        .onChange(of: selectedDetailRange) { _, _ in
+            selectedDetailDate = nil
+        }
+    }
+
+    private func updateCategoryDetailDateSelection(at location: CGPoint, proxy: ChartProxy, geometry: GeometryProxy) {
+        guard let plotFrameAnchor = proxy.plotFrame else { return }
+        let plotFrame = geometry[plotFrameAnchor]
+        let xPosition = location.x - plotFrame.origin.x
+        guard xPosition >= 0, xPosition <= plotFrame.size.width,
+              let date: Date = proxy.value(atX: xPosition, as: Date.self) else { return }
+        selectedDetailDate = date
     }
 
     private var detailRangePicker: some View {
-        HStack {
-            FloatingGlassSegmentedBar(
-                options: AnalysisTimeRange.allCases,
-                title: { $0.title },
-                selection: $selectedDetailRange
-            )
-            .frame(maxWidth: 420, alignment: .leading)
-            .compositingGroup()
+        HStack(alignment: .center, spacing: AppSpacing.medium) {
+            Label(LocalizedStringKey("categories.detail.period"), systemImage: "calendar")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            Picker(LocalizedStringKey("categories.detail.period"), selection: $selectedDetailRange) {
+                ForEach(AnalysisTimeRange.allCases) { range in
+                    Text(rangeLabel(range)).tag(range)
+                }
+            }
+            .pickerStyle(.segmented)
+            .controlSize(.large)
+            .labelsHidden()
+            .frame(maxWidth: 520)
 
             Spacer(minLength: 0)
+        }
+        .padding(.horizontal, AppSpacing.small)
+        .padding(.vertical, AppSpacing.xSmall)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    private func rangeLabel(_ range: AnalysisTimeRange) -> String {
+        switch range {
+        case .month: return appLanguage.localized("categories.detail.range.month")
+        case .threeMonths: return appLanguage.localized("categories.detail.range.threeMonths")
+        case .sixMonths: return appLanguage.localized("categories.detail.range.sixMonths")
+        case .year: return appLanguage.localized("categories.detail.range.year")
+        case .all: return appLanguage.localized("categories.detail.range.all")
         }
     }
 
@@ -392,7 +482,7 @@ struct MacCategoriesView: View {
                 Text(LocalizedStringKey("No movements in this category"))
                     .font(.title3.weight(.semibold))
 
-                Text("Los movimientos asignados a \(category.name) aparecerán aquí con su inspector listo para editar categoría y tipo.")
+                Text(appLanguage.localized("categories.emptyDetail.message", category.name))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -406,9 +496,9 @@ struct MacCategoriesView: View {
     private func detailSummary(for category: CategoryListItem) -> String {
         let count = transactionsViewModel.sortedTransactions.count
         if count == 1 {
-            return "1 movimiento asociado"
+            return appLanguage.localized("categories.associatedMovement.one")
         }
-        return "\(count) movimientos asociados"
+        return appLanguage.localized("categories.associatedMovement.many", appLanguage.formatInteger(count))
     }
 
     private func reloadData() {
@@ -453,20 +543,41 @@ struct MacCategoriesView: View {
     }
 
     private func detailMonthlySpendPoints(for category: CategoryListItem) -> [DetailMonthlySpendPoint] {
-        let transactions = transactionsViewModel.transactions
-            .filter { $0.categoryID == category.id }
-            .filter { $0.resolvedKind != .transfer && NSDecimalNumber(decimal: $0.amount).doubleValue < 0 }
+        let categoryMap = Dictionary(uniqueKeysWithValues: transactionsViewModel.categories.map { ($0.id, $0.name) })
+        let reportingEntries = FinancialReportingScope(now: Date(), dateBasis: .budget)
+            .eligibleEntries(
+                from: transactionsViewModel.transactions,
+                classifier: FinancialMovementClassifier(),
+                categoryMap: categoryMap
+            )
+            .filter { $0.transaction.categoryID == category.id }
+            .filter { FinancialMovementClassifier().isExpense($0.transaction) }
 
-        let filtered = filterTransactions(transactions, for: selectedDetailRange)
-        let grouped = Dictionary(grouping: filtered, by: { startOfMonth(for: $0.accountingDate) })
+        let filtered = filterEntries(reportingEntries, for: selectedDetailRange)
+        guard let latestDate = reportingEntries.map(\.date).max() else { return [] }
+        let endMonth = startOfMonth(for: latestDate)
+        let startMonth: Date = if let monthWindow = selectedDetailRange.monthWindow {
+            Calendar.current.date(byAdding: .month, value: -(monthWindow - 1), to: endMonth) ?? endMonth
+        } else {
+            reportingEntries.map(\.date).min().map(startOfMonth(for:)) ?? endMonth
+        }
+        let grouped = Dictionary(grouping: filtered, by: { startOfMonth(for: $0.date) })
         let formatter = DateFormatter()
-        formatter.dateFormat = "MMM"
+        formatter.setLocalizedDateFormatFromTemplate("MMM")
         formatter.locale = Locale.current
 
-        return grouped.keys.sorted().map { month in
+        var months: [Date] = []
+        var month = startMonth
+        while month <= endMonth {
+            months.append(month)
+            guard let nextMonth = Calendar.current.date(byAdding: .month, value: 1, to: month) else { break }
+            month = nextMonth
+        }
+
+        return months.map { month in
             let items = grouped[month] ?? []
-            let amount = items.reduce(Decimal.zero) { partial, transaction in
-                partial + absolute(transaction.amount)
+            let amount = items.reduce(Decimal.zero) { partial, entry in
+                partial + absolute(entry.amount)
             }
 
             return DetailMonthlySpendPoint(
@@ -478,16 +589,24 @@ struct MacCategoriesView: View {
         }
     }
 
-    private func filterTransactions(_ transactions: [Transaction], for range: AnalysisTimeRange) -> [Transaction] {
+    private func filterEntries(_ transactions: [FinancialReportingEntry], for range: AnalysisTimeRange) -> [FinancialReportingEntry] {
         guard let monthWindow = range.monthWindow,
-              let latestDate = transactions.map(\.accountingDate).max(),
+              let latestDate = transactions.map(\.date).max(),
               let startDate = Calendar.current.date(byAdding: .month, value: -(monthWindow - 1), to: startOfMonth(for: latestDate)) else {
-            return transactions.sorted { $0.accountingDate < $1.accountingDate }
+            return transactions.sorted { $0.date < $1.date }
         }
 
         return transactions
-            .filter { $0.accountingDate >= startDate }
-            .sorted { $0.accountingDate < $1.accountingDate }
+            .filter { $0.date >= startDate }
+            .sorted { $0.date < $1.date }
+    }
+
+    private func xAxisStride(for pointCount: Int) -> Int {
+        switch pointCount {
+        case 0...6: return 1
+        case 7...12: return 2
+        default: return 3
+        }
     }
 
     private func startOfMonth(for date: Date) -> Date {
@@ -506,7 +625,7 @@ struct MacCategoriesView: View {
         value.privacyFormatted(hidden: isPrivacyModeEnabled, currencyCode: AppConfig.defaultCurrencyCode)
     }
 
-    private func detailMetric(title: String, value: String) -> some View {
+    private func detailMetric(title: LocalizedStringKey, value: String, detail: String? = nil) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
                 .font(.caption.weight(.medium))
@@ -514,6 +633,12 @@ struct MacCategoriesView: View {
 
             Text(value)
                 .font(.subheadline.monospacedDigit().weight(.semibold))
+
+            if let detail {
+                Text(detail)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(AppSpacing.medium)
@@ -533,23 +658,24 @@ private struct DetailMonthlySpendPoint: Identifiable {
 private struct CategoryCard: View {
     let item: CategoryListItem
     let onTap: () -> Void
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.english
     @State private var isHovered = false
 
-    private var emoji: String {
+    private var systemImage: String {
         switch item.name.lowercased() {
-        case let n where n.contains("aliment"): return "🛒"
-        case let n where n.contains("restaur"): return "🍽️"
-        case let n where n.contains("transporte"): return "🚗"
-        case let n where n.contains("suscripcion"), let n where n.contains("suscripción"): return "📱"
-        case let n where n.contains("ingreso"), let n where n.contains("nomina"): return "💰"
-        case let n where n.contains("salud"), let n where n.contains("farma"): return "🏥"
-        case let n where n.contains("ocio"), let n where n.contains("entretenimiento"): return "🎬"
-        case let n where n.contains("hogar"), let n where n.contains("casa"): return "🏠"
-        case let n where n.contains("ropa"), let n where n.contains("moda"): return "👗"
-        case let n where n.contains("viaje"), let n where n.contains("hotel"): return "✈️"
-        case let n where n.contains("educacion"), let n where n.contains("educación"): return "📚"
-        case let n where n.contains("deporte"), let n where n.contains("gym"): return "🏋️"
-        default: return item.group == "Income" ? "💵" : "📦"
+        case let n where n.contains("aliment"): return "cart.fill"
+        case let n where n.contains("restaur"): return "fork.knife"
+        case let n where n.contains("transporte"): return "car.fill"
+        case let n where n.contains("suscripcion"), let n where n.contains("suscripción"): return "iphone"
+        case let n where n.contains("ingreso"), let n where n.contains("nomina"): return "banknote.fill"
+        case let n where n.contains("salud"), let n where n.contains("farma"): return "cross.case.fill"
+        case let n where n.contains("ocio"), let n where n.contains("entretenimiento"): return "film.fill"
+        case let n where n.contains("hogar"), let n where n.contains("casa"): return "house.fill"
+        case let n where n.contains("ropa"), let n where n.contains("moda"): return "tshirt.fill"
+        case let n where n.contains("viaje"), let n where n.contains("hotel"): return "airplane"
+        case let n where n.contains("educacion"), let n where n.contains("educación"): return "book.fill"
+        case let n where n.contains("deporte"), let n where n.contains("gym"): return "figure.run"
+        default: return item.group == "Income" ? "banknote.fill" : "shippingbox.fill"
         }
     }
 
@@ -568,8 +694,9 @@ private struct CategoryCard: View {
                         RoundedRectangle(cornerRadius: 16, style: .continuous)
                             .strokeBorder(tint.opacity(0.10), lineWidth: 1)
 
-                        Text(emoji)
-                            .font(.system(size: 22))
+                        Image(systemName: systemImage)
+                            .font(.system(size: 20, weight: .semibold))
+                            .symbolRenderingMode(.hierarchical)
                     }
                     .frame(width: 48, height: 48)
 
@@ -612,7 +739,10 @@ private struct CategoryCard: View {
 
                     Spacer(minLength: 0)
 
-                    Text("Movimientos")
+                    Text(appLanguage.localized(
+                        "categories.shareOfMovements",
+                        appLanguage.formatPercent(item.activityShare)
+                    ))
                         .font(.caption2.weight(.medium))
                         .foregroundStyle(.secondary)
                 }

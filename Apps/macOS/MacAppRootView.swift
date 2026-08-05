@@ -2,8 +2,14 @@ import SwiftUI
 
 struct MacAppRootView: View {
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.english
+    @AppStorage("isPrivacyModeEnabled") private var isPrivacyModeEnabled = false
     @State private var selectedSection: MacSection? = .dashboard
     @State private var isShowingAppleAISheet = false
+
+    @State private var dashboardTab: MacDashboardTab = .overview
+    @State private var activityTab: MacActivityTab = .transactions
+    @State private var reviewTab: MacReviewTab = .reviewQueue
+    @State private var planningTab: MacPlanningTab = .budgets
 
     var body: some View {
         NavigationSplitView {
@@ -11,35 +17,44 @@ struct MacAppRootView: View {
                 Label(section.title, systemImage: section.systemImage)
                     .tag(section)
             }
+            .listStyle(.sidebar)
             .navigationTitle(LocalizedStringKey("Finance"))
         } detail: {
             Group {
                 switch selectedSection ?? .dashboard {
                 case .dashboard:
-                    MacDashboardView(
-                        openImports: { selectedSection = .imports },
-                        openTransactions: { selectedSection = .transactions },
-                        openInsights: { selectedSection = .insights },
-                        openReview: { selectedSection = .review }
+                    MacDashboardContainerView(
+                        selectedTab: $dashboardTab,
+                        openImports: {
+                            selectedSection = .activity
+                            activityTab = .imports
+                        },
+                        openTransactions: {
+                            selectedSection = .activity
+                            activityTab = .transactions
+                        },
+                        openReview: {
+                            selectedSection = .reviewAndAudit
+                            reviewTab = .reviewQueue
+                        },
+                        openGoals: {
+                            selectedSection = .planning
+                            planningTab = .goals
+                        }
                     )
-                case .imports:
-                    MacImportsView(openTransactions: { selectedSection = .transactions })
-                case .transactions:
-                    MacTransactionsView()
-                case .insights:
-                    MacInsightsView()
-                case .review:
-                    MacReviewQueueView()
-                case .categories:
-                    MacCategoriesView()
-                case .budgets:
-                    MacBudgetsView()
+                case .activity:
+                    MacActivityView(selectedTab: $activityTab)
+                case .reviewAndAudit:
+                    MacReviewAndAuditView(selectedTab: $reviewTab)
+                case .planning:
+                    MacPlanningView(selectedTab: $planningTab)
                 case .settings:
                     MacSettingsView()
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .navigationSplitViewStyle(.balanced)
         .toolbar {
             ToolbarItemGroup {
                 Button {
@@ -54,23 +69,22 @@ struct MacAppRootView: View {
             AppleAIContextSheet(surface: aiSurface(for: selectedSection ?? .dashboard))
         }
         .environment(\.locale, appLanguage.locale)
+        .environment(\.isPrivacyModeEnabled, isPrivacyModeEnabled)
     }
 
     private func aiSurface(for section: MacSection) -> AppleAISurface {
         switch section {
         case .dashboard:
-            return .dashboard
-        case .imports:
-            return .imports
-        case .transactions:
-            return .transactions
-        case .insights:
-            return .analysis
-        case .review:
-            return .review
-        case .categories:
-            return .categories
-        case .budgets:
+            return dashboardTab == .overview ? .dashboard : .analysis
+        case .activity:
+            return activityTab == .transactions ? .transactions : .imports
+        case .reviewAndAudit:
+            switch reviewTab {
+            case .reviewQueue: return .review
+            case .audit: return .review
+            case .categories: return .categories
+            }
+        case .planning:
             return .budgets
         case .settings:
             return .settings
@@ -80,12 +94,9 @@ struct MacAppRootView: View {
 
 private enum MacSection: String, CaseIterable, Identifiable {
     case dashboard
-    case imports
-    case transactions
-    case insights
-    case review
-    case categories
-    case budgets
+    case activity
+    case reviewAndAudit
+    case planning
     case settings
 
     var id: String { rawValue }
@@ -93,12 +104,9 @@ private enum MacSection: String, CaseIterable, Identifiable {
     var title: LocalizedStringKey {
         switch self {
         case .dashboard: return "Dashboard"
-        case .imports: return "Import"
-        case .transactions: return "Transactions"
-        case .insights: return "Analysis"
-        case .review: return "Review"
-        case .categories: return "Categories"
-        case .budgets: return "Budgets"
+        case .activity: return "Activity"
+        case .reviewAndAudit: return "Review & Quality"
+        case .planning: return "Planning"
         case .settings: return "Settings"
         }
     }
@@ -106,12 +114,9 @@ private enum MacSection: String, CaseIterable, Identifiable {
     var systemImage: String {
         switch self {
         case .dashboard: return "chart.bar"
-        case .imports: return "square.and.arrow.down"
-        case .transactions: return "tablecells"
-        case .insights: return "chart.xyaxis.line"
-        case .review: return "checklist"
-        case .categories: return "tag"
-        case .budgets: return "target"
+        case .activity: return "tablecells"
+        case .reviewAndAudit: return "checklist"
+        case .planning: return "target"
         case .settings: return "gearshape"
         }
     }

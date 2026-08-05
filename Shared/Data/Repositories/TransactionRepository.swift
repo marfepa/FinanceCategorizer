@@ -35,7 +35,8 @@ final class TransactionRepository {
     }
 
     func count() throws -> Int {
-        try fetchAll().count
+        let context = makeContext()
+        return try context.fetchCount(FetchDescriptor<Transaction>())
     }
 
     func fetch(transactionID: UUID) throws -> Transaction? {
@@ -61,22 +62,40 @@ final class TransactionRepository {
         return counts
     }
 
-    func fetchFirst(byFingerprint fingerprint: String) throws -> Transaction? {
+    func fetchFirst(byFingerprint fingerprint: String, sign: Int? = nil) throws -> Transaction? {
         let context = makeContext()
         let descriptor = FetchDescriptor<Transaction>(
             predicate: #Predicate { $0.fingerprint == fingerprint && $0.categoryID != nil }
         )
-        return try context.fetch(descriptor).first
+        let transactions = try context.fetch(descriptor)
+        guard let sign else { return transactions.first }
+        return transactions.first {
+            sign >= 0 ? $0.amount > .zero : $0.amount < .zero
+        }
     }
 
     func fetchPendingReview() throws -> [Transaction] {
         try fetchAll()
-            .filter { $0.needsReview || $0.categoryID == nil || $0.reviewStatusRaw == ReviewStatus.pending.rawValue }
+            .filter {
+                $0.resolvedKind != .transfer &&
+                ($0.needsReview ||
+                 $0.categoryID == nil ||
+                 $0.reviewStatusRaw == ReviewStatus.pending.rawValue ||
+                 $0.hasRecategorizationSuggestion)
+            }
             .sorted {
                 if $0.confidence == $1.confidence {
                     return $0.bookingDate > $1.bookingDate
                 }
                 return $0.confidence < $1.confidence
+            }
+    }
+
+    func fetchRecategorizationCandidates() throws -> [Transaction] {
+        try fetchAll()
+            .filter {
+                $0.resolvedKind != .transfer &&
+                $0.categorizationSourceRaw != CategorizationSource.manual.rawValue
             }
     }
 
@@ -103,6 +122,49 @@ final class TransactionRepository {
             .map { $0 }
     }
 
+    func fetchMatchingNameTransactions(for transaction: Transaction) throws -> [Transaction] {
+        let targetID = transaction.id
+        let targetKind = transaction.resolvedKind
+        let targetIsIncome = transaction.amount >= 0
+        let targetMerchant = transaction.merchantCanonicalName?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let targetCleaned = transaction.cleanedDescription.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let targetRaw = transaction.rawDescription.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let targetFingerprint = transaction.fingerprint.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        return try fetchAll().filter { t in
+            guard t.id != targetID else { return false }
+            guard t.resolvedKind == targetKind else { return false }
+            guard (t.amount >= 0) == targetIsIncome else { return false }
+
+            if let targetMerchant, !targetMerchant.isEmpty, !targetMerchant.isGenericBankingNoise,
+               let merchant = t.merchantCanonicalName?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
+               !merchant.isEmpty, merchant == targetMerchant {
+                return true
+            }
+
+            if !targetCleaned.isEmpty, !targetCleaned.isGenericBankingNoise {
+                let cleaned = t.cleanedDescription.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                if cleaned == targetCleaned {
+                    return true
+                }
+            }
+
+            if !targetRaw.isEmpty, !targetRaw.isGenericBankingNoise {
+                let raw = t.rawDescription.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                if raw == targetRaw {
+                    return true
+                }
+            }
+
+            if !targetFingerprint.isEmpty, !targetCleaned.isGenericBankingNoise, t.fingerprint == targetFingerprint {
+                return true
+            }
+
+            return false
+        }
+    }
+
+
     func applyDecision(
         transactionID: UUID,
         categoryID: UUID?,
@@ -122,12 +184,54 @@ final class TransactionRepository {
 
         transaction.categoryID = categoryID
         transaction.subcategoryID = subcategoryID
+        clearRecategorizationSuggestion(on: transaction)
         transaction.categorizationSourceRaw = source.rawValue
         transaction.confidence = confidence
         transaction.needsReview = needsReview
         transaction.reviewStatusRaw = reviewStatus.rawValue
         transaction.categorizationReason = reason
         transaction.isRecurringCandidate = isRecurringCandidate
+        transaction.updatedAt = .now
+        try context.save()
+    }
+
+    func saveRecategorizationSuggestion(
+        transactionID: UUID,
+        categoryID: UUID,
+        subcategoryID: UUID? = nil,
+        source: CategorizationSource,
+        confidence: Double,
+        reason: String?
+    ) throws {
+        let context = makeContext()
+        let descriptor = FetchDescriptor<Transaction>(predicate: #Predicate { $0.id == transactionID })
+        guard let transaction = try context.fetch(descriptor).first else {
+            return
+        }
+
+        guard transaction.categoryID != categoryID else {
+            clearRecategorizationSuggestion(on: transaction)
+            try context.save()
+            return
+        }
+
+        transaction.suggestedCategoryID = categoryID
+        transaction.suggestedSubcategoryID = subcategoryID
+        transaction.suggestedConfidence = confidence
+        transaction.suggestedSourceRaw = source.rawValue
+        transaction.suggestedReason = reason
+        transaction.updatedAt = .now
+        try context.save()
+    }
+
+    func clearRecategorizationSuggestion(transactionID: UUID) throws {
+        let context = makeContext()
+        let descriptor = FetchDescriptor<Transaction>(predicate: #Predicate { $0.id == transactionID })
+        guard let transaction = try context.fetch(descriptor).first else {
+            return
+        }
+
+        clearRecategorizationSuggestion(on: transaction)
         transaction.updatedAt = .now
         try context.save()
     }
@@ -152,7 +256,126 @@ final class TransactionRepository {
 
         transaction.kindRaw = kind.rawValue
         transaction.amount = signedAmount
+        if kind == .transfer {
+            transaction.categoryID = nil
+            transaction.subcategoryID = nil
+            clearRecategorizationSuggestion(on: transaction)
+            transaction.categorizationSourceRaw = CategorizationSource.manual.rawValue
+            transaction.confidence = 1
+            transaction.needsReview = false
+            transaction.reviewStatusRaw = ReviewStatus.accepted.rawValue
+            transaction.categorizationReason = "Marked manually as transfer."
+        }
         transaction.updatedAt = .now
         try context.save()
+    }
+
+    func applyDuplicateAudit(_ groups: [DuplicateMovementGroup]) throws {
+        let context = makeContext()
+        let transactions = try context.fetch(FetchDescriptor<Transaction>())
+        var groupsByTransactionID: [UUID: DuplicateMovementGroup] = [:]
+
+        for group in groups {
+            for transactionID in group.transactionIDs {
+                groupsByTransactionID[transactionID] = group
+            }
+        }
+
+        for transaction in transactions {
+            guard let group = groupsByTransactionID[transaction.id] else {
+                clearDuplicateMetadata(on: transaction)
+                continue
+            }
+
+            let keepsPreviousDecision = transaction.duplicateGroupID == group.id
+            transaction.duplicateGroupID = group.id
+            transaction.duplicateConfidence = group.confidence
+            transaction.duplicateReasonKey = group.reasonKey
+            transaction.duplicateRecommendedKeepID = group.recommendedKeepID
+            if !keepsPreviousDecision || transaction.duplicateReviewStatusRaw == nil {
+                transaction.duplicateReviewStatusRaw = DuplicateReviewStatus.pending.rawValue
+            }
+            transaction.updatedAt = .now
+        }
+
+        try context.save()
+    }
+
+    func dismissDuplicateGroup(groupID: String) throws {
+        let context = makeContext()
+        let descriptor = FetchDescriptor<Transaction>(predicate: #Predicate { $0.duplicateGroupID == groupID })
+        let transactions = try context.fetch(descriptor)
+
+        for transaction in transactions {
+            transaction.duplicateReviewStatusRaw = DuplicateReviewStatus.dismissed.rawValue
+            transaction.updatedAt = .now
+        }
+
+        try context.save()
+    }
+
+    func deleteDuplicateGroup(groupID: String, keeping transactionID: UUID) throws {
+        let context = makeContext()
+        let descriptor = FetchDescriptor<Transaction>(predicate: #Predicate { $0.duplicateGroupID == groupID })
+        let transactions = try context.fetch(descriptor)
+        guard transactions.contains(where: { $0.id == transactionID }) else { return }
+
+        for transaction in transactions {
+            if transaction.id == transactionID {
+                clearDuplicateMetadata(on: transaction)
+            } else {
+                context.delete(transaction)
+            }
+        }
+
+        try context.save()
+    }
+
+    @discardableResult
+    func resolveDuplicateGroups(_ groups: [DuplicateMovementGroup]) throws -> Int {
+        guard !groups.isEmpty else { return 0 }
+
+        let context = makeContext()
+        let groupsByTransactionID = Dictionary(
+            uniqueKeysWithValues: groups.flatMap { group in
+                group.transactionIDs.map { ($0, group) }
+            }
+        )
+        let transactions = try context.fetch(FetchDescriptor<Transaction>())
+        var deletedCount = 0
+
+        for transaction in transactions {
+            guard let group = groupsByTransactionID[transaction.id],
+                  transaction.duplicateGroupID == group.id,
+                  group.transactionIDs.contains(group.recommendedKeepID) else {
+                continue
+            }
+
+            if transaction.id == group.recommendedKeepID {
+                clearDuplicateMetadata(on: transaction)
+            } else {
+                context.delete(transaction)
+                deletedCount += 1
+            }
+        }
+
+        try context.save()
+        return deletedCount
+    }
+
+    private func clearDuplicateMetadata(on transaction: Transaction) {
+        transaction.duplicateGroupID = nil
+        transaction.duplicateReviewStatusRaw = nil
+        transaction.duplicateConfidence = nil
+        transaction.duplicateReasonKey = nil
+        transaction.duplicateRecommendedKeepID = nil
+    }
+
+    private func clearRecategorizationSuggestion(on transaction: Transaction) {
+        transaction.suggestedCategoryID = nil
+        transaction.suggestedSubcategoryID = nil
+        transaction.suggestedConfidence = nil
+        transaction.suggestedSourceRaw = nil
+        transaction.suggestedReason = nil
     }
 }
