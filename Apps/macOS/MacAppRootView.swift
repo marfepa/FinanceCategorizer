@@ -21,7 +21,8 @@ struct MacAppRootView: View {
                     MacDashboardView(
                         openImports: { selectedSection = .imports },
                         openTransactions: { selectedSection = .transactions },
-                        openReview: { selectedSection = .review }
+                        openReview: { selectedSection = .review },
+                        openGoals: { selectedSection = .goals }
                     )
                 case .analysis:
                     MacInsightsView()
@@ -37,6 +38,8 @@ struct MacAppRootView: View {
                     MacCategoriesView()
                 case .budgets:
                     MacBudgetsView()
+                case .goals:
+                    MacSavingsGoalsView()
                 case .settings:
                     MacSettingsView()
                 }
@@ -79,6 +82,8 @@ struct MacAppRootView: View {
             return .categories
         case .budgets:
             return .budgets
+        case .goals:
+            return .budgets
         case .settings:
             return .settings
         }
@@ -94,6 +99,7 @@ private enum MacSection: String, CaseIterable, Identifiable {
     case audit
     case categories
     case budgets
+    case goals
     case settings
 
     var id: String { rawValue }
@@ -108,6 +114,7 @@ private enum MacSection: String, CaseIterable, Identifiable {
         case .audit: return "audit.title"
         case .categories: return "Categories"
         case .budgets: return "Budgets"
+        case .goals: return "Savings Goals"
         case .settings: return "Settings"
         }
     }
@@ -122,6 +129,7 @@ private enum MacSection: String, CaseIterable, Identifiable {
         case .audit: return "rectangle.and.text.magnifyingglass"
         case .categories: return "tag"
         case .budgets: return "target"
+        case .goals: return "archivebox"
         case .settings: return "gearshape"
         }
     }
