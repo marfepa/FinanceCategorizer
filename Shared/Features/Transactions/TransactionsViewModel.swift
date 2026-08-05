@@ -9,8 +9,12 @@ final class TransactionsViewModel {
         case oldestFirst
     }
 
-    var searchText = ""
-    var transactions: [Transaction] = []
+    var searchText = "" {
+        didSet { recomputeFilteredResults() }
+    }
+    var transactions: [Transaction] = [] {
+        didSet { recomputeFilteredResults() }
+    }
     var selectedTransaction: Transaction?
     var categories: [Category] = []
     var selectedCategoryID: UUID?
@@ -26,13 +30,32 @@ final class TransactionsViewModel {
     var isScanningDuplicates = false
 
     // Filters
-    var filterStartDate: Date?
-    var filterEndDate: Date?
-    var filterCategoryID: UUID?
-    var filterKind: TransactionKind?
-    var transactionDateSortOrder: TransactionDateSortOrder = .newestFirst
+    var filterStartDate: Date? {
+        didSet { recomputeFilteredResults() }
+    }
+    var filterEndDate: Date? {
+        didSet { recomputeFilteredResults() }
+    }
+    var filterCategoryID: UUID? {
+        didSet { recomputeFilteredResults() }
+    }
+    var filterKind: TransactionKind? {
+        didSet { recomputeFilteredResults() }
+    }
+    var transactionDateSortOrder: TransactionDateSortOrder = .newestFirst {
+        didSet { recomputeFilteredResults() }
+    }
 
-    var sortedTransactions: [Transaction] {
+    private(set) var sortedTransactions: [Transaction] = []
+    private(set) var filteredIncome: Decimal = 0
+    private(set) var filteredExpense: Decimal = 0
+    private(set) var filteredCount: Int = 0
+
+    var filteredTransactions: [Transaction] {
+        sortedTransactions
+    }
+
+    func recomputeFilteredResults() {
         var result = transactions
 
         if let filterStartDate {
@@ -49,9 +72,10 @@ final class TransactionsViewModel {
         }
 
         if !searchText.isEmpty {
+            let query = searchText
             result = result.filter {
-                $0.rawDescription.localizedCaseInsensitiveContains(searchText) ||
-                $0.cleanedDescription.localizedCaseInsensitiveContains(searchText)
+                $0.rawDescription.localizedCaseInsensitiveContains(query) ||
+                $0.cleanedDescription.localizedCaseInsensitiveContains(query)
             }
         }
 
@@ -62,24 +86,20 @@ final class TransactionsViewModel {
             result.sort { $0.bookingDate < $1.bookingDate }
         }
 
-        return result
-    }
+        sortedTransactions = result
 
-    var filteredTransactions: [Transaction] {
-        sortedTransactions
-    }
-
-    // KPIs based on filtered results
-    var filteredIncome: Decimal {
-        sortedTransactions.filter { $0.resolvedKind == .income }.reduce(0) { $0 + $1.amount }
-    }
-
-    var filteredExpense: Decimal {
-        sortedTransactions.filter { $0.resolvedKind == .expense }.reduce(0) { $0 + $1.amount }
-    }
-
-    var filteredCount: Int {
-        sortedTransactions.count
+        var income: Decimal = 0
+        var expense: Decimal = 0
+        for tx in result {
+            if tx.resolvedKind == .income {
+                income += tx.amount
+            } else if tx.resolvedKind == .expense {
+                expense += tx.amount
+            }
+        }
+        filteredIncome = income
+        filteredExpense = expense
+        filteredCount = result.count
     }
 
 

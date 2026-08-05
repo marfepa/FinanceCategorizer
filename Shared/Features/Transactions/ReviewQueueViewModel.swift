@@ -33,8 +33,12 @@ enum ReviewListFilter: String, CaseIterable, Identifiable {
 @Observable
 final class ReviewQueueViewModel {
     var pendingCount = 0
-    var transactions: [Transaction] = []
-    var selectedTransaction: Transaction?
+    var transactions: [Transaction] = [] {
+        didSet { recomputeCaches() }
+    }
+    var selectedTransaction: Transaction? {
+        didSet { updateSimilarCache() }
+    }
     var categories: [Category] = []
     var selectedCategoryID: UUID?
     var selectedKind: TransactionKind = .expense
@@ -46,30 +50,45 @@ final class ReviewQueueViewModel {
     var recategorizationSummary: String?
     var errorMessage: String?
     var statusMessage: String?
-    var suggestedGroups: [SimilarTransactionGroup] = []
-    var listFilter: ReviewListFilter = .all
+    var suggestedGroups: [SimilarTransactionGroup] = [] {
+        didSet { updateFilteredListCache() }
+    }
+    var listFilter: ReviewListFilter = .all {
+        didSet { updateFilteredListCache() }
+    }
 
-    var filteredList: [Transaction] {
+    private(set) var filteredList: [Transaction] = []
+    private(set) var similarTransactions: [Transaction] = []
+
+    private func recomputeCaches() {
+        updateFilteredListCache()
+        updateSimilarCache()
+    }
+
+    private func updateFilteredListCache() {
         switch listFilter {
         case .all:
-            return transactions
+            filteredList = transactions
         case .lowConfidence:
-            return transactions.filter { $0.confidence < AppConfig.softAutoCategorizationThreshold }
+            filteredList = transactions.filter { $0.confidence < AppConfig.softAutoCategorizationThreshold }
         case .uncategorized:
-            return transactions.filter { $0.categoryID == nil }
+            filteredList = transactions.filter { $0.categoryID == nil }
         case .suggestions:
-            return transactions.filter(\.hasRecategorizationSuggestion)
+            filteredList = transactions.filter(\.hasRecategorizationSuggestion)
         case .similar:
             let ids = Set(suggestedGroups.map { $0.representativeTransactionID })
-            return transactions.filter { t in
-                ids.contains(t.id) || similarTransactions(for: t).count > 0
+            filteredList = transactions.filter { t in
+                ids.contains(t.id) || !similarTransactions(for: t).isEmpty
             }
         }
     }
 
-    var similarTransactions: [Transaction] {
-        guard let selectedTransaction else { return [] }
-        return transactions.filter { $0.id != selectedTransaction.id && isSimilar($0, to: selectedTransaction) }
+    private func updateSimilarCache() {
+        guard let selectedTransaction else {
+            similarTransactions = []
+            return
+        }
+        similarTransactions = transactions.filter { $0.id != selectedTransaction.id && isSimilar($0, to: selectedTransaction) }
     }
 
     func load(using container: AppContainer) {
