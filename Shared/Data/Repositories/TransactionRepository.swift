@@ -35,7 +35,8 @@ final class TransactionRepository {
     }
 
     func count() throws -> Int {
-        try fetchAll().count
+        let context = makeContext()
+        return try context.fetchCount(FetchDescriptor<Transaction>())
     }
 
     func fetch(transactionID: UUID) throws -> Transaction? {
@@ -259,8 +260,8 @@ final class TransactionRepository {
 
     func dismissDuplicateGroup(groupID: String) throws {
         let context = makeContext()
-        let transactions = try context.fetch(FetchDescriptor<Transaction>())
-            .filter { $0.duplicateGroupID == groupID }
+        let descriptor = FetchDescriptor<Transaction>(predicate: #Predicate { $0.duplicateGroupID == groupID })
+        let transactions = try context.fetch(descriptor)
 
         for transaction in transactions {
             transaction.duplicateReviewStatusRaw = DuplicateReviewStatus.dismissed.rawValue
@@ -272,8 +273,8 @@ final class TransactionRepository {
 
     func deleteDuplicateGroup(groupID: String, keeping transactionID: UUID) throws {
         let context = makeContext()
-        let transactions = try context.fetch(FetchDescriptor<Transaction>())
-            .filter { $0.duplicateGroupID == groupID }
+        let descriptor = FetchDescriptor<Transaction>(predicate: #Predicate { $0.duplicateGroupID == groupID })
+        let transactions = try context.fetch(descriptor)
         guard transactions.contains(where: { $0.id == transactionID }) else { return }
 
         for transaction in transactions {
