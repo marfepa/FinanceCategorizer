@@ -10,6 +10,7 @@ struct MacInsightsView: View {
     @State private var selectedCategory: String?
     @State private var selectedMonthlyLabel: String?
     @State private var selectedEvolutionDate: Date?
+    @State private var selectedEvolutionCategory: String?
 
     private let chartPalette: [Color] = [
         Color(hue: 0.60, saturation: 0.70, brightness: 0.92),
@@ -243,13 +244,22 @@ struct MacInsightsView: View {
                             .foregroundStyle(.secondary)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     } else {
-                        Chart(Array(snapshot.categoryBreakdown.prefix(5)).enumerated(), id: \.element.id) { index, item in
-                            BarMark(
-                                x: .value("Amount", decimalValue(item.amount)),
-                                y: .value("Category", item.categoryName)
-                            )
-                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                            .foregroundStyle(chartPalette[index % chartPalette.count].gradient)
+                        Chart {
+                            ForEach(Array(snapshot.categoryBreakdown.prefix(5)).enumerated(), id: \.element.id) { index, item in
+                                BarMark(
+                                    x: .value("Amount", decimalValue(item.amount)),
+                                    y: .value("Category", item.categoryName)
+                                )
+                                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                .foregroundStyle(chartPalette[index % chartPalette.count].gradient)
+                                .opacity(selectedHeroCategory == nil || selectedHeroCategory == item.categoryName ? 1.0 : 0.35)
+                            }
+
+                            if let selectedHeroCategory {
+                                RuleMark(y: .value("Category", selectedHeroCategory))
+                                    .foregroundStyle(AppColors.neutral.opacity(0.5))
+                                    .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [4, 4]))
+                            }
                         }
                         .frame(height: 180)
                         .chartXAxis(.hidden)
@@ -263,30 +273,27 @@ struct MacInsightsView: View {
                                     .contentShape(Rectangle())
                                     .gesture(
                                         DragGesture(minimumDistance: 0)
+                                            .onChanged { value in
+                                                updateHeroSelection(at: value.location, proxy: proxy, geometry: geometry)
+                                            }
                                             .onEnded { value in
-                                                guard let plotFrameAnchor = proxy.plotFrame else { return }
-                                                let plotFrame = geometry[plotFrameAnchor]
-                                                let yPosition = value.location.y - plotFrame.origin.y
-                                                guard yPosition >= 0,
-                                                      yPosition <= plotFrame.size.height,
-                                                      let category: String = proxy.value(atY: yPosition, as: String.self) else {
-                                                    return
-                                                }
-                                                selectedHeroCategory = category
+                                                updateHeroSelection(at: value.location, proxy: proxy, geometry: geometry)
                                             }
                                     )
                             }
                         }
-
-                        if let selectedHeroCategory,
-                           let selectedItem = snapshot.categoryBreakdown.first(where: { $0.categoryName == selectedHeroCategory }) {
-                            InteractiveChartReadout(
-                                title: selectedItem.categoryName,
-                                values: [
-                                    (appLanguage.localized("Expenses"), renderAmount(selectedItem.amount)),
-                                    (appLanguage.localized("Share"), appLanguage.formatPercent(selectedItem.percentage))
-                                ]
-                            )
+                        .overlay(alignment: .topTrailing) {
+                            if let selectedHeroCategory,
+                               let selectedItem = snapshot.categoryBreakdown.first(where: { $0.categoryName == selectedHeroCategory }) {
+                                InChartCalloutOverlay(
+                                    title: selectedItem.categoryName,
+                                    items: [
+                                        InChartCalloutOverlayItem(label: appLanguage.localized("Expenses"), value: renderAmount(selectedItem.amount), color: AppColors.expense),
+                                        InChartCalloutOverlayItem(label: appLanguage.localized("Share"), value: appLanguage.formatPercent(selectedItem.percentage), color: AppColors.income)
+                                    ],
+                                    alignment: .topTrailing
+                                )
+                            }
                         }
                     }
                 }
@@ -419,7 +426,9 @@ struct MacInsightsView: View {
     }
 
     private func categorySection(_ snapshot: FinancialAnalysisSnapshot) -> some View {
-        VStack(alignment: .leading, spacing: AppSpacing.medium) {
+        let allCategories = snapshot.categoryBreakdown.map(\.categoryName)
+
+        return VStack(alignment: .leading, spacing: AppSpacing.medium) {
             sectionHeader(
                 title: LocalizedStringKey("Expenses by Category"),
                 icon: "chart.bar.doc.horizontal",
@@ -430,13 +439,31 @@ struct MacInsightsView: View {
                 Text(LocalizedStringKey("No category data available yet."))
                     .foregroundStyle(.secondary)
             } else {
-                Chart(Array(snapshot.categoryBreakdown.prefix(8)).enumerated(), id: \.element.id) { index, item in
-                    BarMark(
-                        x: .value("Category", item.categoryName),
-                        y: .value("Amount", decimalValue(item.amount))
-                    )
-                    .foregroundStyle(chartPalette[index % chartPalette.count].gradient)
-                    .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+                CategoryChartFilterControl(
+                    availableCategories: allCategories,
+                    selectedCategory: $selectedCategory,
+                    appLanguage: appLanguage
+                )
+
+                let displayedBreakdown = selectedCategory != nil
+                    ? snapshot.categoryBreakdown.filter { $0.categoryName == selectedCategory }
+                    : Array(snapshot.categoryBreakdown.prefix(8))
+
+                Chart {
+                    ForEach(Array(displayedBreakdown.enumerated()), id: \.element.id) { index, item in
+                        BarMark(
+                            x: .value("Category", item.categoryName),
+                            y: .value("Amount", decimalValue(item.amount))
+                        )
+                        .foregroundStyle(chartPalette[index % chartPalette.count].gradient)
+                        .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+                    }
+
+                    if let selectedCategory {
+                        RuleMark(x: .value("Category", selectedCategory))
+                            .foregroundStyle(AppColors.neutral.opacity(0.5))
+                            .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [4, 4]))
+                    }
                 }
                 .frame(height: 220)
                 .chartYAxis {
@@ -453,7 +480,6 @@ struct MacInsightsView: View {
                         }
                     }
                 }
-
                 .chartOverlay { proxy in
                     GeometryReader { geometry in
                         Rectangle()
@@ -461,31 +487,28 @@ struct MacInsightsView: View {
                             .contentShape(Rectangle())
                             .gesture(
                                 DragGesture(minimumDistance: 0)
+                                    .onChanged { value in
+                                        updateCategorySelection(at: value.location, proxy: proxy, geometry: geometry)
+                                    }
                                     .onEnded { value in
-                                        guard let plotFrameAnchor = proxy.plotFrame else { return }
-                                        let plotFrame = geometry[plotFrameAnchor]
-                                        let xPosition = value.location.x - plotFrame.origin.x
-                                        guard xPosition >= 0,
-                                              xPosition <= plotFrame.size.width,
-                                              let category: String = proxy.value(atX: xPosition, as: String.self) else {
-                                            return
-                                        }
-                                        selectedCategory = category
+                                        updateCategorySelection(at: value.location, proxy: proxy, geometry: geometry)
                                     }
                             )
                     }
                 }
-
-                if let selectedCategory,
-                   let selectedItem = snapshot.categoryBreakdown.first(where: { $0.categoryName == selectedCategory }) {
-                    InteractiveChartReadout(
-                        title: selectedItem.categoryName,
-                        values: [
-                            (appLanguage.localized("Expenses"), renderAmount(selectedItem.amount)),
-                            (appLanguage.localized("Share"), appLanguage.formatPercent(selectedItem.percentage)),
-                            (appLanguage.localized("Change"), deltaLabel(for: selectedItem.deltaFromPreviousPeriod))
-                        ]
-                    )
+                .overlay(alignment: .topTrailing) {
+                    if let selectedCategory,
+                       let selectedItem = snapshot.categoryBreakdown.first(where: { $0.categoryName == selectedCategory }) {
+                        InChartCalloutOverlay(
+                            title: selectedItem.categoryName,
+                            items: [
+                                InChartCalloutOverlayItem(label: appLanguage.localized("Expenses"), value: renderAmount(selectedItem.amount), color: AppColors.expense),
+                                InChartCalloutOverlayItem(label: appLanguage.localized("Share"), value: appLanguage.formatPercent(selectedItem.percentage), color: AppColors.income),
+                                InChartCalloutOverlayItem(label: appLanguage.localized("Change"), value: deltaLabel(for: selectedItem.deltaFromPreviousPeriod), color: AppColors.neutral)
+                            ],
+                            alignment: .topTrailing
+                        )
+                    }
                 }
 
                 ForEach(Array(snapshot.categoryBreakdown.prefix(6)).enumerated(), id: \.element.id) { index, item in
@@ -531,7 +554,14 @@ struct MacInsightsView: View {
     }
 
     private func categoryEvolutionSection(_ snapshot: FinancialAnalysisSnapshot) -> some View {
-        let items = Array(snapshot.categoryEvolution.prefix(5))
+        let allEvolutionCategories = snapshot.categoryEvolution.map(\.categoryName)
+        let items: [CategoryEvolutionItem] = {
+            if let selectedEvolutionCategory {
+                return snapshot.categoryEvolution.filter { $0.categoryName == selectedEvolutionCategory }
+            } else {
+                return Array(snapshot.categoryEvolution.prefix(5))
+            }
+        }()
         let points = items.flatMap(\.points)
 
         return VStack(alignment: .leading, spacing: AppSpacing.medium) {
@@ -545,11 +575,26 @@ struct MacInsightsView: View {
                 .font(.footnote)
                 .foregroundStyle(.secondary)
 
-            if items.isEmpty {
+            if snapshot.categoryEvolution.isEmpty {
                 Text(LocalizedStringKey("No category evolution available yet."))
                     .foregroundStyle(.secondary)
             } else {
+                CategoryChartFilterControl(
+                    availableCategories: allEvolutionCategories,
+                    selectedCategory: $selectedEvolutionCategory,
+                    appLanguage: appLanguage
+                )
+
                 Chart(points) { point in
+                    if selectedEvolutionCategory != nil {
+                        AreaMark(
+                            x: .value("Month", point.startDate),
+                            y: .value("Amount", decimalValue(point.amount))
+                        )
+                        .interpolationMethod(.catmullRom)
+                        .foregroundStyle(AppColors.income.opacity(0.18).gradient)
+                    }
+
                     LineMark(
                         x: .value("Month", point.startDate),
                         y: .value("Amount", decimalValue(point.amount))
@@ -562,6 +607,18 @@ struct MacInsightsView: View {
                         y: .value("Amount", decimalValue(point.amount))
                     )
                     .foregroundStyle(by: .value("Category", point.categoryName))
+
+                    if let selectedEvolutionDate {
+                        RuleMark(x: .value("Month", selectedEvolutionDate))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [Color.white.opacity(0.45), Color.white.opacity(0.08)],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                            .lineStyle(StrokeStyle(lineWidth: 1.2, dash: [3, 3]))
+                    }
                 }
                 .frame(height: 250)
                 .chartYAxis {
@@ -581,32 +638,33 @@ struct MacInsightsView: View {
                             .contentShape(Rectangle())
                             .gesture(
                                 DragGesture(minimumDistance: 0)
+                                    .onChanged { value in
+                                        updateEvolutionDateSelection(at: value.location, proxy: proxy, geometry: geometry)
+                                    }
                                     .onEnded { value in
-                                        guard let plotFrameAnchor = proxy.plotFrame else { return }
-                                        let plotFrame = geometry[plotFrameAnchor]
-                                        let xPosition = value.location.x - plotFrame.origin.x
-                                        guard xPosition >= 0,
-                                              xPosition <= plotFrame.size.width,
-                                              let date: Date = proxy.value(atX: xPosition, as: Date.self) else {
-                                            return
-                                        }
-                                        selectedEvolutionDate = date
+                                        updateEvolutionDateSelection(at: value.location, proxy: proxy, geometry: geometry)
                                     }
                             )
                     }
                 }
+                .overlay(alignment: .topLeading) {
+                    if let selectedEvolutionDate,
+                       let nearestDate = points.min(by: {
+                           abs($0.startDate.timeIntervalSince(selectedEvolutionDate)) < abs($1.startDate.timeIntervalSince(selectedEvolutionDate))
+                       })?.startDate {
+                        let overlayItems: [InChartCalloutOverlayItem] = items.map { item in
+                            let point = item.points.first { $0.startDate == nearestDate }
+                            return InChartCalloutOverlayItem(
+                                label: item.categoryName,
+                                value: renderAmount(point?.amount ?? .zero),
+                                color: nil
+                            )
+                        }
 
-                if let selectedEvolutionDate {
-                    let nearestDate = points.min {
-                        abs($0.startDate.timeIntervalSince(selectedEvolutionDate)) < abs($1.startDate.timeIntervalSince(selectedEvolutionDate))
-                    }?.startDate
-                    if let nearestDate {
-                        InteractiveChartReadout(
+                        InChartCalloutOverlay(
                             title: nearestDate.formatted(.dateTime.month(.wide).year()),
-                            values: items.map { item in
-                                let point = item.points.first { $0.startDate == nearestDate }
-                                return (item.categoryName, renderAmount(point?.amount ?? .zero))
-                            }
+                            items: overlayItems,
+                            alignment: .topLeading
                         )
                     }
                 }
@@ -646,39 +704,53 @@ struct MacInsightsView: View {
                 Text(LocalizedStringKey("Not enough monthly history to visualize cashflow."))
                     .foregroundStyle(.secondary)
             } else {
-                Chart(snapshot.monthlyCashflow) { point in
-                    BarMark(
-                        x: .value("Month", point.monthLabel),
-                        y: .value("Expenses", decimalValue(point.expense) * -1)
-                    )
-                    .foregroundStyle(AppColors.expense.opacity(0.32).gradient)
-
-                    BarMark(
-                        x: .value("Month", point.monthLabel),
-                        y: .value("Income", decimalValue(point.income))
-                    )
-                    .foregroundStyle(AppColors.income.opacity(0.40).gradient)
-
-                    LineMark(
-                        x: .value("Month", point.monthLabel),
-                        y: .value("Net", decimalValue(point.net))
-                    )
-                    .interpolationMethod(.catmullRom)
-                    .lineStyle(StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
-                    .foregroundStyle(AppColors.neutral.gradient)
-
-                    AreaMark(
-                        x: .value("Month", point.monthLabel),
-                        y: .value("Net", decimalValue(point.net))
-                    )
-                    .interpolationMethod(.catmullRom)
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [AppColors.neutral.opacity(0.24), AppColors.neutral.opacity(0.03)],
-                            startPoint: .top,
-                            endPoint: .bottom
+                Chart {
+                    ForEach(snapshot.monthlyCashflow) { point in
+                        BarMark(
+                            x: .value("Month", point.monthLabel),
+                            y: .value("Expenses", decimalValue(point.expense) * -1)
                         )
-                    )
+                        .foregroundStyle(AppColors.expense.opacity(0.32).gradient)
+
+                        BarMark(
+                            x: .value("Month", point.monthLabel),
+                            y: .value("Income", decimalValue(point.income))
+                        )
+                        .foregroundStyle(AppColors.income.opacity(0.40).gradient)
+
+                        LineMark(
+                            x: .value("Month", point.monthLabel),
+                            y: .value("Net", decimalValue(point.net))
+                        )
+                        .interpolationMethod(.catmullRom)
+                        .lineStyle(StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
+                        .foregroundStyle(AppColors.neutral.gradient)
+
+                        AreaMark(
+                            x: .value("Month", point.monthLabel),
+                            y: .value("Net", decimalValue(point.net))
+                        )
+                        .interpolationMethod(.catmullRom)
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [AppColors.neutral.opacity(0.24), AppColors.neutral.opacity(0.03)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                    }
+
+                    if let selectedMonthlyLabel {
+                        RuleMark(x: .value("Month", selectedMonthlyLabel))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [Color.white.opacity(0.45), Color.white.opacity(0.08)],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                            .lineStyle(StrokeStyle(lineWidth: 1.2, dash: [3, 3]))
+                    }
                 }
                 .frame(height: 280)
                 .chartYAxis {
@@ -691,31 +763,28 @@ struct MacInsightsView: View {
                             .contentShape(Rectangle())
                             .gesture(
                                 DragGesture(minimumDistance: 0)
+                                    .onChanged { value in
+                                        updateMonthlySelection(at: value.location, proxy: proxy, geometry: geometry)
+                                    }
                                     .onEnded { value in
-                                        guard let plotFrameAnchor = proxy.plotFrame else { return }
-                                        let plotFrame = geometry[plotFrameAnchor]
-                                        let xPosition = value.location.x - plotFrame.origin.x
-                                        guard xPosition >= 0,
-                                              xPosition <= plotFrame.size.width,
-                                              let label: String = proxy.value(atX: xPosition, as: String.self) else {
-                                            return
-                                        }
-                                        selectedMonthlyLabel = label
+                                        updateMonthlySelection(at: value.location, proxy: proxy, geometry: geometry)
                                     }
                             )
                     }
                 }
-
-                if let selectedMonthlyLabel,
-                   let selectedPoint = snapshot.monthlyCashflow.first(where: { $0.monthLabel == selectedMonthlyLabel }) {
-                    InteractiveChartReadout(
-                        title: selectedPoint.monthLabel,
-                        values: [
-                            (appLanguage.localized("Income"), renderAmount(selectedPoint.income)),
-                            (appLanguage.localized("Expenses"), renderAmount(selectedPoint.expense)),
-                            (appLanguage.localized("Net"), renderAmount(selectedPoint.net))
-                        ]
-                    )
+                .overlay(alignment: .topLeading) {
+                    if let selectedMonthlyLabel,
+                       let selectedPoint = snapshot.monthlyCashflow.first(where: { $0.monthLabel == selectedMonthlyLabel }) {
+                        InChartCalloutOverlay(
+                            title: selectedPoint.monthLabel,
+                            items: [
+                                InChartCalloutOverlayItem(label: appLanguage.localized("Income"), value: renderAmount(selectedPoint.income), color: AppColors.income),
+                                InChartCalloutOverlayItem(label: appLanguage.localized("Expenses"), value: renderAmount(selectedPoint.expense), color: AppColors.expense),
+                                InChartCalloutOverlayItem(label: appLanguage.localized("Net"), value: renderAmount(selectedPoint.net), color: selectedPoint.net >= 0 ? AppColors.neutral : AppColors.warning)
+                            ],
+                            alignment: .topLeading
+                        )
+                    }
                 }
             }
 
@@ -979,6 +1048,42 @@ struct MacInsightsView: View {
             return appLanguage.localized("Category increased by %@", appLanguage.formatPercent(deltaPercentage))
         }
         return appLanguage.localized("Category appeared this month")
+    }
+
+    private func updateHeroSelection(at location: CGPoint, proxy: ChartProxy, geometry: GeometryProxy) {
+        guard let plotFrameAnchor = proxy.plotFrame else { return }
+        let plotFrame = geometry[plotFrameAnchor]
+        let yPosition = location.y - plotFrame.origin.y
+        guard yPosition >= 0, yPosition <= plotFrame.size.height,
+              let category: String = proxy.value(atY: yPosition, as: String.self) else { return }
+        selectedHeroCategory = category
+    }
+
+    private func updateCategorySelection(at location: CGPoint, proxy: ChartProxy, geometry: GeometryProxy) {
+        guard let plotFrameAnchor = proxy.plotFrame else { return }
+        let plotFrame = geometry[plotFrameAnchor]
+        let xPosition = location.x - plotFrame.origin.x
+        guard xPosition >= 0, xPosition <= plotFrame.size.width,
+              let category: String = proxy.value(atX: xPosition, as: String.self) else { return }
+        selectedCategory = category
+    }
+
+    private func updateEvolutionDateSelection(at location: CGPoint, proxy: ChartProxy, geometry: GeometryProxy) {
+        guard let plotFrameAnchor = proxy.plotFrame else { return }
+        let plotFrame = geometry[plotFrameAnchor]
+        let xPosition = location.x - plotFrame.origin.x
+        guard xPosition >= 0, xPosition <= plotFrame.size.width,
+              let date: Date = proxy.value(atX: xPosition, as: Date.self) else { return }
+        selectedEvolutionDate = date
+    }
+
+    private func updateMonthlySelection(at location: CGPoint, proxy: ChartProxy, geometry: GeometryProxy) {
+        guard let plotFrameAnchor = proxy.plotFrame else { return }
+        let plotFrame = geometry[plotFrameAnchor]
+        let xPosition = location.x - plotFrame.origin.x
+        guard xPosition >= 0, xPosition <= plotFrame.size.width,
+              let label: String = proxy.value(atX: xPosition, as: String.self) else { return }
+        selectedMonthlyLabel = label
     }
 
     private func bestMonth(in points: [MonthlyCashflowPoint]) -> String? {
