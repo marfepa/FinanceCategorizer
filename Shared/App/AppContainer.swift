@@ -107,7 +107,9 @@ final class AppContainer {
         )
 
         try? categoryRepository.ensureBaseCategories()
-        try? localModelManager.rebuildModelIfNeeded()
+        Task(priority: .utility) { [localModelManager] in
+            try? localModelManager.rebuildModelIfNeeded()
+        }
 
         self.normalizer = normalizer
         self.fileImportService = fileImportService
