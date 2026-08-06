@@ -6,6 +6,7 @@ struct IOSDashboardView: View {
     @State private var viewModel = DashboardViewModel()
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.english
     @AppStorage("isPrivacyModeEnabled") private var privacyStoredValue = false
+    @State private var reloadTrigger = UUID()
 
     let openImports: () -> Void
     let openTransactions: () -> Void
@@ -82,10 +83,11 @@ struct IOSDashboardView: View {
         .task(id: appLanguage) {
             await viewModel.load(using: appContainer, language: appLanguage)
         }
+        .task(id: reloadTrigger) {
+            await viewModel.load(using: appContainer, language: appLanguage)
+        }
         .onReceive(NotificationCenter.default.publisher(for: AppContainer.importDidFinishNotification)) { _ in
-            Task {
-                await viewModel.load(using: appContainer, language: appLanguage)
-            }
+            reloadTrigger = UUID()
         }
     }
 
@@ -227,6 +229,7 @@ private struct IOSMetricTile: View {
                 .frame(width: 34, height: 4)
                 .padding(.leading, AppSpacing.medium)
         }
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -335,8 +338,8 @@ private struct IOSCashflowCard: View {
                                     .onChanged { value in
                                         updateIOSMonthSelection(at: value.location, proxy: proxy, geometry: geometry)
                                     }
-                                    .onEnded { value in
-                                        updateIOSMonthSelection(at: value.location, proxy: proxy, geometry: geometry)
+                                    .onEnded { _ in
+                                        selectedMonthLabel = nil
                                     }
                             )
                     }
@@ -441,6 +444,9 @@ private struct IOSCategoryCard: View {
                                 }
                             }
                             .frame(height: 7)
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityLabel(LocalizedStringKey("Category share"))
+                            .accessibilityValue(appLanguage.formatPercent(item.share))
                         }
                     }
                 }

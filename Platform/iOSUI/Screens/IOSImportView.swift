@@ -20,6 +20,7 @@ struct IOSImportView: View {
                     .textFieldStyle(.roundedBorder)
 
                 TextEditor(text: $viewModel.csvText)
+                    .scrollDisabled(true)
                     .frame(minHeight: 220)
                     .padding(AppSpacing.small)
                     .background(
@@ -36,6 +37,12 @@ struct IOSImportView: View {
                         Task {
                             await viewModel.importTransactions(using: appContainer, language: appLanguage)
                         }
+                    }
+                    .disabled(viewModel.isImporting)
+                    
+                    if viewModel.isImporting {
+                        ProgressView()
+                            .padding(.leading, AppSpacing.small)
                     }
                 }
 

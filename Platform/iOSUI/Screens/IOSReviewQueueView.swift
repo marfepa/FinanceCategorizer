@@ -19,14 +19,14 @@ struct IOSReviewQueueView: View {
                         Spacer()
                         Text(transaction.amount.privacyFormatted(hidden: false, currencyCode: transaction.currencyCode))
                             .font(.subheadline.monospacedDigit())
-                            .foregroundStyle(transaction.amount < 0 ? .red : .green)
+                            .foregroundStyle(transaction.amount < 0 ? AppColors.expense : AppColors.income)
                     }
 
                     if let suggestedCategoryID = transaction.suggestedCategoryID,
                        let suggestedCategory = viewModel.categories.first(where: { $0.id == suggestedCategoryID }) {
                         Text("\(categoryName(for: transaction.categoryID)) → \(suggestedCategory.name)")
                             .font(.caption.weight(.semibold))
-                            .foregroundStyle(.green)
+                            .foregroundStyle(AppColors.income)
                     } else {
                         Text(categoryName(for: transaction.categoryID))
                             .font(.caption)
@@ -48,7 +48,7 @@ struct IOSReviewQueueView: View {
                     } label: {
                         Label(LocalizedStringKey("Accept"), systemImage: "checkmark")
                     }
-                    .tint(.green)
+                    .tint(AppColors.income)
 
                     Button {
                         viewModel.select(transaction)
@@ -56,7 +56,7 @@ struct IOSReviewQueueView: View {
                     } label: {
                         Label(LocalizedStringKey("Dismiss"), systemImage: "xmark")
                     }
-                    .tint(.orange)
+                    .tint(AppColors.warning)
                 }
             }
         }

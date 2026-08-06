@@ -5,6 +5,7 @@ struct IOSCategoryAuditView: View {
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.english
     @State private var viewModel = CategoryAuditViewModel()
     @State private var selectedTransaction: Transaction?
+    @State private var analyzeTrigger: UUID?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -48,14 +49,14 @@ struct IOSCategoryAuditView: View {
                             } label: {
                                 Label(LocalizedStringKey("audit.action.accept"), systemImage: "checkmark")
                             }
-                            .tint(.green)
+                            .tint(AppColors.income)
 
                             Button {
                                 viewModel.dismiss(transaction, using: appContainer)
                             } label: {
                                 Label(LocalizedStringKey("audit.action.dismiss"), systemImage: "xmark")
                             }
-                            .tint(.orange)
+                            .tint(AppColors.warning)
                         }
                     }
                 }
@@ -68,7 +69,7 @@ struct IOSCategoryAuditView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     Button {
-                        Task { await viewModel.analyzeAll(using: appContainer) }
+                        analyzeTrigger = UUID()
                     } label: {
                         Label(
                             viewModel.isAnalyzing
@@ -133,6 +134,11 @@ struct IOSCategoryAuditView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: AppContainer.importDidFinishNotification)) { _ in
             viewModel.load(using: appContainer)
+        }
+        .task(id: analyzeTrigger) {
+            if analyzeTrigger != nil {
+                await viewModel.analyzeAll(using: appContainer)
+            }
         }
     }
 
