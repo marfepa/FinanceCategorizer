@@ -20,6 +20,7 @@ final class InsightsViewModel {
         defer { isLoading = false }
 
         do {
+            try Task.checkCancellation()
             let transactions = try container.transactionRepository.fetchAll()
             let categories = try container.categoryRepository.fetchAll()
             let accounts = try container.accountRepository.fetchAll()
@@ -28,26 +29,42 @@ final class InsightsViewModel {
             let planningService = container.financialPlanningService
             let range = selectedRange
 
-            let (computedSnapshot, computedPlanning) = await Task.detached(priority: .userInitiated) {
+            let txSnapshots = transactions.map(TransactionSnapshot.init)
+            let catSnapshots = categories.map(CategorySnapshot.init)
+            let accSnapshots = accounts.map(AccountSnapshot.init)
+            let goalSnapshots = goals.map(SavingsGoalSnapshot.init)
+
+            let (computedSnapshot, computedPlanning) = try await Task.detached(priority: .userInitiated) {
+                try Task.checkCancellation()
+                let txs = txSnapshots.map { $0.toModel() }
+                let cats = catSnapshots.map { $0.toModel() }
+                let accs = accSnapshots.map { $0.toModel() }
+                let gls = goalSnapshots.map { $0.toModel() }
+                
+                try Task.checkCancellation()
                 let snap = analysisService.analyze(
-                    transactions: transactions,
-                    categories: categories,
+                    transactions: txs,
+                    categories: cats,
                     range: range
                 )
                 let plan = planningService.buildSnapshot(
-                    transactions: transactions,
-                    accounts: accounts,
-                    goals: goals,
-                    categories: categories
+                    transactions: txs,
+                    accounts: accs,
+                    goals: gls,
+                    categories: cats
                 )
                 return (snap, plan)
             }.value
 
+            try Task.checkCancellation()
             self.snapshot = computedSnapshot
             self.planningSnapshot = computedPlanning
             self.insights = try container.insightRepository.fetchAll()
             self.errorMessage = nil
             await loadNarrative(using: container, snapshot: computedSnapshot, language: language)
+        } catch is CancellationError {
+            // Ignore cancellation
+            return
         } catch {
             snapshot = nil
             planningSnapshot = nil

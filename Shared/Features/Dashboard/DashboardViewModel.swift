@@ -21,33 +21,49 @@ final class DashboardViewModel {
         }
 
         do {
+            try Task.checkCancellation()
             let transactions = try container.transactionRepository.fetchAll()
             let categories = try container.categoryRepository.fetchAll()
             let accounts = try container.accountRepository.fetchAll()
             let goals = try container.savingsGoalRepository.fetchAll()
             let recentImports = try container.importBatchRepository.fetchRecentBatches(limit: 6)
 
+            let txSnapshots = transactions.map(TransactionSnapshot.init)
+            let catSnapshots = categories.map(CategorySnapshot.init)
+            let accSnapshots = accounts.map(AccountSnapshot.init)
+            let goalSnapshots = goals.map(SavingsGoalSnapshot.init)
+            let importSnapshots = recentImports.map(ImportBatchSnapshot.init)
+
             let dashboardService = container.dashboardInsightService
             let planningService = container.financialPlanningService
             let locale = language.locale
 
-            let (computedSnapshot, computedPlanning) = await Task.detached(priority: .userInitiated) {
+            let (computedSnapshot, computedPlanning) = try await Task.detached(priority: .userInitiated) {
+                try Task.checkCancellation()
+                let txs = txSnapshots.map { $0.toModel() }
+                let cats = catSnapshots.map { $0.toModel() }
+                let accs = accSnapshots.map { $0.toModel() }
+                let gls = goalSnapshots.map { $0.toModel() }
+                let imps = importSnapshots.map { $0.toModel() }
+
+                try Task.checkCancellation()
                 let snap = dashboardService.buildSnapshot(
-                    transactions: transactions,
-                    categories: categories,
-                    recentImports: recentImports,
+                    transactions: txs,
+                    categories: cats,
+                    recentImports: imps,
                     locale: locale,
                     dateBasis: .budget
                 )
                 let plan = planningService.buildSnapshot(
-                    transactions: transactions,
-                    accounts: accounts,
-                    goals: goals,
-                    categories: categories
+                    transactions: txs,
+                    accounts: accs,
+                    goals: gls,
+                    categories: cats
                 )
                 return (snap, plan)
             }.value
 
+            try Task.checkCancellation()
             snapshot = computedSnapshot
             planningSnapshot = computedPlanning
             errorMessage = nil
@@ -61,9 +77,14 @@ final class DashboardViewModel {
 
             isGeneratingCopilot = true
             let copilot = await container.aiDashboardCopilotService.generate(for: snapshot, language: language)
+            try Task.checkCancellation()
+            
             copilotSummary = copilot.summary
             alerts = copilot.alerts
             actions = copilot.recommendedActions
+        } catch is CancellationError {
+            // Ignore cancellation gracefully
+            return
         } catch {
             snapshot = nil
             planningSnapshot = nil
