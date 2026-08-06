@@ -145,9 +145,18 @@ final class ImportOrchestrator: ImportOrchestrating {
         var importedTransactions: [Transaction] = []
         let importBatchID = UUID()
 
-        let existingCandidates = try transactionRepository
-            .fetchAll()
-            .map(DuplicateMovementCandidate.init(transaction:))
+        let sortedDates = preview.rows.map(\.bookingDate).sorted()
+        let existingCandidates: [DuplicateMovementCandidate]
+        if let start = sortedDates.first, let end = sortedDates.last {
+            // Pad by 7 days to catch duplicate transactions slightly offset in dates
+            let paddedStart = Calendar.current.date(byAdding: .day, value: -7, to: start) ?? start
+            let paddedEnd = Calendar.current.date(byAdding: .day, value: 7, to: end) ?? end
+            existingCandidates = try transactionRepository
+                .fetchByDateRange(start: paddedStart, end: paddedEnd)
+                .map(DuplicateMovementCandidate.init(transaction:))
+        } else {
+            existingCandidates = []
+        }
         var normalizedRows: [NormalizedTransactionDTO] = []
         var candidatesForImport: [DuplicateMovementCandidate] = []
 
@@ -228,7 +237,6 @@ final class ImportOrchestrator: ImportOrchestrating {
         formatter.locale = language.locale
         formatter.dateStyle = .medium
         formatter.timeStyle = .none
-        let sortedDates = preview.rows.map(\.bookingDate).sorted()
         let dateRangeText: String
         if let start = sortedDates.first, let end = sortedDates.last {
             dateRangeText = formatter.string(from: start, to: end)
