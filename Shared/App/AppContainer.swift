@@ -2,6 +2,7 @@ import Foundation
 import Observation
 import SwiftData
 import SwiftUI
+import os
 
 @Observable
 @MainActor
@@ -108,7 +109,11 @@ final class AppContainer {
 
         try? categoryRepository.ensureBaseCategories()
         Task(priority: .utility) { [localModelManager] in
-            try? localModelManager.rebuildModelIfNeeded()
+            do {
+                try localModelManager.rebuildModelIfNeeded()
+            } catch {
+                Logger(subsystem: "com.mariofernandez.FinanceCategorizer", category: "MLModel").error("Failed to rebuild local ML model: \(error.localizedDescription)")
+            }
         }
 
         self.normalizer = normalizer

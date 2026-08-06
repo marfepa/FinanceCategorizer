@@ -39,7 +39,11 @@ enum ModelContainerFactory {
         let baseDirectory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?
             .appendingPathComponent("FinanceCategorizer", isDirectory: true)
             ?? URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true).appendingPathComponent("FinanceCategorizer", isDirectory: true)
-        try? FileManager.default.createDirectory(at: baseDirectory, withIntermediateDirectories: true)
+        do {
+            try FileManager.default.createDirectory(at: baseDirectory, withIntermediateDirectories: true)
+        } catch {
+            fatalError("Failed to create application support directory at \(baseDirectory.path): \(error)")
+        }
         return baseDirectory.appendingPathComponent("FinanceCategorizer.store")
     }
 

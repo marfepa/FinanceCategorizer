@@ -39,7 +39,7 @@ final class BudgetRepository {
         let descriptor = FetchDescriptor<Budget>(predicate: #Predicate {
             $0.categoryID == categoryID && $0.monthYear == monthYear
         })
-        if try !context.fetch(descriptor).isEmpty {
+        if try context.fetchCount(descriptor) > 0 {
             throw BudgetRepositoryError.duplicateBudget
         }
 
