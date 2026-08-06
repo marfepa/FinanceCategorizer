@@ -10,7 +10,7 @@ final class TransactionsViewModel {
     }
 
     var searchText = "" {
-        didSet { recomputeFilteredResults() }
+        didSet { recomputeFilteredResults(debounce: true) }
     }
     var transactions: [Transaction] = [] {
         didSet { recomputeFilteredResults() }
@@ -55,51 +55,76 @@ final class TransactionsViewModel {
         sortedTransactions
     }
 
-    func recomputeFilteredResults() {
-        var result = transactions
+    private var filterTask: Task<Void, Never>?
 
-        if let filterStartDate {
-            result = result.filter { $0.bookingDate >= filterStartDate }
-        }
-        if let filterEndDate {
-            result = result.filter { $0.bookingDate <= filterEndDate }
-        }
-        if let filterCategoryID {
-            result = result.filter { $0.categoryID == filterCategoryID }
-        }
-        if let filterKind {
-            result = result.filter { $0.resolvedKind == filterKind }
-        }
-
-        if !searchText.isEmpty {
-            let query = searchText
-            result = result.filter {
-                $0.rawDescription.localizedCaseInsensitiveContains(query) ||
-                $0.cleanedDescription.localizedCaseInsensitiveContains(query)
+    func recomputeFilteredResults(debounce: Bool = false) {
+        filterTask?.cancel()
+        
+        let snapshots = self.transactions.map(TransactionSnapshot.init)
+        let query = self.searchText
+        let startDate = self.filterStartDate
+        let endDate = self.filterEndDate
+        let catID = self.filterCategoryID
+        let kind = self.filterKind
+        let sortOrder = self.transactionDateSortOrder
+        
+        filterTask = Task {
+            if debounce {
+                try? await Task.sleep(nanoseconds: 300_000_000)
             }
-        }
+            if Task.isCancelled { return }
 
-        switch transactionDateSortOrder {
-        case .newestFirst:
-            result.sort { $0.bookingDate > $1.bookingDate }
-        case .oldestFirst:
-            result.sort { $0.bookingDate < $1.bookingDate }
-        }
+            let (resultIDs, income, expense, count) = await Task.detached(priority: .userInitiated) {
+                var result = snapshots
 
-        sortedTransactions = result
+                if let startDate {
+                    result = result.filter { $0.bookingDate >= startDate }
+                }
+                if let endDate {
+                    result = result.filter { $0.bookingDate <= endDate }
+                }
+                if let catID {
+                    result = result.filter { $0.categoryID == catID }
+                }
+                if let kind {
+                    result = result.filter { $0.resolvedKind == kind }
+                }
 
-        var income: Decimal = 0
-        var expense: Decimal = 0
-        for tx in result {
-            if tx.resolvedKind == .income {
-                income += tx.amount
-            } else if tx.resolvedKind == .expense {
-                expense += tx.amount
-            }
+                if !query.isEmpty {
+                    result = result.filter {
+                        $0.rawDescription.localizedCaseInsensitiveContains(query) ||
+                        $0.cleanedDescription.localizedCaseInsensitiveContains(query)
+                    }
+                }
+
+                switch sortOrder {
+                case .newestFirst:
+                    result.sort { $0.bookingDate > $1.bookingDate }
+                case .oldestFirst:
+                    result.sort { $0.bookingDate < $1.bookingDate }
+                }
+
+                var inc: Decimal = 0
+                var exp: Decimal = 0
+                for tx in result {
+                    if tx.resolvedKind == .income {
+                        inc += tx.amount
+                    } else if tx.resolvedKind == .expense {
+                        exp += tx.amount
+                    }
+                }
+                
+                return (result.map { $0.id }, inc, exp, result.count)
+            }.value
+
+            if Task.isCancelled { return }
+
+            let txDict = Dictionary(uniqueKeysWithValues: self.transactions.map { ($0.id, $0) })
+            self.sortedTransactions = resultIDs.compactMap { txDict[$0] }
+            self.filteredIncome = income
+            self.filteredExpense = expense
+            self.filteredCount = count
         }
-        filteredIncome = income
-        filteredExpense = expense
-        filteredCount = result.count
     }
 
 
@@ -284,6 +309,7 @@ final class TransactionsViewModel {
         let targetKind = batchRecategorizationKind
 
         do {
+            try Task.checkCancellation()
             let candidates = try container.transactionRepository.fetchAll()
                 .filter { $0.resolvedKind == targetKind }
                 .filter { $0.categorizationSourceRaw != CategorizationSource.manual.rawValue }
@@ -293,8 +319,10 @@ final class TransactionsViewModel {
                 return
             }
 
+            try Task.checkCancellation()
             let result = try await container.recategorizationService.analyze(candidates)
 
+            try Task.checkCancellation()
             load(using: container)
             NotificationCenter.default.post(name: AppContainer.importDidFinishNotification, object: nil)
 
@@ -309,6 +337,9 @@ final class TransactionsViewModel {
             }
             statusMessage = AppLanguage.currentSelection.localized("transactions.recategorizationReviewHint")
             errorMessage = nil
+        } catch is CancellationError {
+            // Ignore gracefully
+            return
         } catch {
             errorMessage = error.localizedDescription
         }

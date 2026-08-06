@@ -16,6 +16,7 @@ enum IOSActivityTab: String, CaseIterable, Identifiable {
 
 struct IOSActivityView: View {
     @Binding var selectedTab: IOSActivityTab
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.english
 
     var body: some View {
         VStack(spacing: 0) {

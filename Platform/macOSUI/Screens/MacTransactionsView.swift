@@ -7,6 +7,7 @@ struct MacTransactionsView: View {
     @Environment(\.appContainer) private var appContainer
     @AppStorage("isPrivacyModeEnabled") private var isPrivacyModeEnabled = false
     @State private var viewModel = TransactionsViewModel()
+    @State private var reloadTrigger = 0
 
     @State private var isExporting = false
     @State private var exportDocument: CSVDocument?
@@ -111,6 +112,10 @@ struct MacTransactionsView: View {
             viewModel.load(using: appContainer)
         }
         .onReceive(NotificationCenter.default.publisher(for: AppContainer.importDidFinishNotification)) { _ in
+            reloadTrigger += 1
+        }
+        .task(id: reloadTrigger) {
+            guard reloadTrigger > 0 else { return }
             viewModel.load(using: appContainer)
         }
     }

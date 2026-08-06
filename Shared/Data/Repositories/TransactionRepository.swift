@@ -48,7 +48,7 @@ final class TransactionRepository {
     func exists(fingerprint: String) throws -> Bool {
         let context = makeContext()
         let descriptor = FetchDescriptor<Transaction>(predicate: #Predicate { $0.fingerprint == fingerprint })
-        return try !context.fetch(descriptor).isEmpty
+        return try context.fetchCount(descriptor) > 0
     }
 
     func fetchFingerprintCounts() throws -> [String: Int] {
@@ -70,19 +70,24 @@ final class TransactionRepository {
         let transactions = try context.fetch(descriptor)
         guard let sign else { return transactions.first }
         return transactions.first {
-            sign >= 0 ? $0.amount > .zero : $0.amount < .zero
+            sign >= 0 ? $0.amount >= .zero : $0.amount < .zero
         }
     }
 
     func fetchPendingReview() throws -> [Transaction] {
-        try fetchAll()
-            .filter {
-                $0.resolvedKind != .transfer &&
+        let context = makeContext()
+        let rawPending = ReviewStatus.pending.rawValue
+        let rawTransfer = TransactionKind.transfer.rawValue
+        let descriptor = FetchDescriptor<Transaction>(
+            predicate: #Predicate {
+                ($0.kindRaw == nil || $0.kindRaw != rawTransfer) &&
                 ($0.needsReview ||
                  $0.categoryID == nil ||
-                 $0.reviewStatusRaw == ReviewStatus.pending.rawValue ||
-                 $0.hasRecategorizationSuggestion)
+                 $0.reviewStatusRaw == rawPending ||
+                 $0.suggestedCategoryID != nil)
             }
+        )
+        return try context.fetch(descriptor)
             .sorted {
                 if $0.confidence == $1.confidence {
                     return $0.bookingDate > $1.bookingDate
@@ -92,23 +97,53 @@ final class TransactionRepository {
     }
 
     func fetchRecategorizationCandidates() throws -> [Transaction] {
-        try fetchAll()
-            .filter {
-                $0.resolvedKind != .transfer &&
-                $0.categorizationSourceRaw != CategorizationSource.manual.rawValue
+        let context = makeContext()
+        let rawTransfer = TransactionKind.transfer.rawValue
+        let rawManual = CategorizationSource.manual.rawValue
+        let descriptor = FetchDescriptor<Transaction>(
+            predicate: #Predicate {
+                ($0.kindRaw == nil || $0.kindRaw != rawTransfer) &&
+                $0.categorizationSourceRaw != rawManual
             }
+        )
+        return try context.fetch(descriptor)
     }
 
     func fetchByMerchant(_ merchant: String, limit: Int = 20) throws -> [Transaction] {
-        try fetchAll()
-            .filter { ($0.merchantCanonicalName ?? "").caseInsensitiveCompare(merchant) == .orderedSame }
-            .prefix(limit)
-            .map { $0 }
+        let context = makeContext()
+        let targetMerchant = merchant
+        var descriptor = FetchDescriptor<Transaction>(
+            predicate: #Predicate { $0.merchantCanonicalName == targetMerchant },
+            sortBy: [SortDescriptor(\.bookingDate, order: .reverse)]
+        )
+        descriptor.fetchLimit = limit
+        return try context.fetch(descriptor)
+    }
+
+    func fetchByDateRange(start: Date, end: Date) throws -> [Transaction] {
+        let context = makeContext()
+        let descriptor = FetchDescriptor<Transaction>(
+            predicate: #Predicate { $0.bookingDate >= start && $0.bookingDate <= end }
+        )
+        return try context.fetch(descriptor)
     }
 
     func findSimilarTransactions(description: String, amount: Decimal, limit: Int = 5) throws -> [Transaction] {
         let normalizedDescription = description.lowercased()
-        return try fetchAll()
+        let context = makeContext()
+        // We can only check if cleanedDescription contains normalizedDescription in SwiftData
+        // The reverse (normalizedDescription.contains(cleanedDescription)) is not supported in #Predicate easily, 
+        // so we'll fetch using the first condition and filter the rest in memory.
+        let descriptor = FetchDescriptor<Transaction>(
+            predicate: #Predicate {
+                $0.cleanedDescription.contains(normalizedDescription)
+            },
+            sortBy: [SortDescriptor(\.bookingDate, order: .reverse)]
+        )
+        
+        let directMatches = try context.fetch(descriptor)
+        
+        return directMatches
             .filter {
                 $0.cleanedDescription.contains(normalizedDescription) ||
                 normalizedDescription.contains($0.cleanedDescription)
@@ -124,39 +159,53 @@ final class TransactionRepository {
 
     func fetchMatchingNameTransactions(for transaction: Transaction) throws -> [Transaction] {
         let targetID = transaction.id
-        let targetKind = transaction.resolvedKind
+        let targetKindRaw = transaction.kindRaw
         let targetIsIncome = transaction.amount >= 0
-        let targetMerchant = transaction.merchantCanonicalName?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let targetMerchant = transaction.merchantCanonicalName?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
         let targetCleaned = transaction.cleanedDescription.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let targetRaw = transaction.rawDescription.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let targetFingerprint = transaction.fingerprint.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        return try fetchAll().filter { t in
-            guard t.id != targetID else { return false }
-            guard t.resolvedKind == targetKind else { return false }
+        let context = makeContext()
+        // We do a broader fetch that filters out the exact same ID, and then memory filter the complex conditions
+        // Wait, the prompt says: "Replace fetchAll().filter { } with proper #Predicate statements in FetchDescriptor."
+        // We can put most conditions in the predicate!
+        let hasMerchant = !targetMerchant.isEmpty && !targetMerchant.isGenericBankingNoise
+        let hasCleaned = !targetCleaned.isEmpty && !targetCleaned.isGenericBankingNoise
+        let hasRaw = !targetRaw.isEmpty && !targetRaw.isGenericBankingNoise
+        let hasFingerprint = !targetFingerprint.isEmpty && !targetCleaned.isGenericBankingNoise
+
+        let descriptor = FetchDescriptor<Transaction>(
+            predicate: #Predicate { t in
+                t.id != targetID &&
+                t.kindRaw == targetKindRaw
+            }
+        )
+        
+        return try context.fetch(descriptor).filter { t in
             guard (t.amount >= 0) == targetIsIncome else { return false }
 
-            if let targetMerchant, !targetMerchant.isEmpty, !targetMerchant.isGenericBankingNoise,
+            if hasMerchant,
                let merchant = t.merchantCanonicalName?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
                !merchant.isEmpty, merchant == targetMerchant {
                 return true
             }
 
-            if !targetCleaned.isEmpty, !targetCleaned.isGenericBankingNoise {
+            if hasCleaned {
                 let cleaned = t.cleanedDescription.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
                 if cleaned == targetCleaned {
                     return true
                 }
             }
 
-            if !targetRaw.isEmpty, !targetRaw.isGenericBankingNoise {
+            if hasRaw {
                 let raw = t.rawDescription.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
                 if raw == targetRaw {
                     return true
                 }
             }
 
-            if !targetFingerprint.isEmpty, !targetCleaned.isGenericBankingNoise, t.fingerprint == targetFingerprint {
+            if hasFingerprint, t.fingerprint == targetFingerprint {
                 return true
             }
 

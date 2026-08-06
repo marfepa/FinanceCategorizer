@@ -17,6 +17,7 @@ struct RuleEditorSheet: View {
     @State private var amountMax: String = ""
     @State private var targetCategoryID: UUID = UUID()
     @State private var isEnabled: Bool = true
+    @State private var saveError: String? = nil
     
     init(rule: Rule? = nil, categories: [Category], onSave: @escaping () -> Void) {
         self.rule = rule
@@ -65,6 +66,16 @@ struct RuleEditorSheet: View {
                         .disabled(name.isEmpty || (merchantContains.isEmpty && descriptionContains.isEmpty))
                 }
             }
+            .alert(appLanguage.localized("Error"), isPresented: Binding(
+                get: { saveError != nil },
+                set: { if !$0 { saveError = nil } }
+            )) {
+                Button(appLanguage.localized("OK"), role: .cancel) { }
+            } message: {
+                if let error = saveError {
+                    Text(error)
+                }
+            }
             .onAppear {
                 if let rule = rule {
                     name = rule.name
@@ -110,7 +121,7 @@ struct RuleEditorSheet: View {
             onSave()
             dismiss()
         } catch {
-            // Handle error
+            saveError = error.localizedDescription
         }
     }
 }

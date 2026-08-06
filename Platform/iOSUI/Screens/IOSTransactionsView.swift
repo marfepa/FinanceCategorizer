@@ -35,6 +35,7 @@ struct IOSTransactionsView: View {
                         Button(LocalizedStringKey("Create category")) {
                             viewModel.createCategory(using: appContainer)
                         }
+                        .disabled(viewModel.newCategoryName.isEmpty)
 
                         if let recategorizationSummary = viewModel.recategorizationSummary {
                             Text(recategorizationSummary)
@@ -45,13 +46,13 @@ struct IOSTransactionsView: View {
                         if let statusMessage = viewModel.statusMessage {
                             Text(statusMessage)
                                 .font(.footnote)
-                                .foregroundStyle(.green)
+                                .foregroundStyle(AppColors.income)
                         }
 
                         if let errorMessage = viewModel.errorMessage {
                             Text(errorMessage)
                                 .font(.footnote)
-                                .foregroundStyle(.red)
+                                .foregroundStyle(AppColors.expense)
                         }
                     }
 
@@ -87,7 +88,7 @@ struct IOSTransactionsView: View {
                                     .foregroundStyle(.secondary)
                                 Text(appLanguage.formatCurrency(transaction.amount, code: transaction.currencyCode))
                                     .font(.subheadline.weight(.medium))
-                                    .foregroundStyle(NSDecimalNumber(decimal: transaction.amount).doubleValue < 0 ? .red : .green)
+                                    .foregroundStyle(transaction.amount < 0 ? AppColors.expense : AppColors.income)
                             }
                             .padding(.vertical, AppSpacing.xSmall)
                         }

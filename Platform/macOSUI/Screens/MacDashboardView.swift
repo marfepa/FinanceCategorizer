@@ -6,6 +6,7 @@ struct MacDashboardView: View {
     @State private var viewModel = DashboardViewModel()
     @AppStorage("isPrivacyModeEnabled") private var privacyStoredValue = false
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.english
+    @State private var reloadTrigger = 0
 
     let openImports: () -> Void
     let openTransactions: () -> Void
@@ -95,10 +96,12 @@ struct MacDashboardView: View {
         .task(id: appLanguage) {
             await viewModel.load(using: appContainer, language: appLanguage)
         }
+        .task(id: reloadTrigger) {
+            guard reloadTrigger > 0 else { return }
+            await viewModel.load(using: appContainer, language: appLanguage)
+        }
         .onReceive(NotificationCenter.default.publisher(for: AppContainer.importDidFinishNotification)) { _ in
-            Task {
-                await viewModel.load(using: appContainer, language: appLanguage)
-            }
+            reloadTrigger += 1
         }
     }
 

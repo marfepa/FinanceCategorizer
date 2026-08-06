@@ -62,16 +62,27 @@ final class ImportBatchRepository {
 
     func findDuplicateBatch(fileFingerprint: String?, rowFingerprint: String?) throws -> DuplicateImportMatch? {
         let context = makeContext()
-        let batches = try context.fetch(FetchDescriptor<ImportBatch>(sortBy: [SortDescriptor(\.importedAt, order: .reverse)]))
-
-        if let fileFingerprint,
-           let batch = batches.first(where: { $0.fileFingerprint == fileFingerprint }) {
-            return DuplicateImportMatch(batch: batch, reason: "Exact same file content")
+        
+        if let fileFingerprint {
+            var descriptor = FetchDescriptor<ImportBatch>(
+                predicate: #Predicate { $0.fileFingerprint == fileFingerprint },
+                sortBy: [SortDescriptor(\.importedAt, order: .reverse)]
+            )
+            descriptor.fetchLimit = 1
+            if let batch = try context.fetch(descriptor).first {
+                return DuplicateImportMatch(batch: batch, reason: "Exact same file content")
+            }
         }
 
-        if let rowFingerprint,
-           let batch = batches.first(where: { $0.rowFingerprint == rowFingerprint }) {
-            return DuplicateImportMatch(batch: batch, reason: "Same imported movements")
+        if let rowFingerprint {
+            var descriptor = FetchDescriptor<ImportBatch>(
+                predicate: #Predicate { $0.rowFingerprint == rowFingerprint },
+                sortBy: [SortDescriptor(\.importedAt, order: .reverse)]
+            )
+            descriptor.fetchLimit = 1
+            if let batch = try context.fetch(descriptor).first {
+                return DuplicateImportMatch(batch: batch, reason: "Same imported movements")
+            }
         }
 
         return nil

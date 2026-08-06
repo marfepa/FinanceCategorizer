@@ -24,21 +24,9 @@ struct MacCategoriesView: View {
         GridItem(.adaptive(minimum: 180, maximum: 240), spacing: AppSpacing.medium)
     ]
 
-    private var categoryCount: Int {
-        viewModel.categories.count
-    }
-
-    private var transactionCount: Int {
-        viewModel.categories.reduce(0) { $0 + $1.transactionCount }
-    }
-
-    private var systemCategoryCount: Int {
-        viewModel.categories.filter(\.isSystem).count
-    }
-
-    private var incomeCategoryCount: Int {
-        viewModel.categories.filter { $0.group == "Income" }.count
-    }
+    @State private var transactionCount: Int = 0
+    @State private var systemCategoryCount: Int = 0
+    @State private var incomeCategoryCount: Int = 0
 
     var body: some View {
         Group {
@@ -85,7 +73,7 @@ struct MacCategoriesView: View {
             }
 
             HStack(alignment: .top, spacing: AppSpacing.small) {
-                SummaryChip(value: appLanguage.formatInteger(categoryCount), label: "Categories")
+                SummaryChip(value: appLanguage.formatInteger(viewModel.categories.count), label: "Categories")
                 SummaryChip(value: appLanguage.formatInteger(transactionCount), label: "Movements")
                 SummaryChip(value: appLanguage.formatInteger(systemCategoryCount), label: "System")
                 SummaryChip(value: appLanguage.formatInteger(incomeCategoryCount), label: "Income")
@@ -504,6 +492,11 @@ struct MacCategoriesView: View {
     private func reloadData() {
         viewModel.load(using: appContainer)
         transactionsViewModel.load(using: appContainer)
+        
+        transactionCount = viewModel.categories.reduce(0) { $0 + $1.transactionCount }
+        systemCategoryCount = viewModel.categories.filter(\.isSystem).count
+        incomeCategoryCount = viewModel.categories.filter { $0.group == "Income" }.count
+
         syncDetailState()
     }
 

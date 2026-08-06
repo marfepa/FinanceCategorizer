@@ -179,7 +179,8 @@ struct DuplicateReviewGroupCard: View {
     let onDismiss: () -> Void
 
     var body: some View {
-        let members = transactions.filter { group.transactionIDs.contains($0.id) }
+        let idSet = Set(group.transactionIDs)
+        let members = transactions.filter { idSet.contains($0.id) }
         let recommended = members.first(where: { $0.id == group.recommendedKeepID }) ?? members.first
 
         return VStack(alignment: .leading, spacing: AppSpacing.small) {

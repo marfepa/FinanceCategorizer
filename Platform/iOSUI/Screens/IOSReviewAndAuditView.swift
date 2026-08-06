@@ -18,6 +18,7 @@ enum IOSReviewTab: String, CaseIterable, Identifiable {
 
 struct IOSReviewAndAuditView: View {
     @Binding var selectedTab: IOSReviewTab
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.english
 
     var body: some View {
         VStack(spacing: 0) {

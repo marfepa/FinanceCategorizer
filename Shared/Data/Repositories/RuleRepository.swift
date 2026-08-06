@@ -84,27 +84,21 @@ final class RuleRepository {
         createdFromUserCorrection: Bool
     ) throws {
         let context = makeContext()
-        let rules = try context.fetch(FetchDescriptor<Rule>())
-        let normalizedMerchant = merchantContains?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        let normalizedDescription = descriptionContains?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let normalizedMerchant = merchantContains?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
+        let normalizedDescription = descriptionContains?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
 
-        if let existing = rules.first(where: {
-            let merchantMatch: Bool
-            if let normalizedMerchant, !normalizedMerchant.isEmpty {
-                merchantMatch = $0.merchantContains?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == normalizedMerchant
-            } else {
-                merchantMatch = $0.merchantContains == nil || $0.merchantContains?.isEmpty == true
-            }
-
-            let descriptionMatch: Bool
-            if let normalizedDescription, !normalizedDescription.isEmpty {
-                descriptionMatch = $0.descriptionContains?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == normalizedDescription
-            } else {
-                descriptionMatch = $0.descriptionContains == nil || $0.descriptionContains?.isEmpty == true
-            }
-
-            return merchantMatch && descriptionMatch
-        }) {
+        // SwiftData string equality is case insensitive, but we'll fetch exact matches
+        // For rules with empty or nil merchant/description, we need to match appropriately
+        let allRules = try fetchAll()
+        let existing = allRules.first { rule in
+            let mMatch = (normalizedMerchant.isEmpty && (rule.merchantContains == nil || rule.merchantContains?.isEmpty == true)) ||
+                         (!normalizedMerchant.isEmpty && rule.merchantContains?.lowercased() == normalizedMerchant)
+            let dMatch = (normalizedDescription.isEmpty && (rule.descriptionContains == nil || rule.descriptionContains?.isEmpty == true)) ||
+                         (!normalizedDescription.isEmpty && rule.descriptionContains?.lowercased() == normalizedDescription)
+            return mMatch && dMatch
+        }
+        
+        if let existing {
             existing.targetCategoryID = targetCategoryID
             existing.name = name
             existing.isEnabled = true

@@ -60,26 +60,43 @@ final class ReviewQueueViewModel {
     private(set) var filteredList: [Transaction] = []
     private(set) var similarTransactions: [Transaction] = []
 
+    private var filterTask: Task<Void, Never>?
+    private var similarTask: Task<Void, Never>?
+
     private func recomputeCaches() {
         updateFilteredListCache()
         updateSimilarCache()
     }
 
     private func updateFilteredListCache() {
-        switch listFilter {
-        case .all:
-            filteredList = transactions
-        case .lowConfidence:
-            filteredList = transactions.filter { $0.confidence < AppConfig.softAutoCategorizationThreshold }
-        case .uncategorized:
-            filteredList = transactions.filter { $0.categoryID == nil }
-        case .suggestions:
-            filteredList = transactions.filter(\.hasRecategorizationSuggestion)
-        case .similar:
-            let ids = Set(suggestedGroups.map { $0.representativeTransactionID })
-            filteredList = transactions.filter { t in
-                ids.contains(t.id) || !similarTransactions(for: t).isEmpty
-            }
+        filterTask?.cancel()
+        let snapshots = self.transactions.map(TransactionSnapshot.init)
+        let filter = self.listFilter
+        let suggestedGroups = self.suggestedGroups.map { $0.representativeTransactionID }
+        let similarIds = Set(self.similarTransactions.map { $0.id })
+        
+        filterTask = Task {
+            let resultIDs = await Task.detached(priority: .userInitiated) {
+                switch filter {
+                case .all:
+                    return snapshots.map { $0.id }
+                case .lowConfidence:
+                    return snapshots.filter { $0.confidence < AppConfig.softAutoCategorizationThreshold }.map { $0.id }
+                case .uncategorized:
+                    return snapshots.filter { $0.categoryID == nil }.map { $0.id }
+                case .suggestions:
+                    return snapshots.filter { $0.suggestedCategoryID != nil }.map { $0.id }
+                case .similar:
+                    let ids = Set(suggestedGroups)
+                    return snapshots.filter { t in
+                        ids.contains(t.id) || similarIds.contains(t.id)
+                    }.map { $0.id }
+                }
+            }.value
+            
+            if Task.isCancelled { return }
+            let txDict = Dictionary(uniqueKeysWithValues: self.transactions.map { ($0.id, $0) })
+            self.filteredList = resultIDs.compactMap { txDict[$0] }
         }
     }
 
@@ -88,7 +105,7 @@ final class ReviewQueueViewModel {
             similarTransactions = []
             return
         }
-        similarTransactions = transactions.filter { $0.id != selectedTransaction.id && isSimilar($0, to: selectedTransaction) }
+        similarTransactions = similarTransactions(for: selectedTransaction)
     }
 
     func load(using container: AppContainer) {
@@ -339,21 +356,29 @@ final class ReviewQueueViewModel {
         isLoadingAISuggestion = true
         defer { isLoadingAISuggestion = false }
 
-        let suggestion = await container.aiSuggestionService.suggestWithFoundationModel(
-            for: transaction,
-            categories: categories
-        )
+        do {
+            try Task.checkCancellation()
+            let suggestion = await container.aiSuggestionService.suggestWithFoundationModel(
+                for: transaction,
+                categories: categories
+            )
 
-        guard let suggestion,
-              let category = categories.first(where: { $0.name.caseInsensitiveCompare(suggestion.suggestedCategoryName) == .orderedSame }) else {
+            try Task.checkCancellation()
+            guard let suggestion,
+                  let category = categories.first(where: { $0.name.caseInsensitiveCompare(suggestion.suggestedCategoryName) == .orderedSame }) else {
+                errorMessage = nil
+                statusMessage = language.localized("review.status.aiNoReliableCategory")
+                return
+            }
+
+            selectedCategoryID = category.id
+            statusMessage = language.localized("review.status.aiSuggests", category.name, language.formatPercent(suggestion.confidence))
             errorMessage = nil
-            statusMessage = language.localized("review.status.aiNoReliableCategory")
+        } catch is CancellationError {
             return
+        } catch {
+            errorMessage = error.localizedDescription
         }
-
-        selectedCategoryID = category.id
-        statusMessage = language.localized("review.status.aiSuggests", category.name, language.formatPercent(suggestion.confidence))
-        errorMessage = nil
     }
 
     // MARK: - ML Re-categorization
@@ -365,14 +390,17 @@ final class ReviewQueueViewModel {
         defer { isRecategorizing = false }
 
         do {
+            try Task.checkCancellation()
             let candidates = try container.transactionRepository.fetchRecategorizationCandidates()
             guard !candidates.isEmpty else {
                 recategorizationSummary = language.localized("review.status.noCandidatesToRecategorize")
                 return
             }
 
+            try Task.checkCancellation()
             let result = try await container.recategorizationService.analyze(candidates)
 
+            try Task.checkCancellation()
             load(using: container)
             NotificationCenter.default.post(name: AppContainer.importDidFinishNotification, object: nil)
 
@@ -388,6 +416,8 @@ final class ReviewQueueViewModel {
             } else {
                 recategorizationSummary = language.localized("review.status.mlRerun", parts.joined(separator: ", "))
             }
+        } catch is CancellationError {
+            return
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -435,7 +465,8 @@ final class ReviewQueueViewModel {
     }
 
     private func similarTransactions(for transaction: Transaction) -> [Transaction] {
-        transactions.filter { $0.id != transaction.id && isSimilar($0, to: transaction) }
+        let targetSnapshot = TransactionSnapshot(from: transaction)
+        return transactions.filter { $0.id != transaction.id && Self.isSimilar(snapshot: TransactionSnapshot(from: $0), to: targetSnapshot) }
     }
 
     private func normalizedDTO(from transaction: Transaction) -> NormalizedTransactionDTO {
@@ -455,7 +486,7 @@ final class ReviewQueueViewModel {
         )
     }
 
-    private func isSimilar(_ lhs: Transaction, to rhs: Transaction) -> Bool {
+    private nonisolated static func isSimilar(snapshot lhs: TransactionSnapshot, to rhs: TransactionSnapshot) -> Bool {
         let lhsIsIncome = lhs.amount >= 0
         let rhsIsIncome = rhs.amount >= 0
         if lhsIsIncome != rhsIsIncome {
@@ -476,7 +507,7 @@ final class ReviewQueueViewModel {
         return overlap >= 2
     }
 
-    private func signatureTokens(from text: String) -> [String] {
+    private nonisolated static func signatureTokens(from text: String) -> [String] {
         let normalized = text
             .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
             .lowercased()
@@ -520,7 +551,7 @@ final class ReviewQueueViewModel {
             return "merchant:\(merchant):\(transaction.amount >= 0 ? "income" : "expense")"
         }
 
-        let tokens = signatureTokens(from: transaction.cleanedDescription.isEmpty ? transaction.rawDescription : transaction.cleanedDescription)
+        let tokens = ReviewQueueViewModel.signatureTokens(from: transaction.cleanedDescription.isEmpty ? transaction.rawDescription : transaction.cleanedDescription)
             .prefix(3)
             .joined(separator: "|")
         return "tokens:\(tokens):\(transaction.amount >= 0 ? "income" : "expense")"

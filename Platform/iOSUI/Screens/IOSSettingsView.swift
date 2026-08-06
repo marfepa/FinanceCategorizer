@@ -17,7 +17,7 @@ struct IOSSettingsView: View {
 
             Section(LocalizedStringKey("Local ML Readiness")) {
                 Label(viewModel.localizedModelStatusTitle(language: appLanguage), systemImage: viewModel.modelReady ? "checkmark.seal.fill" : "hourglass")
-                    .foregroundStyle(viewModel.modelReady ? .green : .orange)
+                    .foregroundStyle(viewModel.modelReady ? AppColors.income : AppColors.warning)
                 Text(viewModel.localizedModelStatusDetail(language: appLanguage))
                     .font(.footnote)
                     .foregroundStyle(.secondary)

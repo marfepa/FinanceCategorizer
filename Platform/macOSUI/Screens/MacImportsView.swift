@@ -5,6 +5,7 @@ struct MacImportsView: View {
     @Environment(\.appContainer) private var appContainer
     @AppStorage("appLanguage") private var appLanguage: AppLanguage = .english
     @State private var viewModel = ImportViewModel()
+    @State private var importTrigger = 0
     @State private var isFileImporterPresented = false
     @State private var recentImports: [ImportBatch] = []
     @State private var isAdvancedValidationExpanded = false
@@ -91,6 +92,11 @@ struct MacImportsView: View {
             }
         }
         .onAppear {
+            loadRecentImports()
+        }
+        .task(id: importTrigger) {
+            guard importTrigger > 0 else { return }
+            await viewModel.importTransactions(using: appContainer, language: appLanguage)
             loadRecentImports()
         }
     }
@@ -225,17 +231,17 @@ struct MacImportsView: View {
             summaryStat(
                 title: LocalizedStringKey("Selected file"),
                 value: viewModel.selectedFileURL?.lastPathComponent ?? viewModel.sourceFileName,
-                subtitle: LocalizedStringKey(detectedSourceType)
+                subtitleText: Text(verbatim: detectedSourceType)
             )
             summaryStat(
                 title: LocalizedStringKey("Preview rows"),
                 value: viewModel.previewRows.isEmpty ? String(localized: "Waiting") : "\(viewModel.previewRows.count)",
-                subtitle: LocalizedStringKey("Rows ready for validation")
+                subtitleText: Text(LocalizedStringKey("Rows ready for validation"))
             )
             summaryStat(
                 title: LocalizedStringKey("Pending review"),
                 value: pendingReviewValue,
-                subtitle: LocalizedStringKey("Movements likely to need attention")
+                subtitleText: Text(LocalizedStringKey("Movements likely to need attention"))
             )
         }
         .contentCard()
@@ -246,17 +252,17 @@ struct MacImportsView: View {
             summaryStat(
                 title: LocalizedStringKey("Last import"),
                 value: viewModel.summary?.sourceFileName ?? viewModel.lastImportedFileName ?? String(localized: "In progress"),
-                subtitle: LocalizedStringKey("Current import context")
+                subtitleText: Text(LocalizedStringKey("Current import context"))
             )
             summaryStat(
                 title: LocalizedStringKey("Detected accounts"),
                 value: viewModel.summary.map { "\($0.detectedAccounts)" } ?? "0",
-                subtitle: LocalizedStringKey("Accounts found in source")
+                subtitleText: Text(LocalizedStringKey("Accounts found in source"))
             )
             summaryStat(
                 title: LocalizedStringKey("Pending review"),
                 value: pendingReviewValue,
-                subtitle: LocalizedStringKey("Items queued for confirmation")
+                subtitleText: Text(LocalizedStringKey("Items queued for confirmation"))
             )
         }
         .contentCard()
@@ -374,7 +380,7 @@ struct MacImportsView: View {
         )
     }
 
-    private func summaryStat(title: LocalizedStringKey, value: String, subtitle: LocalizedStringKey) -> some View {
+    private func summaryStat(title: LocalizedStringKey, value: String, subtitleText: Text) -> some View {
         VStack(alignment: .leading, spacing: AppLayoutMetrics.microGap) {
             Text(title)
                 .font(.caption)
@@ -382,7 +388,7 @@ struct MacImportsView: View {
             Text(value)
                 .font(.title3.weight(.semibold))
                 .lineLimit(2)
-            Text(subtitle)
+            subtitleText
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
@@ -482,10 +488,7 @@ struct MacImportsView: View {
         }
 
         if !viewModel.previewRows.isEmpty {
-            Task {
-                await viewModel.importTransactions(using: appContainer, language: appLanguage)
-                loadRecentImports()
-            }
+            importTrigger += 1
             return
         }
 
