@@ -65,7 +65,7 @@ struct TransactionTable: View {
                         Spacer()
 
                         Text(transaction.amount.privacyFormatted(hidden: isPrivacyModeEnabled, language: appLanguage, currencyCode: transaction.currencyCode))
-                            .foregroundStyle(NSDecimalNumber(decimal: transaction.amount).doubleValue < 0 ? .red : .green)
+                            .foregroundStyle(transaction.amount < 0 ? .red : .green)
                     }
                     .padding(.vertical, AppSpacing.xSmall)
                     .padding(.horizontal, AppSpacing.small)

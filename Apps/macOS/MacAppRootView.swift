@@ -70,6 +70,11 @@ struct MacAppRootView: View {
         }
         .environment(\.locale, appLanguage.locale)
         .environment(\.isPrivacyModeEnabled, isPrivacyModeEnabled)
+        .onChange(of: selectedSection) { _, newValue in
+            if newValue == nil {
+                selectedSection = .dashboard
+            }
+        }
     }
 
     private func aiSurface(for section: MacSection) -> AppleAISurface {

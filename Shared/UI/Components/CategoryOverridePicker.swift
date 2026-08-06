@@ -31,32 +31,30 @@ struct CategoryOverridePicker: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.vertical, AppSpacing.small)
             } else {
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 2) {
-                        ForEach(filteredCategories) { category in
-                            Button {
-                                onSelect(category.id)
-                            } label: {
-                                HStack(spacing: AppSpacing.small) {
-                                    Image(systemName: category.iconName)
-                                        .frame(width: 20)
-                                        .foregroundStyle(.secondary)
-                                    Text(category.name)
-                                        .foregroundStyle(.primary)
-                                    Spacer()
-                                    if selectedCategoryID == category.id {
-                                        Image(systemName: "checkmark")
-                                            .foregroundStyle(AppColors.accent)
-                                    }
+                LazyVStack(alignment: .leading, spacing: 2) {
+                    ForEach(filteredCategories) { category in
+                        Button {
+                            onSelect(category.id)
+                        } label: {
+                            HStack(spacing: AppSpacing.small) {
+                                Image(systemName: category.iconName)
+                                    .frame(width: 20)
+                                    .foregroundStyle(.secondary)
+                                Text(category.name)
+                                    .foregroundStyle(.primary)
+                                Spacer()
+                                if selectedCategoryID == category.id {
+                                    Image(systemName: "checkmark")
+                                        .foregroundStyle(AppColors.accent)
                                 }
-                                .contentShape(Rectangle())
-                                .padding(.vertical, 6)
-                                .padding(.horizontal, AppSpacing.xSmall)
                             }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel(category.name)
-                            .accessibilityAddTraits(selectedCategoryID == category.id ? .isSelected : [])
+                            .contentShape(Rectangle())
+                            .padding(.vertical, 6)
+                            .padding(.horizontal, AppSpacing.xSmall)
                         }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(category.name)
+                        .accessibilityAddTraits(selectedCategoryID == category.id ? .isSelected : [])
                     }
                 }
                 .frame(maxHeight: 220)
