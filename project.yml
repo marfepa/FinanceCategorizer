@@ -58,6 +58,8 @@ targets:
         PRODUCT_NAME: FinanceCategorizerMac
         INFOPLIST_KEY_CFBundleDisplayName: Finance Categorizer
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.finance
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        INFOPLIST_KEY_CFBundleIconFile: AppIcon
       configs:
         Release:
           ENABLE_HARDENED_RUNTIME: YES
