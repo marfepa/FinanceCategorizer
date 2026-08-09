@@ -1,6 +1,10 @@
 import XCTest
 import SwiftData
+#if os(macOS)
+@testable import FinanceCategorizerMac
+#else
 @testable import FinanceCategorizerIOS
+#endif
 
 private struct UnavailableAIAvailabilityServiceStub: AIAvailabilityChecking {
     func isAvailable() -> Bool { false }
@@ -1466,8 +1470,13 @@ final class FinanceCategorizerTests: XCTestCase {
         let container = AppContainer(inMemory: true)
         let service = AppleAIGlobalActionService(availabilityService: UnavailableAIAvailabilityServiceStub())
 
+        let calendar = Calendar(identifier: .gregorian)
+        let now = Date()
+        let currentYear = calendar.component(.year, from: now)
+        let currentMonth = calendar.component(.month, from: now)
+
         let payroll = Transaction(
-            bookingDate: date(year: 2026, month: 1, day: 26),
+            bookingDate: date(year: currentYear, month: currentMonth, day: 10),
             rawDescription: "NOMINA EMPRESA",
             cleanedDescription: "NOMINA EMPRESA",
             merchantDisplayName: "Empresa",
@@ -1487,7 +1496,7 @@ final class FinanceCategorizerTests: XCTestCase {
             isRecurringCandidate: false
         )
         let expense = Transaction(
-            bookingDate: date(year: 2026, month: 1, day: 27),
+            bookingDate: date(year: currentYear, month: currentMonth, day: 11),
             rawDescription: "ALQUILER ENERO",
             cleanedDescription: "ALQUILER ENERO",
             merchantDisplayName: "Casero",

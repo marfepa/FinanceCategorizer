@@ -71,13 +71,6 @@ targets:
       - path: Tests/UnitTests
     dependencies:
       - target: FinanceCategorizerIOS
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.mariofernandez.FinanceCategorizerTests
-        PRODUCT_NAME: FinanceCategorizerTests
-        GENERATE_INFOPLIST_FILE: YES
-        TEST_HOST: $(BUILT_PRODUCTS_DIR)/FinanceCategorizerIOS.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/FinanceCategorizerIOS
-        BUNDLE_LOADER: $(TEST_HOST)
 
   FinanceCategorizerUITestsIOS:
     type: bundle.ui-testing
@@ -86,12 +79,14 @@ targets:
       - path: Tests/UITests_iOS
     dependencies:
       - target: FinanceCategorizerIOS
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.mariofernandez.FinanceCategorizerUITestsIOS
-        PRODUCT_NAME: FinanceCategorizerUITestsIOS
-        GENERATE_INFOPLIST_FILE: YES
-        TEST_TARGET_NAME: FinanceCategorizerIOS
+
+  FinanceCategorizerTestsMac:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: Tests/UnitTests
+    dependencies:
+      - target: FinanceCategorizerMac
 
   FinanceCategorizerUITestsMac:
     type: bundle.ui-testing
@@ -100,12 +95,6 @@ targets:
       - path: Tests/UITests_macOS
     dependencies:
       - target: FinanceCategorizerMac
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.mariofernandez.FinanceCategorizerUITestsMac
-        PRODUCT_NAME: FinanceCategorizerUITestsMac
-        GENERATE_INFOPLIST_FILE: YES
-        TEST_TARGET_NAME: FinanceCategorizerMac
 
 schemes:
   FinanceCategorizerIOS:
@@ -124,8 +113,10 @@ schemes:
     build:
       targets:
         FinanceCategorizerMac: all
+        FinanceCategorizerTestsMac: [test]
         FinanceCategorizerUITestsMac: [test]
     test:
       gatherCoverageData: true
       targets:
+        - name: FinanceCategorizerTestsMac
         - name: FinanceCategorizerUITestsMac
