@@ -18,6 +18,26 @@ final class FinanceCategorizerTests: XCTestCase {
         XCTAssertGreaterThan(AppConfig.softAutoCategorizationThreshold, AppConfig.suggestionThreshold)
     }
 
+    func testAppLockStateFollowsPrivacyPreferenceWithoutAuthentication() async {
+        let viewModel = AppLockViewModel()
+
+        viewModel.lockIfEnabled(false)
+        XCTAssertFalse(viewModel.isLocked)
+
+        viewModel.lockIfEnabled(true)
+        XCTAssertTrue(viewModel.isLocked)
+
+        await viewModel.configure(isEnabled: false, reason: "Test")
+        XCTAssertFalse(viewModel.isLocked)
+        XCTAssertNil(viewModel.errorMessage)
+    }
+
+    func testPersistenceSchemaHasAnExplicitVersionAndMigrationPlan() {
+        XCTAssertEqual(FinanceSchemaV1.versionIdentifier, Schema.Version(1, 0, 0))
+        XCTAssertEqual(FinanceMigrationPlan.schemas.count, 1)
+        XCTAssertTrue(FinanceMigrationPlan.stages.isEmpty)
+    }
+
     func testDashboardSnapshotSurfacesMonthlyProgressAndCategoryGrowth() throws {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!
@@ -104,6 +124,51 @@ final class FinanceCategorizerTests: XCTestCase {
         XCTAssertEqual(englishKeys, spanishKeys, "English and Spanish localization catalogs must contain the same keys")
     }
 
+    func testAnonymizedExportRemovesConceptAndMerchant() {
+        let transaction = Transaction(
+            bookingDate: Date(timeIntervalSince1970: 1_700_000_000),
+            rawDescription: "SECRET MEDICAL PAYMENT",
+            cleanedDescription: "SECRET MEDICAL PAYMENT",
+            merchantCanonicalName: "Private Clinic",
+            amount: Decimal(-125),
+            fingerprint: "export-private"
+        )
+
+        let csv = ExportService.generateCSV(
+            from: [transaction],
+            categories: [],
+            locale: Locale(identifier: "en_US"),
+            privacyMode: .anonymized
+        )
+
+        XCTAssertFalse(csv.contains("SECRET MEDICAL PAYMENT"))
+        XCTAssertFalse(csv.contains("Private Clinic"))
+        XCTAssertTrue(csv.contains("Movement 1"))
+        XCTAssertTrue(csv.contains("-125"))
+    }
+
+    func testExportAuditKeepsOnlyMostRecentFiftyEntries() throws {
+        let suiteName = "ExportAuditTests-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        let service = ExportAuditService(defaults: defaults)
+
+        for index in 0..<55 {
+            service.record(
+                privacyMode: index.isMultiple(of: 2) ? .anonymized : .full,
+                transactionCount: index,
+                at: Date(timeIntervalSince1970: Double(index))
+            )
+        }
+
+        let entries = service.entries()
+        XCTAssertEqual(entries.count, 50)
+        XCTAssertEqual(entries.first?.transactionCount, 54)
+        XCTAssertEqual(entries.last?.transactionCount, 5)
+
+        service.clear()
+        XCTAssertTrue(service.entries().isEmpty)
+    }
+
     func testTransactionNormalizerCleansNoiseAndBuildsFingerprint() {
         let normalizer = TransactionNormalizer()
         let row = ParsedRowDTO(
@@ -149,6 +214,142 @@ final class FinanceCategorizerTests: XCTestCase {
         XCTAssertTrue(ConfidenceScore(value: 0.95).shouldAutoAccept)
         XCTAssertTrue(ConfidenceScore(value: 0.81).shouldAutoAcceptButMarkSoft)
         XCTAssertTrue(ConfidenceScore(value: 0.40).shouldSendToReview)
+    }
+
+    func testCategoryDirectionPolicyRejectsExpenseCategoryForIncome() {
+        let original = CategorizationDecision(
+            categoryID: UUID(),
+            subcategoryID: nil,
+            source: .merchantMemory,
+            confidence: 0.98,
+            shouldQueueForReview: false,
+            isRecurringCandidate: false,
+            reason: "Learned merchant"
+        )
+
+        let result = CategoryDirectionPolicy().rejectingIncompatible(
+            original,
+            categoryIsIncome: false,
+            transactionKind: .income
+        )
+
+        XCTAssertNil(result.categoryID)
+        XCTAssertTrue(result.shouldQueueForReview)
+        XCTAssertEqual(result.source, .merchantMemory)
+    }
+
+    func testCategoryDirectionPolicyAllowsMatchingDirections() {
+        let policy = CategoryDirectionPolicy()
+        XCTAssertTrue(policy.isCompatible(categoryIsIncome: true, transactionKind: .income))
+        XCTAssertTrue(policy.isCompatible(categoryIsIncome: false, transactionKind: .expense))
+        XCTAssertFalse(policy.isCompatible(categoryIsIncome: false, transactionKind: .income))
+        XCTAssertFalse(policy.isCompatible(categoryIsIncome: true, transactionKind: .expense))
+    }
+
+    func testImportCommitPersistsTransactionsAndBatchTogether() throws {
+        let container = AppContainer(inMemory: true)
+        let batchID = UUID()
+        let transaction = Transaction(
+            importBatchID: batchID,
+            bookingDate: .now,
+            rawDescription: "TEST IMPORT",
+            cleanedDescription: "TEST IMPORT",
+            amount: Decimal(-12),
+            fingerprint: "atomic-import-test"
+        )
+
+        try container.importBatchRepository.commitImport(
+            transactions: [transaction],
+            id: batchID,
+            fileName: "test.csv",
+            sourceType: "csv",
+            rawRowCount: 1,
+            validRowCount: 1,
+            importedRowCount: 1,
+            duplicatesSkipped: 0,
+            pendingReviewCount: 1,
+            fileFingerprint: "file-test",
+            rowFingerprint: "row-test",
+            dateRangeText: nil
+        )
+
+        XCTAssertEqual(try container.transactionRepository.count(), 1)
+        XCTAssertEqual(try container.importBatchRepository.fetchRecentBatches(limit: 1).first?.id, batchID)
+    }
+
+    func testTransactionRepositoryFetchesStablePagesNewestFirst() throws {
+        let container = AppContainer(inMemory: true)
+        let baseDate = Date(timeIntervalSince1970: 1_700_000_000)
+        let transactions = (0..<205).map { index in
+            Transaction(
+                bookingDate: baseDate.addingTimeInterval(Double(index)),
+                rawDescription: "PAGE \(index)",
+                cleanedDescription: "PAGE \(index)",
+                amount: Decimal(-index - 1),
+                fingerprint: "page-\(index)"
+            )
+        }
+        try container.transactionRepository.insert(transactions)
+
+        let firstPage = try container.transactionRepository.fetchPage(offset: 0, limit: 200)
+        let secondPage = try container.transactionRepository.fetchPage(offset: 200, limit: 200)
+
+        XCTAssertEqual(firstPage.count, 200)
+        XCTAssertEqual(secondPage.count, 5)
+        XCTAssertEqual(firstPage.first?.rawDescription, "PAGE 204")
+        XCTAssertEqual(secondPage.last?.rawDescription, "PAGE 0")
+        XCTAssertTrue(Set(firstPage.map(\.id)).isDisjoint(with: secondPage.map(\.id)))
+    }
+
+    func testAccountsViewModelCreatesLiabilityAndCalculatesNetWorth() throws {
+        let container = AppContainer(inMemory: true)
+        try container.accountRepository.save(Account(
+            name: "Savings",
+            currentBalance: Decimal(5_000),
+            balanceAsOf: .now,
+            balanceSourceRaw: BalanceSource.manual.rawValue
+        ))
+        let viewModel = AccountsViewModel()
+        viewModel.name = "Credit card"
+        viewModel.institution = "Test Bank"
+        viewModel.currencyCode = "eur"
+        viewModel.balanceText = "1200,50"
+        viewModel.isLiability = true
+
+        viewModel.save(using: container, language: .spanish)
+
+        XCTAssertEqual(viewModel.accounts.count, 2)
+        XCTAssertEqual(viewModel.netWorth, Decimal(string: "3799.50"))
+        let liability = try XCTUnwrap(viewModel.accounts.first(where: { $0.name == "Credit card" }))
+        XCTAssertTrue(liability.isLiability)
+        XCTAssertEqual(liability.currencyCode, "EUR")
+        XCTAssertEqual(liability.balance, Decimal(string: "1200.50"))
+    }
+
+    func testImportAssociatesTransactionsAndBalanceWithAccount() async throws {
+        let container = AppContainer(inMemory: true)
+        var reportedProgress: [Double] = []
+        let csv = """
+        Fecha;Concepto;Importe;Saldo
+        01/08/2026;COMPRA TEST;-25,00;975,00
+        """
+
+        let summary = try await container.importOrchestrator.importCSV(
+            csv,
+            sourceFileName: "account-test.csv",
+            language: .spanish,
+            accountName: "Cuenta principal",
+            progress: { reportedProgress.append($0) }
+        )
+
+        XCTAssertEqual(reportedProgress.last, 1.0)
+        XCTAssertEqual(reportedProgress, reportedProgress.sorted())
+        XCTAssertTrue(reportedProgress.allSatisfy { (0...1).contains($0) })
+        XCTAssertEqual(summary.detectedAccounts, 1)
+        XCTAssertEqual(try container.transactionRepository.fetchAll().first?.accountName, "Cuenta principal")
+        let account = try XCTUnwrap(try container.accountRepository.fetchAll().first)
+        XCTAssertEqual(account.name, "Cuenta principal")
+        XCTAssertEqual(account.currentBalance, Decimal(975))
     }
 
     func testHeuristicsRecognizeMerchantsObservedInNumbersFiles() throws {

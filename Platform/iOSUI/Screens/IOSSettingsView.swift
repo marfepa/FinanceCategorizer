@@ -4,6 +4,8 @@ struct IOSSettingsView: View {
     @Environment(\.appContainer) private var appContainer
     @State private var viewModel = SettingsViewModel()
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.english
+    @AppStorage("isPrivacyModeEnabled") private var isPrivacyModeEnabled = false
+    @AppStorage("isAppLockEnabled") private var isAppLockEnabled = false
 
     var body: some View {
         Form {
@@ -45,6 +47,18 @@ struct IOSSettingsView: View {
                 LabeledContent(LocalizedStringKey("Review threshold")) {
                     Text(appLanguage.formatNumber(viewModel.reviewThreshold))
                 }
+            }
+
+            Section(LocalizedStringKey("Privacy")) {
+                Toggle(LocalizedStringKey("Enable privacy mode (hide amounts)"), isOn: $isPrivacyModeEnabled)
+                Toggle(LocalizedStringKey("Require authentication to open the app"), isOn: $isAppLockEnabled)
+                Text(LocalizedStringKey("When app lock is enabled, authentication is required after the app leaves the foreground."))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section(LocalizedStringKey("Export history")) {
+                ExportAuditHistoryView(language: appLanguage)
             }
         }
         .navigationTitle(LocalizedStringKey("Settings"))

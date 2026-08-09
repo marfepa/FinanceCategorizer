@@ -1,8 +1,12 @@
 import SwiftUI
 
 struct MacAppRootView: View {
+    @Environment(\.appContainer) private var appContainer
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.english
     @AppStorage("isPrivacyModeEnabled") private var isPrivacyModeEnabled = false
+    @AppStorage("isAppLockEnabled") private var isAppLockEnabled = false
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var appLock = AppLockViewModel()
     @State private var selectedSection: MacSection? = .dashboard
     @State private var isShowingAppleAISheet = false
 
@@ -12,7 +16,13 @@ struct MacAppRootView: View {
     @State private var planningTab: MacPlanningTab = .budgets
 
     var body: some View {
-        NavigationSplitView {
+        ZStack {
+        VStack(spacing: 0) {
+            if let issue = appContainer.persistenceRecoveryIssue {
+                PersistenceRecoveryBanner(issue: issue)
+            }
+
+            NavigationSplitView {
             List(MacSection.allCases, selection: $selectedSection) { section in
                 Label(section.title, systemImage: section.systemImage)
                     .tag(section)
@@ -53,6 +63,13 @@ struct MacAppRootView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+            if isAppLockEnabled && appLock.isLocked {
+                AppLockView(viewModel: appLock, language: appLanguage)
+                    .transition(.opacity)
+                    .zIndex(10)
+            }
         }
         .navigationSplitViewStyle(.balanced)
         .toolbar {
@@ -75,6 +92,19 @@ struct MacAppRootView: View {
                 selectedSection = .dashboard
             }
         }
+        .task(id: isAppLockEnabled) {
+            await appLock.configure(isEnabled: isAppLockEnabled, reason: appLanguage.localized("appLock.reason"))
+        }
+        .onChange(of: scenePhase) { _, phase in
+            switch phase {
+            case .inactive, .background:
+                appLock.lockIfEnabled(isAppLockEnabled)
+            case .active:
+                Task { await appLock.authenticate(reason: appLanguage.localized("appLock.reason")) }
+            @unknown default:
+                break
+            }
+        }
     }
 
     private func aiSurface(for section: MacSection) -> AppleAISurface {
@@ -82,7 +112,10 @@ struct MacAppRootView: View {
         case .dashboard:
             return dashboardTab == .overview ? .dashboard : .analysis
         case .activity:
-            return activityTab == .transactions ? .transactions : .imports
+            switch activityTab {
+            case .transactions, .accounts: return .transactions
+            case .imports: return .imports
+            }
         case .reviewAndAudit:
             switch reviewTab {
             case .reviewQueue: return .review
