@@ -4,6 +4,7 @@ struct MacSettingsView: View {
     @Environment(\.appContainer) private var appContainer
     @State private var viewModel = SettingsViewModel()
     @AppStorage("isPrivacyModeEnabled") private var isPrivacyModeEnabled = false
+    @AppStorage("isAppLockEnabled") private var isAppLockEnabled = false
     @AppStorage("payrollCutoffDay") private var payrollCutoffDay = 25
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.english
 
@@ -62,9 +63,17 @@ struct MacSettingsView: View {
 
             Section(LocalizedStringKey("Privacy")) {
                 Toggle(LocalizedStringKey("Enable privacy mode (hide amounts)"), isOn: $isPrivacyModeEnabled)
+                Toggle(LocalizedStringKey("Require authentication to open the app"), isOn: $isAppLockEnabled)
                 Text(LocalizedStringKey("When enabled, all monetary amounts are masked with asterisks across the entire app."))
                     .font(.footnote)
                     .foregroundStyle(.secondary)
+                Text(LocalizedStringKey("When app lock is enabled, authentication is required after the app leaves the foreground."))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section(LocalizedStringKey("Export history")) {
+                ExportAuditHistoryView(language: appLanguage)
             }
 
             Section(LocalizedStringKey("Payroll")) {
