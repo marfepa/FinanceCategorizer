@@ -2,6 +2,7 @@ import SwiftUI
 
 enum MacActivityTab: String, CaseIterable, Identifiable {
     case transactions
+    case accounts
     case imports
 
     var id: String { rawValue }
@@ -9,6 +10,7 @@ enum MacActivityTab: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .transactions: return AppLanguage.currentSelection.localized("Transactions")
+        case .accounts: return AppLanguage.currentSelection.localized("Accounts")
         case .imports: return AppLanguage.currentSelection.localized("Import")
         }
     }
@@ -33,6 +35,8 @@ struct MacActivityView: View {
             switch selectedTab {
             case .transactions:
                 MacTransactionsView()
+            case .accounts:
+                AccountsView()
             case .imports:
                 MacImportsView(openTransactions: { selectedTab = .transactions })
             }

@@ -50,12 +50,16 @@ final class TransactionsViewModel {
     private(set) var filteredIncome: Decimal = 0
     private(set) var filteredExpense: Decimal = 0
     private(set) var filteredCount: Int = 0
+    private(set) var totalTransactionCount: Int = 0
+    private(set) var hasMoreTransactions = false
+    private(set) var isLoadingMore = false
 
     var filteredTransactions: [Transaction] {
         sortedTransactions
     }
 
     private var filterTask: Task<Void, Never>?
+    private let pageSize = 200
 
     func recomputeFilteredResults(debounce: Bool = false) {
         filterTask?.cancel()
@@ -130,9 +134,13 @@ final class TransactionsViewModel {
 
     func load(using container: AppContainer) {
         do {
-            transactions = try container.transactionRepository.fetchAll()
+            totalTransactionCount = try container.transactionRepository.count()
+            transactions = try container.transactionRepository.fetchPage(offset: 0, limit: pageSize)
+            hasMoreTransactions = transactions.count < totalTransactionCount
             categories = try container.categoryRepository.fetchAll()
-            duplicateGroups = pendingDuplicateGroups(from: transactions)
+            duplicateGroups = pendingDuplicateGroups(
+                from: try container.transactionRepository.fetchPendingDuplicateReview()
+            )
             if selectedTransaction == nil {
                 selectedTransaction = transactions.first
             } else if let selectedTransaction,
@@ -146,6 +154,39 @@ final class TransactionsViewModel {
                 batchRecategorizationKind = selectedKind
             }
             recategorizationSummary = nil
+            errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func loadMore(using container: AppContainer) {
+        guard hasMoreTransactions, !isLoadingMore else { return }
+        isLoadingMore = true
+        defer { isLoadingMore = false }
+
+        do {
+            let nextPage = try container.transactionRepository.fetchPage(
+                offset: transactions.count,
+                limit: pageSize
+            )
+            let knownIDs = Set(transactions.map(\.id))
+            transactions.append(contentsOf: nextPage.filter { !knownIDs.contains($0.id) })
+            hasMoreTransactions = transactions.count < totalTransactionCount && !nextPage.isEmpty
+            errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func ensureCompleteHistoryLoaded(using container: AppContainer) {
+        guard hasMoreTransactions, !isLoadingMore else { return }
+        isLoadingMore = true
+        defer { isLoadingMore = false }
+
+        do {
+            transactions = try container.transactionRepository.fetchAll()
+            hasMoreTransactions = false
             errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
