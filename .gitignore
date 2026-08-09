@@ -2,6 +2,7 @@
 FinanceCategorizer.xcodeproj/
 DerivedData/
 .derived-data/
+.derived-data.nosync/
 build/
 *.xcuserstate
 *.xcuserdata/

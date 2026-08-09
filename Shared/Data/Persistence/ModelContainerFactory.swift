@@ -1,15 +1,34 @@
 import Foundation
 import SwiftData
 
+struct PersistenceRecoveryIssue: Identifiable {
+    let id = UUID()
+    let storeURL: URL
+    let backupDirectory: URL?
+    let underlyingError: String
+}
+
+struct ModelContainerSetup {
+    let container: ModelContainer
+    let recoveryIssue: PersistenceRecoveryIssue?
+}
+
 enum ModelContainerFactory {
     @MainActor
-    static func make(inMemory: Bool = false) -> ModelContainer {
-        let schema = Schema(FinanceSchema.models)
+    static func make(inMemory: Bool = false) -> ModelContainerSetup {
+        let schema = FinanceSchema.schema
         let memoryConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
 
         if inMemory {
             do {
-                return try ModelContainer(for: schema, configurations: [memoryConfiguration])
+                return ModelContainerSetup(
+                    container: try ModelContainer(
+                        for: schema,
+                        migrationPlan: FinanceMigrationPlan.self,
+                        configurations: [memoryConfiguration]
+                    ),
+                    recoveryIssue: nil
+                )
             } catch {
                 fatalError("Failed to create in-memory ModelContainer: \(error)")
             }
@@ -19,19 +38,42 @@ enum ModelContainerFactory {
         let persistentConfiguration = ModelConfiguration(schema: schema, url: storeURL)
 
         do {
-            return try ModelContainer(for: schema, configurations: [persistentConfiguration])
+            return ModelContainerSetup(
+                container: try ModelContainer(
+                    for: schema,
+                    migrationPlan: FinanceMigrationPlan.self,
+                    configurations: [persistentConfiguration]
+                ),
+                recoveryIssue: nil
+            )
         } catch {
-            NSLog("FinanceCategorizer: failed to open persistent SwiftData store at %@. Preserving store files and stopping instead of hiding the failure behind an empty store. Error: %@", storeURL.path, String(describing: error))
+            NSLog("FinanceCategorizer: failed to open persistent SwiftData store at %@. Preserving store files and entering visible recovery mode. Error: %@", storeURL.path, String(describing: error))
 
+            let backupDirectory: URL?
             do {
-                try backupPersistentStoreFiles(at: storeURL)
+                backupDirectory = try backupPersistentStoreFiles(at: storeURL)
             } catch {
                 NSLog("FinanceCategorizer: failed to create recovery backup for persistent SwiftData store. Error: %@", String(describing: error))
+                backupDirectory = nil
             }
 
-            // Never hide a persistence/migration failure behind an empty
-            // in-memory store: that makes the user's data appear deleted.
-            fatalError("Failed to open persistent FinanceCategorizer store at \(storeURL.path). A recovery backup was preserved.")
+            do {
+                let recoveryContainer = try ModelContainer(
+                    for: schema,
+                    migrationPlan: FinanceMigrationPlan.self,
+                    configurations: [memoryConfiguration]
+                )
+                return ModelContainerSetup(
+                    container: recoveryContainer,
+                    recoveryIssue: PersistenceRecoveryIssue(
+                        storeURL: storeURL,
+                        backupDirectory: backupDirectory,
+                        underlyingError: error.localizedDescription
+                    )
+                )
+            } catch {
+                fatalError("Failed to create recovery ModelContainer: \(error)")
+            }
         }
     }
 
@@ -47,7 +89,7 @@ enum ModelContainerFactory {
         return baseDirectory.appendingPathComponent("FinanceCategorizer.store")
     }
 
-    private static func backupPersistentStoreFiles(at storeURL: URL) throws {
+    private static func backupPersistentStoreFiles(at storeURL: URL) throws -> URL {
         let fileManager = FileManager.default
         let sidecarExtensions = ["", "-shm", "-wal"]
         let backupDirectory = storeURL
@@ -62,6 +104,7 @@ enum ModelContainerFactory {
                 try fileManager.copyItem(at: url, to: backupDirectory.appendingPathComponent(url.lastPathComponent))
             }
         }
+        return backupDirectory
     }
 
     private static func recoveryBackupName(date: Date = Date()) -> String {

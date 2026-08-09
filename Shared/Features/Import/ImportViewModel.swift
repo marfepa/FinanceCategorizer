@@ -6,6 +6,7 @@ import Observation
 final class ImportViewModel {
     var csvText = ""
     var sourceFileName = "bank-export.csv"
+    var accountName = ""
     var selectedFileURL: URL?
     var lastImportedFileName: String?
     var importedRows = 0
@@ -21,6 +22,7 @@ final class ImportViewModel {
     var currentPreview: ImportPreviewResult?
     var manualMapping: ImportColumnMapping?
     var duplicateInfo: ImportDuplicateInfo?
+    private var activeImportTask: Task<ImportSummary, Error>?
 
     func preview(using container: AppContainer, language: AppLanguage = .currentSelection) {
         guard selectedFileURL != nil || !csvText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
@@ -46,23 +48,47 @@ final class ImportViewModel {
     }
 
     func importTransactions(using container: AppContainer, language: AppLanguage) async {
+        guard !isImporting else { return }
         isImporting = true
-        importProgress = 0.1
+        importProgress = 0.02
         defer { 
             isImporting = false 
             importProgress = 0.0
         }
         do {
-            let summary: ImportSummary
             let preview = try ensuredPreview(using: container)
             if let duplicateInfo = preview.duplicateInfo {
                 throw DuplicateImportError.alreadyImported(duplicateInfo)
             }
-            if let selectedFileURL {
-                summary = try await container.importOrchestrator.importFile(at: selectedFileURL, language: language, preview: preview)
-            } else {
-                summary = try await container.importOrchestrator.importCSV(csvText, sourceFileName: sourceFileName, language: language, preview: preview)
+            let selectedFileURL = selectedFileURL
+            let csvText = csvText
+            let sourceFileName = sourceFileName
+            let accountName = normalizedAccountName
+            let task = Task { @MainActor [weak self] in
+                let progress: @MainActor @Sendable (Double) -> Void = { value in
+                    self?.importProgress = value
+                }
+                if let selectedFileURL {
+                    return try await container.importOrchestrator.importFile(
+                        at: selectedFileURL,
+                        language: language,
+                        preview: preview,
+                        accountName: accountName,
+                        progress: progress
+                    )
+                }
+                return try await container.importOrchestrator.importCSV(
+                    csvText,
+                    sourceFileName: sourceFileName,
+                    language: language,
+                    preview: preview,
+                    accountName: accountName,
+                    progress: progress
+                )
             }
+            activeImportTask = task
+            let summary = try await task.value
+            activeImportTask = nil
             importedRows = summary.importedCount
             lastImportedFileName = summary.sourceFileName
             self.summary = summary
@@ -73,11 +99,21 @@ final class ImportViewModel {
             )
             errorMessage = nil
             NotificationCenter.default.post(name: AppContainer.importDidFinishNotification, object: nil)
+        } catch is CancellationError {
+            activeImportTask = nil
+            statusMessage = language.localized("import.status.cancelled")
+            errorMessage = nil
+            summary = nil
         } catch {
+            activeImportTask = nil
             statusMessage = nil
             errorMessage = error.localizedDescription
             summary = nil
         }
+    }
+
+    func cancelImport() {
+        activeImportTask?.cancel()
     }
 
     func loadFile(from url: URL, using container: AppContainer, language: AppLanguage) {
@@ -129,6 +165,11 @@ final class ImportViewModel {
         }
 
         return try container.importOrchestrator.previewCSV(csvText, overrideMapping: manualMapping)
+    }
+
+    private var normalizedAccountName: String? {
+        let trimmed = accountName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 
     private func apply(_ preview: ImportPreviewResult, language: AppLanguage) {

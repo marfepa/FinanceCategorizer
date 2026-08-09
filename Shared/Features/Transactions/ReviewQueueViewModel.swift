@@ -32,6 +32,7 @@ enum ReviewListFilter: String, CaseIterable, Identifiable {
 @MainActor
 @Observable
 final class ReviewQueueViewModel {
+    private let directionPolicy = CategoryDirectionPolicy()
     var pendingCount = 0
     var transactions: [Transaction] = [] {
         didSet { recomputeCaches() }
@@ -59,6 +60,12 @@ final class ReviewQueueViewModel {
 
     private(set) var filteredList: [Transaction] = []
     private(set) var similarTransactions: [Transaction] = []
+
+    var compatibleCategories: [Category] {
+        categories.filter {
+            directionPolicy.isCompatible(categoryIsIncome: $0.isIncome, transactionKind: selectedKind)
+        }
+    }
 
     private var filterTask: Task<Void, Never>?
     private var similarTask: Task<Void, Never>?
@@ -428,6 +435,14 @@ final class ReviewQueueViewModel {
     private func applyDecision(for transaction: Transaction, categoryID: UUID, using container: AppContainer) {
         let language = AppLanguage.currentSelection
         do {
+            guard let category = try container.categoryRepository.fetch(categoryID: categoryID),
+                  directionPolicy.isCompatible(
+                    categoryIsIncome: category.isIncome,
+                    transactionKind: transaction.resolvedKind
+                  ) else {
+                errorMessage = language.localized("review.error.incompatibleCategory")
+                return
+            }
             try container.correctionLearningService.applyCorrection(
                 for: transaction,
                 categoryID: categoryID,

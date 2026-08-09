@@ -11,6 +11,7 @@ final class AppContainer {
     static let importDidFinishNotification = Notification.Name("FinanceCategorizerImportDidFinish")
 
     let modelContainer: ModelContainer
+    let persistenceRecoveryIssue: PersistenceRecoveryIssue?
 
     let transactionRepository: TransactionRepository
     let categoryRepository: CategoryRepository
@@ -42,7 +43,9 @@ final class AppContainer {
     let financialPlanningService: FinancialPlanningService
 
     init(inMemory: Bool = false) {
-        modelContainer = ModelContainerFactory.make(inMemory: inMemory)
+        let persistenceSetup = ModelContainerFactory.make(inMemory: inMemory)
+        modelContainer = persistenceSetup.container
+        persistenceRecoveryIssue = persistenceSetup.recoveryIssue
 
         transactionRepository = TransactionRepository(modelContainer: modelContainer)
         categoryRepository = CategoryRepository(modelContainer: modelContainer)
@@ -94,6 +97,7 @@ final class AppContainer {
         let merchantLearningStore = MerchantLearningStore(merchantRepository: merchantRepository)
         let correctionLearningService = CorrectionLearningService(
             correctionRepository: correctionRepository,
+            categoryRepository: categoryRepository,
             merchantLearningStore: merchantLearningStore,
             ruleRepository: ruleRepository,
             transactionRepository: transactionRepository,

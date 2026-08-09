@@ -75,7 +75,7 @@ struct FloatingGlassSegmentedBar<Option: Hashable & Identifiable>: View {
 
                         Text(title(option))
                             .font(.system(size: 14, weight: isSelected ? .semibold : .medium, design: .rounded))
-                            .foregroundStyle(isSelected ? Color.primary.opacity(0.98) : Color.primary.opacity(0.74))
+                            .foregroundStyle(isSelected ? Color.primary : Color.secondary)
                             .lineLimit(1)
                             .minimumScaleFactor(0.92)
                             .allowsTightening(false)
@@ -160,8 +160,8 @@ private struct SelectedSegmentCapsule: View {
                             .fill(
                                 LinearGradient(
                                     colors: [
-                                        Color.white.opacity(0.30),
-                                        Color.white.opacity(0.12),
+                                    Color.primary.opacity(0.12),
+                                    Color.primary.opacity(0.05),
                                         Color.clear
                                     ],
                                     startPoint: .top,
@@ -178,9 +178,9 @@ private struct SelectedSegmentCapsule: View {
                             .strokeBorder(
                                 LinearGradient(
                                     colors: [
-                                        .white.opacity(0.48),
-                                        .white.opacity(0.18),
-                                        .white.opacity(0.36)
+                                    Color.primary.opacity(0.30),
+                                    Color.primary.opacity(0.10),
+                                    Color.primary.opacity(0.20)
                                     ],
                                     startPoint: .topLeading,
                                     endPoint: .bottomTrailing
@@ -188,7 +188,7 @@ private struct SelectedSegmentCapsule: View {
                                 lineWidth: 0.95
                             )
                     }
-                    .shadow(color: .white.opacity(0.11), radius: 4, x: 0, y: -1)
+                    .shadow(color: Color.primary.opacity(0.05), radius: 4, x: 0, y: -1)
                     .shadow(color: .black.opacity(0.12), radius: 12, x: 0, y: 6)
             } else {
                 Capsule(style: .continuous)

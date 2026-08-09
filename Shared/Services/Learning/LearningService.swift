@@ -30,6 +30,7 @@ final class RuleSuggestionEngine {
 @MainActor
 final class CorrectionLearningService {
     private let correctionRepository: CorrectionRepository
+    private let categoryRepository: CategoryRepository
     private let merchantLearningStore: MerchantLearningStore
     private let ruleRepository: RuleRepository
     private let transactionRepository: TransactionRepository
@@ -38,6 +39,7 @@ final class CorrectionLearningService {
 
     init(
         correctionRepository: CorrectionRepository,
+        categoryRepository: CategoryRepository,
         merchantLearningStore: MerchantLearningStore,
         ruleRepository: RuleRepository,
         transactionRepository: TransactionRepository,
@@ -45,6 +47,7 @@ final class CorrectionLearningService {
         localModelManager: LocalModelManager
     ) {
         self.correctionRepository = correctionRepository
+        self.categoryRepository = categoryRepository
         self.merchantLearningStore = merchantLearningStore
         self.ruleRepository = ruleRepository
         self.transactionRepository = transactionRepository
@@ -59,6 +62,14 @@ final class CorrectionLearningService {
         subcategoryID: UUID? = nil,
         applyToFuture: Bool = true
     ) throws -> Int {
+        guard let category = try categoryRepository.fetch(categoryID: categoryID),
+              CategoryDirectionPolicy().isCompatible(
+                categoryIsIncome: category.isIncome,
+                transactionKind: transaction.resolvedKind
+              ) else {
+            throw CategoryDirectionError.incompatibleCategory
+        }
+
         let correction = UserCorrection(
             transactionID: transaction.id,
             previousCategoryID: transaction.categoryID,

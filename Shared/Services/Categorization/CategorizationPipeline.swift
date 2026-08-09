@@ -11,6 +11,7 @@ final class CategorizationOrchestrator: CategorizationOrchestrating {
     private let classifier: StatisticalClassifier
     private let foundationResolver: FoundationModelsResolver?
     private let confidenceScorer: ConfidenceScorer
+    private let directionPolicy = CategoryDirectionPolicy()
 
     init(
         categoryRepository: CategoryRepository,
@@ -43,15 +44,15 @@ final class CategorizationOrchestrator: CategorizationOrchestrating {
         }
 
         if let ruleMatch = ruleEngine.match(input) {
-            return confidenceScorer.finalize(ruleMatch)
+            return finalize(ruleMatch, for: input)
         }
 
         if let merchantMatch = merchantMemory.match(input) {
-            return confidenceScorer.finalize(merchantMatch)
+            return finalize(merchantMatch, for: input)
         }
 
         if let mlMatch = classifier.predict(input) {
-            let finalized = confidenceScorer.finalize(mlMatch)
+            let finalized = finalize(mlMatch, for: input)
             if !finalized.shouldQueueForReview || finalized.confidence >= AppConfig.softAutoCategorizationThreshold {
                 return finalized
             }
@@ -59,7 +60,7 @@ final class CategorizationOrchestrator: CategorizationOrchestrating {
 
         if let foundationResolver {
             let aiMatch = await foundationResolver.resolve(input)
-            return confidenceScorer.finalize(aiMatch)
+            return finalize(aiMatch, for: input)
         }
 
         return CategorizationDecision(
@@ -79,15 +80,15 @@ final class CategorizationOrchestrator: CategorizationOrchestrating {
     /// inconsistent with the current transaction text.
     func recommendRecategorization(_ input: NormalizedTransactionDTO) async -> CategorizationDecision {
         if let ruleMatch = ruleEngine.match(input) {
-            return confidenceScorer.finalize(ruleMatch)
+            return finalize(ruleMatch, for: input)
         }
 
         if let mlMatch = classifier.predict(input) {
-            return confidenceScorer.finalize(mlMatch)
+            return finalize(mlMatch, for: input)
         }
 
         if let merchantMatch = merchantMemory.match(input) {
-            return confidenceScorer.finalize(merchantMatch)
+            return finalize(merchantMatch, for: input)
         }
 
         return CategorizationDecision(
@@ -98,6 +99,22 @@ final class CategorizationOrchestrator: CategorizationOrchestrating {
             shouldQueueForReview: true,
             isRecurringCandidate: false,
             reason: "No reliable recategorization signal."
+        )
+    }
+
+    private func finalize(
+        _ decision: CategorizationDecision,
+        for input: NormalizedTransactionDTO
+    ) -> CategorizationDecision {
+        let scored = confidenceScorer.finalize(decision)
+        guard let categoryID = scored.categoryID,
+              let category = try? categoryRepository.fetch(categoryID: categoryID) else {
+            return scored
+        }
+        return directionPolicy.rejectingIncompatible(
+            scored,
+            categoryIsIncome: category.isIncome,
+            transactionKind: input.resolvedKind
         )
     }
 }

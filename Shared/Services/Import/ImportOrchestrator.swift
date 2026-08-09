@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 protocol ImportOrchestrating {
     func importFile(from url: URL, language: AppLanguage) async throws -> ImportSummary
@@ -103,16 +104,29 @@ final class ImportOrchestrator: ImportOrchestrating {
     }
 
     @discardableResult
-    func importCSV(_ text: String, sourceFileName: String, language: AppLanguage, preview: ImportPreviewResult? = nil) async throws -> ImportSummary {
+    func importCSV(
+        _ text: String,
+        sourceFileName: String,
+        language: AppLanguage,
+        preview: ImportPreviewResult? = nil,
+        accountName: String? = nil,
+        progress: @MainActor @Sendable (Double) -> Void = { _ in }
+    ) async throws -> ImportSummary {
         let resolvedPreview = if let preview { preview } else { try previewCSV(text) }
-        return try await importPreview(resolvedPreview, sourceFileName: sourceFileName, sourceType: "csv", fileFingerprint: nil, language: language)
+        return try await importPreview(resolvedPreview, sourceFileName: sourceFileName, sourceType: "csv", fileFingerprint: nil, accountName: accountName, language: language, progress: progress)
     }
 
     @discardableResult
-    func importFile(at url: URL, language: AppLanguage, preview: ImportPreviewResult? = nil) async throws -> ImportSummary {
+    func importFile(
+        at url: URL,
+        language: AppLanguage,
+        preview: ImportPreviewResult? = nil,
+        accountName: String? = nil,
+        progress: @MainActor @Sendable (Double) -> Void = { _ in }
+    ) async throws -> ImportSummary {
         let resolvedPreview = if let preview { preview } else { try self.previewFile(at: url) }
         let fileFingerprint = try fileImportService.fingerprint(for: fileImportService.readData(from: url))
-        return try await importPreview(resolvedPreview, sourceFileName: url.lastPathComponent, sourceType: "file", fileFingerprint: fileFingerprint, language: language)
+        return try await importPreview(resolvedPreview, sourceFileName: url.lastPathComponent, sourceType: "file", fileFingerprint: fileFingerprint, accountName: accountName, language: language, progress: progress)
     }
 
     private func importPreview(
@@ -120,13 +134,16 @@ final class ImportOrchestrator: ImportOrchestrating {
         sourceFileName: String,
         sourceType: String,
         fileFingerprint: String?,
-        language: AppLanguage
+        accountName: String? = nil,
+        language: AppLanguage,
+        progress: @MainActor @Sendable (Double) -> Void = { _ in }
     ) async throws -> ImportSummary {
         try validationService.validateForImport(preview)
         if let duplicateInfo = preview.duplicateInfo {
             throw DuplicateImportError.alreadyImported(duplicateInfo)
         }
-        return try await importRows(preview, sourceFileName: sourceFileName, sourceType: sourceType, fileFingerprint: fileFingerprint, language: language)
+        progress(0.08)
+        return try await importRows(preview, sourceFileName: sourceFileName, sourceType: sourceType, fileFingerprint: fileFingerprint, accountName: accountName, language: language, progress: progress)
     }
 
     private func importRows(
@@ -134,8 +151,11 @@ final class ImportOrchestrator: ImportOrchestrating {
         sourceFileName: String,
         sourceType: String,
         fileFingerprint: String?,
-        language: AppLanguage
+        accountName: String?,
+        language: AppLanguage,
+        progress: @MainActor @Sendable (Double) -> Void
     ) async throws -> ImportSummary {
+        try Task.checkCancellation()
         try categoryRepository.ensureBaseCategories()
         let localizedSourceType = language.localized(sourceType == "csv" ? "import.source.csv" : "import.source.file")
         var importedCount = 0
@@ -160,7 +180,8 @@ final class ImportOrchestrator: ImportOrchestrating {
         var normalizedRows: [NormalizedTransactionDTO] = []
         var candidatesForImport: [DuplicateMovementCandidate] = []
 
-        for row in preview.rows {
+        for (index, row) in preview.rows.enumerated() {
+            try Task.checkCancellation()
             let parsed = ParsedRowDTO(
                 externalID: nil,
                 bookingDate: row.bookingDate,
@@ -169,13 +190,17 @@ final class ImportOrchestrator: ImportOrchestrating {
                 amount: row.amount,
                 balance: row.balance,
                 currencyCode: row.currencyCode ?? AppConfig.defaultCurrencyCode,
-                accountName: nil
+                accountName: accountName
             )
             let normalized = normalizer.normalize(parsed)
             normalizedRows.append(normalized)
             candidatesForImport.append(
                 DuplicateMovementCandidate(normalized: normalized, importBatchID: importBatchID)
             )
+            if index.isMultiple(of: 50) {
+                progress(0.08 + (Double(index + 1) / Double(max(preview.rows.count, 1))) * 0.17)
+                await Task.yield()
+            }
         }
 
         let duplicateMatches = duplicateMovementDetector.findMatches(
@@ -184,6 +209,7 @@ final class ImportOrchestrator: ImportOrchestrating {
         )
 
         for index in preview.rows.indices {
+            try Task.checkCancellation()
             let candidate = candidatesForImport[index]
             if duplicateMatches[candidate.id] != nil {
                 duplicatesSkipped += 1
@@ -227,11 +253,11 @@ final class ImportOrchestrator: ImportOrchestrating {
             if decision.shouldQueueForReview {
                 pendingReviewCount += 1
             }
+            if index.isMultiple(of: 25) || index == preview.rows.indices.last {
+                progress(0.25 + (Double(index + 1) / Double(max(preview.rows.count, 1))) * 0.65)
+                await Task.yield()
+            }
         }
-
-        try transactionRepository.insert(importedTransactions)
-        try localModelManager.rebuildModelIfNeeded()
-        try await insightEngine.refreshInsights(language: language)
 
         let formatter = DateIntervalFormatter()
         formatter.locale = language.locale
@@ -244,7 +270,10 @@ final class ImportOrchestrator: ImportOrchestrating {
             dateRangeText = language.localized("No date range")
         }
 
-        try importBatchRepository.saveBatch(
+        try Task.checkCancellation()
+        progress(0.93)
+        try importBatchRepository.commitImport(
+            transactions: importedTransactions,
             id: importBatchID,
             fileName: sourceFileName,
             sourceType: sourceType,
@@ -257,6 +286,19 @@ final class ImportOrchestrator: ImportOrchestrating {
             rowFingerprint: rowFingerprint(for: preview),
             dateRangeText: dateRangeText
         )
+        progress(0.97)
+
+        // Derived data must never turn a successful financial-data commit into
+        // a reported import failure. It can be rebuilt safely on the next run.
+        do {
+            try localModelManager.rebuildModelIfNeeded()
+            try await insightEngine.refreshInsights(language: language)
+        } catch {
+            Logger(subsystem: "com.mariofernandez.FinanceCategorizer", category: "Import")
+                .error("Post-import refresh failed: \(error.localizedDescription, privacy: .public)")
+        }
+
+        progress(1.0)
 
         return ImportSummary(
             sourceFileName: sourceFileName,
@@ -268,7 +310,7 @@ final class ImportOrchestrator: ImportOrchestrating {
             autoCategorizedCount: autoCategorizedCount,
             duplicatesSkipped: duplicatesSkipped,
             pendingReviewCount: pendingReviewCount,
-            detectedAccounts: 1,
+            detectedAccounts: Set(importedTransactions.compactMap(\.accountName)).count,
             dateRangeText: dateRangeText
         )
     }

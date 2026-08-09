@@ -154,6 +154,7 @@ struct MacCategoriesView: View {
                                 transactionsViewModel.select(transaction)
                             }
                         )
+                        .frame(minWidth: 420, maxWidth: .infinity)
 
                         TransactionInspectorView(
                             transaction: transactionsViewModel.selectedTransaction,
@@ -197,9 +198,10 @@ struct MacCategoriesView: View {
                                 }
                             }
                         )
-                        .frame(minWidth: 260, idealWidth: 320)
+                        .frame(minWidth: 280, idealWidth: 320, maxWidth: 360)
                     }
-                    .frame(minHeight: 620)
+                    .frame(maxWidth: .infinity, minHeight: 420, maxHeight: .infinity)
+                    .layoutPriority(1)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .topLeading)

@@ -199,7 +199,7 @@ struct MacReviewQueueView: View {
                 }
 
                 HStack {
-                    Text(transaction.bookingDate.formatted(date: .abbreviated, time: .omitted))
+                    Text(appLanguage.format(date: transaction.bookingDate, dateStyle: .medium))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Spacer()
@@ -249,7 +249,7 @@ struct MacReviewQueueView: View {
     private func primaryInfo(for transaction: Transaction) -> some View {
         VStack(alignment: .leading, spacing: AppLayoutMetrics.contentGap) {
             infoBlock(LocalizedStringKey("Concept"), transaction.rawDescription)
-            infoBlock(LocalizedStringKey("Date"), transaction.bookingDate.formatted(date: .complete, time: .omitted))
+            infoBlock(LocalizedStringKey("Date"), appLanguage.format(date: transaction.bookingDate, dateStyle: .full))
             infoBlock(LocalizedStringKey("Amount"), transaction.amount.privacyFormatted(hidden: isPrivacyModeEnabled, currencyCode: transaction.currencyCode))
             infoBlock(LocalizedStringKey("Current Category"), categoryName(for: transaction.categoryID))
             if transaction.hasRecategorizationSuggestion {
@@ -295,7 +295,7 @@ struct MacReviewQueueView: View {
                 set: { viewModel.selectedCategoryID = $0 }
             )) {
                 Text(LocalizedStringKey("Keep suggestion")).tag(Optional<UUID>.none)
-                ForEach(viewModel.categories, id: \.id) { category in
+                ForEach(viewModel.compatibleCategories, id: \.id) { category in
                     Text(category.name).tag(Optional(category.id))
                 }
             }
