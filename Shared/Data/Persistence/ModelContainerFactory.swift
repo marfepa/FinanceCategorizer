@@ -15,7 +15,7 @@ struct ModelContainerSetup {
 
 enum ModelContainerFactory {
     @MainActor
-    static func make(inMemory: Bool = false) -> ModelContainerSetup {
+    static func make(inMemory: Bool = false, customStoreURL: URL? = nil) -> ModelContainerSetup {
         let schema = FinanceSchema.schema
         let memoryConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
 
@@ -34,7 +34,7 @@ enum ModelContainerFactory {
             }
         }
 
-        let storeURL = persistentStoreURL()
+        let storeURL = customStoreURL ?? persistentStoreURL()
         let persistentConfiguration = ModelConfiguration(schema: schema, url: storeURL)
 
         do {
