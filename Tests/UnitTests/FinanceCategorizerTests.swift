@@ -42,6 +42,49 @@ final class FinanceCategorizerTests: XCTestCase {
         XCTAssertTrue(FinanceMigrationPlan.stages.isEmpty)
     }
 
+    func testModelContainerFactoryOpensHealthyPersistentStoreSuccessfully() throws {
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let storeURL = tempDir.appendingPathComponent("FinanceCategorizerTest.store")
+        let setup = ModelContainerFactory.make(inMemory: false, customStoreURL: storeURL)
+
+        XCTAssertNil(setup.recoveryIssue)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: storeURL.path))
+    }
+
+    func testModelContainerFactoryCreatesBackupAndRecoverySetupOnStoreFailure() throws {
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let storeURL = tempDir.appendingPathComponent("CorruptStore.store")
+        let corruptData = "INVALID_SQLITE_DATABASE_HEADER".data(using: .utf8)!
+        try corruptData.write(to: storeURL)
+
+        let shmURL = URL(fileURLWithPath: storeURL.path + "-shm")
+        let walURL = URL(fileURLWithPath: storeURL.path + "-wal")
+        try corruptData.write(to: shmURL)
+        try corruptData.write(to: walURL)
+
+        let setup = ModelContainerFactory.make(inMemory: false, customStoreURL: storeURL)
+
+        let issue = try XCTUnwrap(setup.recoveryIssue)
+        XCTAssertEqual(issue.storeURL, storeURL)
+
+        let backupDir = try XCTUnwrap(issue.backupDirectory)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: backupDir.path))
+
+        let backedUpStore = backupDir.appendingPathComponent(storeURL.lastPathComponent)
+        let backedUpShm = backupDir.appendingPathComponent(shmURL.lastPathComponent)
+        let backedUpWal = backupDir.appendingPathComponent(walURL.lastPathComponent)
+
+        XCTAssertTrue(FileManager.default.fileExists(atPath: backedUpStore.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: backedUpShm.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: backedUpWal.path))
+    }
+
     func testDashboardSnapshotSurfacesMonthlyProgressAndCategoryGrowth() throws {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!
