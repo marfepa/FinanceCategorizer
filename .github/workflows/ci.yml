@@ -30,4 +30,7 @@ jobs:
         run: xcodebuild -project FinanceCategorizer.xcodeproj -scheme FinanceCategorizerIOS -destination 'platform=iOS Simulator,name=iPhone 17' test -only-testing:FinanceCategorizerTests/FinanceCategorizerTests/testLocalizedStringFilesHaveTheSameKeys
 
       - name: Unit tests
-        run: xcodebuild -project FinanceCategorizer.xcodeproj -scheme FinanceCategorizerIOS -destination 'platform=iOS Simulator,name=iPhone 17' test
+        run: xcodebuild -project FinanceCategorizer.xcodeproj -scheme FinanceCategorizerIOS -destination 'platform=iOS Simulator,name=iPhone 17' test -only-testing:FinanceCategorizerTests
+
+      - name: Verify generated artifacts are not tracked
+        run: git diff --exit-code -- . ':!.github/workflows/ci.yml'

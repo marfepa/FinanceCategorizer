@@ -175,6 +175,8 @@ struct MacImportsView: View {
                 }
             )
 
+            accountContextCard
+
             if viewModel.selectedFileURL != nil || !viewModel.sourceFileName.isEmpty {
                 fileSummaryBand
             }
@@ -184,6 +186,7 @@ struct MacImportsView: View {
     private var validateStage: some View {
         VStack(alignment: .leading, spacing: AppLayoutMetrics.blockGap) {
             fileSummaryBand
+            accountContextCard
             previewSection
 
             if !viewModel.invalidRows.isEmpty {
@@ -213,6 +216,21 @@ struct MacImportsView: View {
                 )
             }
         }
+    }
+
+    private var accountContextCard: some View {
+        VStack(alignment: .leading, spacing: AppLayoutMetrics.microGap) {
+            Label(LocalizedStringKey("Import account"), systemImage: "building.columns")
+                .font(AppTypography.sectionTitle)
+            Text(LocalizedStringKey("Associate these movements with an account to keep balances and transfers reliable."))
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            TextField(LocalizedStringKey("Account name, for example Main account"), text: $viewModel.accountName)
+                .textFieldStyle(.roundedBorder)
+                .frame(maxWidth: 420)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentCard()
     }
 
     private var importStage: some View {
@@ -277,6 +295,12 @@ struct MacImportsView: View {
 
             Text(LocalizedStringKey(viewModel.isImporting ? "Categorizing movements and preparing the final summary." : "The import finished. Open Transactions to review the results."))
                 .foregroundStyle(.secondary)
+
+            if viewModel.isImporting {
+                Button(LocalizedStringKey("Cancel"), role: .cancel) {
+                    viewModel.cancelImport()
+                }
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentCard()

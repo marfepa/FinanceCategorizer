@@ -19,6 +19,9 @@ struct IOSImportView: View {
                 TextField(LocalizedStringKey("Source file name"), text: $viewModel.sourceFileName)
                     .textFieldStyle(.roundedBorder)
 
+                TextField(LocalizedStringKey("Account name, for example Main account"), text: $viewModel.accountName)
+                    .textFieldStyle(.roundedBorder)
+
                 TextEditor(text: $viewModel.csvText)
                     .scrollDisabled(true)
                     .frame(minHeight: 220)
@@ -41,8 +44,12 @@ struct IOSImportView: View {
                     .disabled(viewModel.isImporting)
                     
                     if viewModel.isImporting {
-                        ProgressView()
+                        ProgressView(value: viewModel.importProgress, total: 1)
+                            .frame(maxWidth: 120)
                             .padding(.leading, AppSpacing.small)
+                        Button(LocalizedStringKey("Cancel"), role: .cancel) {
+                            viewModel.cancelImport()
+                        }
                     }
                 }
 
