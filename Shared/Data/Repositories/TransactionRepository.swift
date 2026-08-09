@@ -34,9 +34,39 @@ final class TransactionRepository {
         return try context.fetch(descriptor)
     }
 
+    func fetchPage(offset: Int, limit: Int) throws -> [Transaction] {
+        guard limit > 0 else { return [] }
+        let context = makeContext()
+        var descriptor = FetchDescriptor<Transaction>(
+            sortBy: [SortDescriptor(\.bookingDate, order: .reverse)]
+        )
+        descriptor.fetchOffset = max(offset, 0)
+        descriptor.fetchLimit = limit
+        return try context.fetch(descriptor)
+    }
+
     func count() throws -> Int {
         let context = makeContext()
         return try context.fetchCount(FetchDescriptor<Transaction>())
+    }
+
+    func count(accountName: String) throws -> Int {
+        let context = makeContext()
+        let targetName = accountName
+        return try context.fetchCount(FetchDescriptor<Transaction>(
+            predicate: #Predicate { $0.accountName == targetName }
+        ))
+    }
+
+    func fetchLatest(accountName: String) throws -> Transaction? {
+        let context = makeContext()
+        let targetName = accountName
+        var descriptor = FetchDescriptor<Transaction>(
+            predicate: #Predicate { $0.accountName == targetName },
+            sortBy: [SortDescriptor(\.bookingDate, order: .reverse)]
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
     }
 
     func fetch(transactionID: UUID) throws -> Transaction? {
@@ -94,6 +124,16 @@ final class TransactionRepository {
                 }
                 return $0.confidence < $1.confidence
             }
+    }
+
+    func fetchPendingDuplicateReview() throws -> [Transaction] {
+        let context = makeContext()
+        let pending = DuplicateReviewStatus.pending.rawValue
+        let descriptor = FetchDescriptor<Transaction>(
+            predicate: #Predicate { $0.duplicateReviewStatusRaw == pending },
+            sortBy: [SortDescriptor(\.bookingDate, order: .reverse)]
+        )
+        return try context.fetch(descriptor)
     }
 
     func fetchRecategorizationCandidates() throws -> [Transaction] {

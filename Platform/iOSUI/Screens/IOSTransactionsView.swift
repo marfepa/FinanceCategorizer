@@ -4,6 +4,11 @@ struct IOSTransactionsView: View {
     @Environment(\.appContainer) private var appContainer
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.english
     @State private var viewModel = TransactionsViewModel()
+    @State private var isShowingExportOptions = false
+    @State private var isExporting = false
+    @State private var exportDocument: CSVDocument?
+    @State private var pendingExportMode: ExportService.PrivacyMode = .full
+    @State private var pendingExportCount = 0
 
     var body: some View {
         Group {
@@ -92,6 +97,23 @@ struct IOSTransactionsView: View {
                             }
                             .padding(.vertical, AppSpacing.xSmall)
                         }
+
+                        if viewModel.hasMoreTransactions {
+                            Button {
+                                viewModel.loadMore(using: appContainer)
+                            } label: {
+                                HStack {
+                                    Spacer()
+                                    if viewModel.isLoadingMore {
+                                        ProgressView()
+                                    } else {
+                                        Text(LocalizedStringKey("Load more movements"))
+                                    }
+                                    Spacer()
+                                }
+                            }
+                            .disabled(viewModel.isLoadingMore)
+                        }
                     }
                 }
                 .searchable(text: $viewModel.searchText, prompt: LocalizedStringKey("Search concepts"))
@@ -101,8 +123,63 @@ struct IOSTransactionsView: View {
             }
         }
         .navigationTitle(LocalizedStringKey("Transactions"))
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    isShowingExportOptions = true
+                } label: {
+                    Label(LocalizedStringKey("Export CSV"), systemImage: "square.and.arrow.up")
+                }
+                .disabled(viewModel.sortedTransactions.isEmpty)
+            }
+        }
+        .confirmationDialog(
+            LocalizedStringKey("Choose export privacy"),
+            isPresented: $isShowingExportOptions,
+            titleVisibility: .visible
+        ) {
+            Button(LocalizedStringKey("Export anonymized CSV")) {
+                prepareExport(privacyMode: .anonymized)
+            }
+            Button(LocalizedStringKey("Export full CSV"), role: .destructive) {
+                prepareExport(privacyMode: .full)
+            }
+            Button(LocalizedStringKey("Cancel"), role: .cancel) {}
+        } message: {
+            Text(LocalizedStringKey("Exported files leave the app's private storage. Anonymized export removes concepts and merchant names."))
+        }
+        .fileExporter(
+            isPresented: $isExporting,
+            document: exportDocument,
+            contentType: .commaSeparatedText,
+            defaultFilename: "Transactions_Export_\(Date().formatted(date: .numeric, time: .omitted)).csv"
+        ) { result in
+            if case .success = result {
+                ExportAuditService().record(
+                    privacyMode: pendingExportMode,
+                    transactionCount: pendingExportCount
+                )
+            }
+        }
         .onAppear {
             viewModel.load(using: appContainer)
         }
+        .onChange(of: viewModel.searchText) { _, query in
+            if !query.isEmpty {
+                viewModel.ensureCompleteHistoryLoaded(using: appContainer)
+            }
+        }
+    }
+
+    private func prepareExport(privacyMode: ExportService.PrivacyMode) {
+        let exportedTransactions = viewModel.sortedTransactions
+        pendingExportMode = privacyMode
+        pendingExportCount = exportedTransactions.count
+        exportDocument = CSVDocument(text: ExportService.generateCSV(
+            from: exportedTransactions,
+            categories: viewModel.categories,
+            privacyMode: privacyMode
+        ))
+        isExporting = true
     }
 }

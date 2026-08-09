@@ -11,6 +11,9 @@ struct MacTransactionsView: View {
 
     @State private var isExporting = false
     @State private var exportDocument: CSVDocument?
+    @State private var isShowingExportOptions = false
+    @State private var pendingExportMode: ExportService.PrivacyMode = .full
+    @State private var pendingExportCount = 0
 
     var body: some View {
         VStack(spacing: 0) {
@@ -41,14 +44,31 @@ struct MacTransactionsView: View {
             Divider()
 
             HSplitView {
-                TransactionTable(
-                    transactions: viewModel.sortedTransactions,
-                    searchText: $viewModel.searchText,
-                    selectedTransaction: viewModel.selectedTransaction,
-                    onSelect: { transaction in
-                        viewModel.select(transaction)
+                VStack(spacing: 0) {
+                    TransactionTable(
+                        transactions: viewModel.sortedTransactions,
+                        searchText: $viewModel.searchText,
+                        selectedTransaction: viewModel.selectedTransaction,
+                        onSelect: { transaction in
+                            viewModel.select(transaction)
+                        }
+                    )
+                    if viewModel.hasMoreTransactions {
+                        Button {
+                            viewModel.loadMore(using: appContainer)
+                        } label: {
+                            if viewModel.isLoadingMore {
+                                ProgressView()
+                                    .controlSize(.small)
+                            } else {
+                                Text(LocalizedStringKey("Load more movements"))
+                            }
+                        }
+                        .buttonStyle(.borderless)
+                        .padding(AppSpacing.small)
+                        .disabled(viewModel.isLoadingMore)
                     }
-                )
+                }
                 TransactionInspectorView(
                     transaction: viewModel.selectedTransaction,
                     categories: viewModel.categories,
@@ -103,10 +123,29 @@ struct MacTransactionsView: View {
         ) { result in
             switch result {
             case .success(let url):
+                ExportAuditService().record(
+                    privacyMode: pendingExportMode,
+                    transactionCount: pendingExportCount
+                )
                 transactionsLogger.info("Exported transactions to \(url.path, privacy: .private)")
             case .failure(let error):
                 transactionsLogger.error("Transaction export failed: \(error.localizedDescription, privacy: .public)")
             }
+        }
+        .confirmationDialog(
+            LocalizedStringKey("Choose export privacy"),
+            isPresented: $isShowingExportOptions,
+            titleVisibility: .visible
+        ) {
+            Button(LocalizedStringKey("Export anonymized CSV")) {
+                prepareExport(privacyMode: .anonymized)
+            }
+            Button(LocalizedStringKey("Export full CSV"), role: .destructive) {
+                prepareExport(privacyMode: .full)
+            }
+            Button(LocalizedStringKey("Cancel"), role: .cancel) {}
+        } message: {
+            Text(LocalizedStringKey("Exported files leave the app's private storage. Anonymized export removes concepts and merchant names."))
         }
         .onAppear {
             viewModel.load(using: appContainer)
@@ -117,6 +156,21 @@ struct MacTransactionsView: View {
         .task(id: reloadTrigger) {
             guard reloadTrigger > 0 else { return }
             viewModel.load(using: appContainer)
+        }
+        .onChange(of: viewModel.searchText) { _, query in
+            if !query.isEmpty { viewModel.ensureCompleteHistoryLoaded(using: appContainer) }
+        }
+        .onChange(of: viewModel.filterKind) { _, value in
+            if value != nil { viewModel.ensureCompleteHistoryLoaded(using: appContainer) }
+        }
+        .onChange(of: viewModel.filterCategoryID) { _, value in
+            if value != nil { viewModel.ensureCompleteHistoryLoaded(using: appContainer) }
+        }
+        .onChange(of: viewModel.filterStartDate) { _, value in
+            if value != nil { viewModel.ensureCompleteHistoryLoaded(using: appContainer) }
+        }
+        .onChange(of: viewModel.filterEndDate) { _, value in
+            if value != nil { viewModel.ensureCompleteHistoryLoaded(using: appContainer) }
         }
     }
 
@@ -160,9 +214,7 @@ struct MacTransactionsView: View {
                 .disabled(viewModel.filterKind == nil && viewModel.filterCategoryID == nil && viewModel.filterStartDate == nil && viewModel.filterEndDate == nil && viewModel.transactionDateSortOrder == .newestFirst)
                 
                 Button {
-                    let csv = ExportService.generateCSV(from: viewModel.sortedTransactions, categories: viewModel.categories)
-                    exportDocument = CSVDocument(text: csv)
-                    isExporting = true
+                    isShowingExportOptions = true
                 } label: {
                     Label(LocalizedStringKey("Export CSV"), systemImage: "arrow.down.doc")
                 }
@@ -178,6 +230,19 @@ struct MacTransactionsView: View {
                 kpiView(title: LocalizedStringKey("Found"), value: Decimal(viewModel.filteredCount), color: .primary, isCount: true)
             }
         }
+    }
+
+    private func prepareExport(privacyMode: ExportService.PrivacyMode) {
+        let exportedTransactions = viewModel.sortedTransactions
+        pendingExportMode = privacyMode
+        pendingExportCount = exportedTransactions.count
+        let csv = ExportService.generateCSV(
+            from: exportedTransactions,
+            categories: viewModel.categories,
+            privacyMode: privacyMode
+        )
+        exportDocument = CSVDocument(text: csv)
+        isExporting = true
     }
 
     private func kpiView(title: LocalizedStringKey, value: Decimal, color: Color, isCount: Bool = false) -> some View {

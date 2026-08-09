@@ -1,11 +1,21 @@
 import Foundation
 
 final class ExportService {
+    enum PrivacyMode: String, Codable {
+        case full
+        case anonymized
+    }
+
     enum ExportFormat {
         case csv
     }
 
-    static func generateCSV(from transactions: [Transaction], categories: [Category], locale: Locale = .current) -> String {
+    static func generateCSV(
+        from transactions: [Transaction],
+        categories: [Category],
+        locale: Locale = .current,
+        privacyMode: PrivacyMode = .full
+    ) -> String {
         let isEuropeanLocale = locale.decimalSeparator == ","
         let delimiter = isEuropeanLocale ? ";" : ","
         
@@ -13,7 +23,7 @@ final class ExportService {
 
         let categoryMap = Dictionary(uniqueKeysWithValues: categories.map { ($0.id, $0.name) })
 
-        for tx in transactions {
+        for (index, tx) in transactions.enumerated() {
             let escape: (String) -> String = { text in
                 let cleaned = text.replacingOccurrences(of: "\"", with: "\"\"")
                 if cleaned.contains(delimiter) || cleaned.contains("\"") || cleaned.contains("\n") {
@@ -23,8 +33,12 @@ final class ExportService {
             }
 
             let dateString = tx.bookingDate.formatted(date: .numeric, time: .omitted)
-            let concept = escape(tx.rawDescription)
-            let merchant = escape(tx.merchantCanonicalName ?? "")
+            let concept = privacyMode == .anonymized
+                ? escape("Movement \(index + 1)")
+                : escape(tx.rawDescription)
+            let merchant = privacyMode == .anonymized
+                ? ""
+                : escape(tx.merchantCanonicalName ?? "")
             
             // Format amount based on locale
             let amountString = tx.amount.formatted(.number)
