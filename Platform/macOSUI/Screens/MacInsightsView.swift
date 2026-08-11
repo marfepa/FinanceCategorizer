@@ -628,7 +628,7 @@ struct MacInsightsView: View {
                     AxisMarks(values: .stride(by: .month)) { value in
                         AxisGridLine()
                         AxisTick()
-                        AxisValueLabel(format: .dateTime.month(.abbreviated), centered: true)
+                        AxisValueLabel(format: .dateTime.month(.abbreviated), anchor: .center)
                     }
                 }
                 .chartOverlay { proxy in
