@@ -62,9 +62,18 @@ struct ForecastSnapshot {
 struct RecurringExpenseItem: Identifiable {
     let id: String
     let concept: String
+    let merchantName: String?
+    let categoryName: String?
     let averageAmount: Decimal
     let occurrences: Int
+    let expectedMonths: Int
+    let missingMonths: [Date]
     let latestDate: Date
+    let transactionIDs: [UUID]
+    let monthlyCoverage: Double
+    let confidence: Double
+    let status: RecurringExpenseDetectionStatus
+    let recurrenceType: RecurrenceType
 }
 
 struct FinancialAnalysisSnapshot {
@@ -83,6 +92,12 @@ struct FinancialAnalysisSnapshot {
     let dataQuality: FinancialDataQuality
     let forecast: ForecastSnapshot
     let recurringExpenses: [RecurringExpenseItem]
+
+    var recurringMonthlyExpenses: Decimal {
+        recurringExpenses
+            .filter { $0.status == .confirmed }
+            .reduce(Decimal.zero) { $0 + $1.averageAmount }
+    }
 }
 
 struct FinancialAnalysisService {
@@ -148,7 +163,13 @@ struct FinancialAnalysisService {
             categoryMap: categoryMap
         )
         let forecast = buildForecast(from: monthlyCashflow)
-        let recurringExpenses = buildRecurringExpenses(from: filteredEntries)
+        // Recurrence needs the complete eligible history. Restricting this to
+        // the selected visual range would make a monthly charge disappear when
+        // the user switches from All to 1M or 3M.
+        let recurringExpenses = buildRecurringExpenses(
+            from: validEntries,
+            categoryMap: categoryMap
+        )
 
         return FinancialAnalysisSnapshot(
             range: range,
@@ -350,21 +371,37 @@ struct FinancialAnalysisService {
         )
     }
 
-    private func buildRecurringExpenses(from transactions: [FinancialReportingEntry]) -> [RecurringExpenseItem] {
-        Dictionary(grouping: transactions.filter { classifier.isExpense($0.transaction) }, by: { $0.transaction.cleanedDescription })
-            .compactMap { concept, items in
-                guard items.count >= 2 else { return nil }
-                let averageAmount = items.reduce(Decimal.zero) { $0 + absolute($1.amount) } / Decimal(items.count)
-                let latestDate = items.map(\.date).max() ?? .now
-                return RecurringExpenseItem(
-                    id: concept,
-                    concept: items.first?.transaction.rawDescription ?? concept,
-                    averageAmount: averageAmount,
-                    occurrences: items.count,
-                    latestDate: latestDate
-                )
-            }
-            .sorted { $0.averageAmount > $1.averageAmount }
+    private func buildRecurringExpenses(
+        from entries: [FinancialReportingEntry],
+        categoryMap: [UUID: String]
+    ) -> [RecurringExpenseItem] {
+        let detections = RecurringExpenseDetector(calendar: Calendar.current).detect(from: entries)
+        let transactionsByID = Dictionary(uniqueKeysWithValues: entries.map { ($0.transaction.id, $0.transaction) })
+
+        return detections.map { detection in
+            let categoryNames = Set(
+                detection.transactionIDs.compactMap { transactionID in
+                    transactionsByID[transactionID]?.categoryID.flatMap { categoryMap[$0] }
+                }
+            )
+
+            return RecurringExpenseItem(
+                id: detection.id,
+                concept: detection.concept,
+                merchantName: detection.merchantName,
+                categoryName: categoryNames.count == 1 ? categoryNames.first : nil,
+                averageAmount: detection.averageAmount,
+                occurrences: detection.occurrences,
+                expectedMonths: detection.expectedMonths,
+                missingMonths: detection.missingMonths,
+                latestDate: detection.latestDate,
+                transactionIDs: detection.transactionIDs,
+                monthlyCoverage: detection.monthlyCoverage,
+                confidence: detection.confidence,
+                status: detection.status,
+                recurrenceType: detection.recurrenceType
+            )
+        }
     }
 
     private func sequenceOfMonths(from start: Date, through end: Date) -> [Date] {
