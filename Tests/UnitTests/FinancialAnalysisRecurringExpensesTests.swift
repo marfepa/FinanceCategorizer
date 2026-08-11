@@ -77,6 +77,72 @@ final class FinancialAnalysisRecurringExpensesTests: XCTestCase {
         XCTAssertEqual(snapshot.recurringExpenses.first?.transactionIDs.count, 3)
     }
 
+    func testAnalysisHandlesBudgetSplitTransactionIDs() {
+        let defaults = UserDefaults.standard
+        let cutoffKey = "payrollCutoffDay"
+        let previousCutoff = defaults.object(forKey: cutoffKey)
+        defaults.set(25, forKey: cutoffKey)
+        defer {
+            if let previousCutoff {
+                defaults.set(previousCutoff, forKey: cutoffKey)
+            } else {
+                defaults.removeObject(forKey: cutoffKey)
+            }
+        }
+
+        let recurringExpenses = (1...3).map { month in
+            Transaction(
+                bookingDate: date(year: 2026, month: month, day: 5),
+                rawDescription: "SEGURO",
+                cleanedDescription: "SEGURO",
+                merchantCanonicalName: "Seguro",
+                amount: Decimal(-40),
+                kindRaw: TransactionKind.expense.rawValue,
+                needsReview: false,
+                reviewStatusRaw: ReviewStatus.accepted.rawValue
+            )
+        }
+        let payroll = [
+            Transaction(
+                bookingDate: date(year: 2026, month: 1, day: 28),
+                rawDescription: "NOMINA",
+                cleanedDescription: "NOMINA",
+                amount: Decimal(2_000),
+                kindRaw: TransactionKind.income.rawValue,
+                needsReview: false,
+                reviewStatusRaw: ReviewStatus.accepted.rawValue
+            ),
+            Transaction(
+                bookingDate: date(year: 2026, month: 2, day: 28),
+                rawDescription: "NOMINA",
+                cleanedDescription: "NOMINA",
+                amount: Decimal(2_000),
+                kindRaw: TransactionKind.income.rawValue,
+                needsReview: false,
+                reviewStatusRaw: ReviewStatus.accepted.rawValue
+            ),
+            Transaction(
+                bookingDate: date(year: 2026, month: 3, day: 28),
+                rawDescription: "NOMINA",
+                cleanedDescription: "NOMINA",
+                amount: Decimal(4_000),
+                kindRaw: TransactionKind.income.rawValue,
+                needsReview: false,
+                reviewStatusRaw: ReviewStatus.accepted.rawValue
+            )
+        ]
+
+        let snapshot = FinancialAnalysisService().analyze(
+            transactions: recurringExpenses + payroll,
+            categories: [],
+            range: .all,
+            now: date(year: 2026, month: 6, day: 20)
+        )
+
+        XCTAssertEqual(snapshot.recurringExpenses.count, 1)
+        XCTAssertEqual(snapshot.recurringExpenses.first?.occurrences, 3)
+    }
+
     private func date(year: Int, month: Int, day: Int) -> Date {
         var components = DateComponents()
         components.calendar = Calendar(identifier: .gregorian)
