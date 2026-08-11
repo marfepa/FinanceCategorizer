@@ -749,6 +749,16 @@
 "Net over income" = "Net over income";
 "Recurring Charges" = "Recurring charges";
 "Patterns detected" = "Patterns detected";
+"Recurring monthly total" = "Recurring monthly total";
+"Confirmed monthly expenses" = "Confirmed monthly expenses";
+"Detected recurring expenses are calculated from the full eligible history." = "Detected recurring expenses are calculated from the full eligible history.";
+"per month" = "per month";
+"Recurring pattern confirmed" = "Recurring pattern confirmed";
+"Recurring pattern provisional" = "Recurring pattern provisional";
+"recurring.coverage" = "Detected in %@ of %@ months";
+"recurring.category" = "Category: %@";
+"recurring.lastCharge" = "Last charge: %@";
+"recurring.missingMonths" = "%@ month(s) missing";
 "Forecast 12M" = "12-month scenario";
 "Deterministic projection" = "Scenario based on the current pace";
 "Forecast" = "Scenario";

@@ -757,6 +757,16 @@
 "Net over income" = "Neto sobre ingresos";
 "Recurring Charges" = "Cargos recurrentes";
 "Patterns detected" = "Patrones detectados";
+"Recurring monthly total" = "Total mensual recurrente";
+"Confirmed monthly expenses" = "Gastos mensuales confirmados";
+"Detected recurring expenses are calculated from the full eligible history." = "Los gastos recurrentes se calculan usando todo el historial elegible.";
+"per month" = "al mes";
+"Recurring pattern confirmed" = "Patrón recurrente confirmado";
+"Recurring pattern provisional" = "Patrón recurrente provisional";
+"recurring.coverage" = "Detectado en %@ de %@ meses";
+"recurring.category" = "Categoría: %@";
+"recurring.lastCharge" = "Último cargo: %@";
+"recurring.missingMonths" = "Falta en %@ mes(es)";
 "Forecast 12M" = "Escenario a 12 meses";
 "Deterministic projection" = "Escenario según el ritmo actual";
 "Forecast" = "Escenario";

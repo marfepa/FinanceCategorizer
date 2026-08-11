@@ -854,32 +854,130 @@ struct MacInsightsView: View {
                 tint: AppColors.warning
             )
 
+            HStack(alignment: .top, spacing: AppSpacing.medium) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(LocalizedStringKey("Recurring monthly total"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text(renderAmount(snapshot.recurringMonthlyExpenses))
+                        .font(.title3.weight(.bold))
+                        .foregroundStyle(AppColors.warning)
+                }
+
+                Spacer()
+
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text(LocalizedStringKey("Confirmed monthly expenses"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text(appLanguage.formatInteger(confirmedRecurringCount(in: snapshot)))
+                        .font(.title3.weight(.bold))
+                }
+            }
+            .padding(AppSpacing.medium)
+            .liquidGlassPanel(
+                padding: 0,
+                radius: AppRadius.card,
+                material: AppMaterials.subtleGlass,
+                tint: AppColors.warning,
+                shadowRadius: 8,
+                shadowY: 4,
+                shadowOpacity: 0.06
+            )
+
+            Text(LocalizedStringKey("Detected recurring expenses are calculated from the full eligible history."))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
             if snapshot.recurringExpenses.isEmpty {
                 Text(LocalizedStringKey("No recurring expenses detected yet."))
                     .foregroundStyle(.secondary)
             } else {
                 ForEach(snapshot.recurringExpenses.prefix(6)) { item in
-                    HStack(alignment: .center, spacing: AppSpacing.small) {
-                        Image(systemName: "arrow.triangle.2.circlepath")
-                            .foregroundStyle(AppColors.warning)
-                            .frame(width: 38, height: 38)
-                            .liquidGlassPill(padding: 0, tint: AppColors.warning)
-
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(item.concept)
-                                .lineLimit(1)
-                            Text(appLanguage.localized("insights.occurrences", appLanguage.formatInteger(item.occurrences)))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        Text(renderAmount(item.averageAmount))
-                            .font(.headline)
-                    }
-                    .padding(.vertical, 2)
+                    recurringExpenseRow(item)
                 }
             }
         }
+    }
+
+    private func recurringExpenseRow(_ item: RecurringExpenseItem) -> some View {
+        VStack(alignment: .leading, spacing: AppSpacing.small) {
+            HStack(alignment: .center, spacing: AppSpacing.small) {
+                Image(systemName: "arrow.triangle.2.circlepath")
+                    .foregroundStyle(recurringStatusColor(item.status))
+                    .frame(width: 38, height: 38)
+                    .liquidGlassPill(padding: 0, tint: recurringStatusColor(item.status))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(item.merchantName ?? item.concept)
+                        .lineLimit(1)
+                    Text(appLanguage.localized(
+                        "recurring.coverage",
+                        appLanguage.formatInteger(item.occurrences),
+                        appLanguage.formatInteger(item.expectedMonths)
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text(renderAmount(item.averageAmount))
+                        .font(.headline)
+                    Text(LocalizedStringKey("per month"))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            HStack(spacing: AppSpacing.small) {
+                Text(recurringStatusTitle(for: item.status))
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(recurringStatusColor(item.status))
+
+                if let categoryName = item.categoryName {
+                    Text(appLanguage.localized("recurring.category", categoryName))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+
+                Spacer()
+
+                Text(appLanguage.localized("recurring.lastCharge", appLanguage.format(date: item.latestDate, dateStyle: .medium)))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
+            if !item.missingMonths.isEmpty {
+                Text(appLanguage.localized("recurring.missingMonths", appLanguage.formatInteger(item.missingMonths.count)))
+                    .font(.caption2)
+                    .foregroundStyle(AppColors.warning)
+            }
+        }
+        .padding(.vertical, AppSpacing.small)
+        .padding(.horizontal, AppSpacing.small)
+        .background(
+            RoundedRectangle(cornerRadius: AppRadius.card, style: .continuous)
+                .fill(recurringStatusColor(item.status).opacity(0.08))
+        )
+    }
+
+    private func confirmedRecurringCount(in snapshot: FinancialAnalysisSnapshot) -> Int {
+        snapshot.recurringExpenses.filter { $0.status == .confirmed }.count
+    }
+
+    private func recurringStatusTitle(for status: RecurringExpenseDetectionStatus) -> LocalizedStringKey {
+        switch status {
+        case .confirmed: return "Recurring pattern confirmed"
+        case .provisional: return "Recurring pattern provisional"
+        }
+    }
+
+    private func recurringStatusColor(_ status: RecurringExpenseDetectionStatus) -> Color {
+        status == .confirmed ? AppColors.warning : AppColors.neutral
     }
 
     private func reviewImpactSection(_ snapshot: FinancialAnalysisSnapshot) -> some View {
