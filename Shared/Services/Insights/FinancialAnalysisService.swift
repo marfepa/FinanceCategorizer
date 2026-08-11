@@ -376,7 +376,14 @@ struct FinancialAnalysisService {
         categoryMap: [UUID: String]
     ) -> [RecurringExpenseItem] {
         let detections = RecurringExpenseDetector(calendar: Calendar.current).detect(from: entries)
-        let transactionsByID = Dictionary(uniqueKeysWithValues: entries.map { ($0.transaction.id, $0.transaction) })
+        // Budget allocation can split one source transaction into multiple
+        // reporting entries (for example ordinary and extraordinary payroll).
+        // The recurring detector works with source transaction IDs, so the
+        // lookup must tolerate those repeated IDs.
+        var transactionsByID: [UUID: Transaction] = [:]
+        for entry in entries {
+            transactionsByID[entry.transaction.id] = entry.transaction
+        }
 
         return detections.map { detection in
             let categoryNames = Set(
