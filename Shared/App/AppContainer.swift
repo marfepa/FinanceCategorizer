@@ -41,6 +41,8 @@ final class AppContainer {
     let insightEngine: InsightEngine
     let duplicateAuditService: DuplicateAuditService
     let financialPlanningService: FinancialPlanningService
+    let savingsStrategyStore: SavingsStrategyStore
+    let savingsStrategyService: SavingsStrategyService
 
     init(inMemory: Bool = false) {
         let persistenceSetup = ModelContainerFactory.make(inMemory: inMemory)
@@ -139,6 +141,8 @@ final class AppContainer {
         self.insightEngine = insightEngine
         self.duplicateAuditService = DuplicateAuditService()
         self.financialPlanningService = FinancialPlanningService()
+        self.savingsStrategyStore = SavingsStrategyStore()
+        self.savingsStrategyService = SavingsStrategyService()
         self.importOrchestrator = ImportOrchestrator(
             transactionRepository: transactionRepository,
             categoryRepository: categoryRepository,
