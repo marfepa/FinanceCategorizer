@@ -43,15 +43,18 @@ Rutas criticas:
 Crear carpeta de fixtures dentro del repo de producto:
 
 ```text
-Tests/Fixtures/
+Tests/UnitTests/Fixtures/
+  anonymous_openbank_csv.csv
+  anonymous_cajamar_csv.csv
+  anonymous_abanca_csv.csv
+  anonymous_openbank_xlsx.xlsx
+  anonymous_openbank_pdf.pdf
   openbank/
-    csv_basic.csv
-    csv_multiline_concepts.csv
-    pdf_basic.txt
+    openbank_csv_multiline.csv
   cajamar/
-    csv_basic.csv
+    cajamar_basic.csv
   abanca/
-    csv_basic.csv
+    abanca_basic.csv
 ```
 
 Reglas:
@@ -60,6 +63,9 @@ Reglas:
 - Importes plausibles, no reales.
 - Nombres de comercio sinteticos.
 - Casos borde documentados en el nombre del fichero.
+- Ingresos y gastos en el mismo lote para comprobar la direccion del movimiento.
+- Direcciones de prueba como `CALLE PRUEBA 12`, nunca localizaciones reales.
+- Al menos una fila invalida por formato para comprobar importacion parcial sin perder filas validas.
 
 ## CI minimo
 

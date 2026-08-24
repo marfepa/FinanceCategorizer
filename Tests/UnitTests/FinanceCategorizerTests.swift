@@ -629,6 +629,130 @@ final class FinanceCategorizerTests: XCTestCase {
         }
     }
 
+    func testAnonymousCSVFixtureReportsPartialErrorsAndBothDirections() throws {
+        let csv = try String(contentsOf: unitTestFixtureURL("anonymous_openbank_csv.csv"), encoding: .utf8)
+
+        let preview = try CSVParsingService().preview(text: csv)
+
+        XCTAssertEqual(preview.diagnostics.rawRowCount, 7)
+        XCTAssertEqual(preview.rows.count, 5)
+        XCTAssertEqual(preview.invalidRows.count, 1)
+        XCTAssertEqual(preview.invalidRows.first?.rowNumber, 5)
+        XCTAssertEqual(Set(preview.rows.map { $0.amount >= 0 }), Set([true, false]))
+        XCTAssertTrue(preview.rows.contains { $0.concept.contains("CALLE PRUEBA 12") })
+    }
+
+    func testAnonymousXLSXFixtureReportsPartialErrorsAndDetectsWorksheet() throws {
+        let url = unitTestFixtureURL("anonymous_openbank_xlsx.xlsx")
+
+        let preview = try XLSXParsingService().preview(fileURL: url)
+
+        XCTAssertEqual(preview.diagnostics.sourceType, "xlsx")
+        XCTAssertEqual(preview.diagnostics.worksheetName, "Movimientos")
+        XCTAssertEqual(preview.rows.count, 3)
+        XCTAssertEqual(preview.invalidRows.count, 1)
+        XCTAssertEqual(preview.invalidRows.first?.rowNumber, 4)
+        XCTAssertEqual(preview.rows.first?.amount, Decimal(string: "-42.60"))
+        XCTAssertEqual(preview.rows.first?.currencyCode, "EUR")
+        XCTAssertTrue(preview.rows.first?.concept.contains("CALLE PRUEBA 12") == true)
+        XCTAssertEqual(Set(preview.rows.map { $0.amount >= 0 }), Set([true, false]))
+    }
+
+    func testAnonymousPDFFixtureIsReadableAndPreservesDirections() throws {
+        let url = unitTestFixtureURL("anonymous_openbank_pdf.pdf")
+        let service = FileImportService()
+
+        let text = try service.readPDFText(from: url)
+        let preview = try PDFParsingService().preview(text: text)
+
+        XCTAssertTrue(text.contains("Openbank"))
+        XCTAssertEqual(preview.rows.count, 3)
+        XCTAssertTrue(preview.invalidRows.isEmpty)
+        XCTAssertEqual(preview.rows.map(\.amount), [
+            Decimal(string: "-42.60")!,
+            Decimal(string: "1850.00")!,
+            Decimal(string: "-10.99")!
+        ])
+        XCTAssertTrue(preview.rows.first?.concept.contains("CALLE PRUEBA 12") == true)
+        XCTAssertEqual(Set(preview.rows.map { $0.amount >= 0 }), Set([true, false]))
+    }
+
+    func testAnonymousCSVFixtureImportsValidRowsAndKeepsSameBatchDuplicates() async throws {
+        let container = AppContainer(inMemory: true)
+        let csv = try String(contentsOf: unitTestFixtureURL("anonymous_openbank_csv.csv"), encoding: .utf8)
+
+        let summary = try await container.importOrchestrator.importCSV(
+            csv,
+            sourceFileName: "anonymous_openbank_csv.csv",
+            language: .spanish
+        )
+
+        XCTAssertEqual(summary.rawRowCount, 7)
+        XCTAssertEqual(summary.validRowCount, 5)
+        XCTAssertEqual(summary.invalidRowCount, 1)
+        XCTAssertEqual(summary.importedCount, 5)
+        XCTAssertEqual(summary.duplicatesSkipped, 0)
+        XCTAssertEqual(try container.transactionRepository.count(), 5)
+
+        let fingerprintCounts = try container.transactionRepository.fetchFingerprintCounts()
+        XCTAssertTrue(fingerprintCounts.values.contains(2))
+    }
+
+    func testAnonymousXLSXFileImportIsIdempotentAndCrossSourceDuplicatesAreSkipped() async throws {
+        let container = AppContainer(inMemory: true)
+        let csv = try String(contentsOf: unitTestFixtureURL("anonymous_openbank_csv.csv"), encoding: .utf8)
+        let xlsxURL = unitTestFixtureURL("anonymous_openbank_xlsx.xlsx")
+
+        _ = try await container.importOrchestrator.importCSV(
+            csv,
+            sourceFileName: "anonymous_openbank_csv.csv",
+            language: .spanish
+        )
+
+        let xlsxSummary = try await container.importOrchestrator.importFile(
+            at: xlsxURL,
+            language: .spanish
+        )
+
+        XCTAssertEqual(xlsxSummary.validRowCount, 3)
+        XCTAssertEqual(xlsxSummary.invalidRowCount, 1)
+        XCTAssertEqual(xlsxSummary.importedCount, 0)
+        XCTAssertEqual(xlsxSummary.duplicatesSkipped, 3)
+        XCTAssertEqual(try container.transactionRepository.count(), 5)
+
+        do {
+            _ = try await container.importOrchestrator.importFile(at: xlsxURL, language: .spanish)
+            XCTFail("Expected the second XLSX import to be blocked as an exact duplicate.")
+        } catch DuplicateImportError.alreadyImported(let info) {
+            XCTAssertEqual(info.previousFileName, "anonymous_openbank_xlsx.xlsx")
+            XCTAssertEqual(info.importedRowCount, 0)
+        }
+    }
+
+    func testAnonymousCSVFixtureSupportsRowDuplicateSkipWithoutBlockingNewRows() async throws {
+        let container = AppContainer(inMemory: true)
+        let csv = try String(contentsOf: unitTestFixtureURL("anonymous_openbank_csv.csv"), encoding: .utf8)
+        let changedCSV = csv.replacingOccurrences(
+            of: "FILA CON IMPORTE INVALIDO;NO_VALID_AMOUNT;3.039,34",
+            with: "NUEVO MOVIMIENTO DEMO;-7,25;3.027,09"
+        )
+
+        _ = try await container.importOrchestrator.importCSV(
+            csv,
+            sourceFileName: "anonymous_openbank_csv.csv",
+            language: .spanish
+        )
+        let summary = try await container.importOrchestrator.importCSV(
+            changedCSV,
+            sourceFileName: "anonymous_openbank_csv_variant.csv",
+            language: .spanish
+        )
+
+        XCTAssertEqual(summary.importedCount, 1)
+        XCTAssertEqual(summary.duplicatesSkipped, 5)
+        XCTAssertEqual(try container.transactionRepository.count(), 6)
+    }
+
     func testImportHandlesLegitimateDuplicatesInSameOrSeparateImportBatches() async throws {
         let container = AppContainer(inMemory: true)
         
@@ -1512,14 +1636,19 @@ final class FinanceCategorizerTests: XCTestCase {
     func testAppleAIFallbackUsesBudgetAllocationForMonthlyBriefing() async throws {
         let container = AppContainer(inMemory: true)
         let service = AppleAIGlobalActionService(availabilityService: UnavailableAIAvailabilityServiceStub())
-
-        let calendar = Calendar(identifier: .gregorian)
-        let now = Date()
-        let currentYear = calendar.component(.year, from: now)
-        let currentMonth = calendar.component(.month, from: now)
+        let defaults = UserDefaults.standard
+        let previousCutoff = defaults.object(forKey: "payrollCutoffDay")
+        defaults.set(25, forKey: "payrollCutoffDay")
+        defer {
+            if let previousCutoff {
+                defaults.set(previousCutoff, forKey: "payrollCutoffDay")
+            } else {
+                defaults.removeObject(forKey: "payrollCutoffDay")
+            }
+        }
 
         let payroll = Transaction(
-            bookingDate: date(year: currentYear, month: currentMonth, day: 10),
+            bookingDate: date(year: 2026, month: 1, day: 26),
             rawDescription: "NOMINA EMPRESA",
             cleanedDescription: "NOMINA EMPRESA",
             merchantDisplayName: "Empresa",
@@ -1539,9 +1668,9 @@ final class FinanceCategorizerTests: XCTestCase {
             isRecurringCandidate: false
         )
         let expense = Transaction(
-            bookingDate: date(year: currentYear, month: currentMonth, day: 11),
-            rawDescription: "ALQUILER ENERO",
-            cleanedDescription: "ALQUILER ENERO",
+            bookingDate: date(year: 2026, month: 2, day: 3),
+            rawDescription: "ALQUILER FEBRERO",
+            cleanedDescription: "ALQUILER FEBRERO",
             merchantDisplayName: "Casero",
             merchantCanonicalName: "Casero",
             amount: Decimal(-400),
@@ -1555,7 +1684,7 @@ final class FinanceCategorizerTests: XCTestCase {
             needsReview: false,
             reviewStatusRaw: ReviewStatus.accepted.rawValue,
             categorizationReason: nil,
-            fingerprint: "expense-jan",
+            fingerprint: "expense-feb",
             isRecurringCandidate: false
         )
 
@@ -1565,8 +1694,8 @@ final class FinanceCategorizerTests: XCTestCase {
         let digitsOnly = result.summary.filter(\.isNumber)
 
         XCTAssertTrue(digitsOnly.contains("1000"))
-        XCTAssertFalse(digitsOnly.contains("400"))
-        XCTAssertFalse(digitsOnly.contains("600"))
+        XCTAssertTrue(digitsOnly.contains("400"))
+        XCTAssertTrue(digitsOnly.contains("600"))
     }
 
     func testAppleAIFallbackDetectsCategoryCleanupSignals() async throws {
@@ -1834,6 +1963,27 @@ final class FinanceCategorizerTests: XCTestCase {
         let firstRow = try XCTUnwrap(preview.rows.first)
         XCTAssertEqual(firstRow.amount, Decimal(string: "-42.60"))
         XCTAssertEqual(firstRow.concept, "COMPRA TARJ MERCADONA TEST")
+    }
+
+    func testAnonymousCajamarAndAbancaCSVFixturesCoverPartialRowsAndDirections() throws {
+        let fixtures = [
+            (path: "anonymous_cajamar_csv.csv", expectedRows: 3, expectedInvalidRows: 1, expectedConcept: "COMERCIO DEMO CALLE PRUEBA 12"),
+            (path: "anonymous_abanca_csv.csv", expectedRows: 3, expectedInvalidRows: 1, expectedConcept: "COMERCIO DEMO CALLE PRUEBA 12")
+        ]
+
+        for fixture in fixtures {
+            let csv = try String(contentsOf: unitTestFixtureURL(fixture.path), encoding: .utf8)
+            let preview = try CSVParsingService().preview(text: csv)
+
+            XCTAssertEqual(preview.rows.count, fixture.expectedRows, fixture.path)
+            XCTAssertEqual(preview.invalidRows.count, fixture.expectedInvalidRows, fixture.path)
+            XCTAssertFalse(preview.requiresManualMapping, fixture.path)
+            XCTAssertEqual(Set(preview.rows.map { $0.amount >= 0 }), Set([true, false]), fixture.path)
+            XCTAssertTrue(
+                preview.rows.contains { $0.concept.contains(fixture.expectedConcept) },
+                fixture.path
+            )
+        }
     }
 
     func testSingleRowCSVDoesNotRequireManualMapping() throws {
