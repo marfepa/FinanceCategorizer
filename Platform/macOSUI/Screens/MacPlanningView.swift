@@ -1,6 +1,7 @@
 import SwiftUI
 
 enum MacPlanningTab: String, CaseIterable, Identifiable {
+    case strategy
     case budgets
     case goals
 
@@ -8,6 +9,7 @@ enum MacPlanningTab: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
+        case .strategy: return AppLanguage.currentSelection.localized("strategy.title")
         case .budgets: return AppLanguage.currentSelection.localized("Budgets")
         case .goals: return AppLanguage.currentSelection.localized("Savings Goals")
         }
@@ -26,11 +28,16 @@ struct MacPlanningView: View {
             }
             .pickerStyle(.segmented)
             .labelsHidden()
+            .padding(.horizontal, 4)
+            .padding(.vertical, 4)
+            .liquidGlassPill(padding: 0, tint: .white, interactive: true)
             .padding(.horizontal, AppSpacing.large)
             .padding(.top, AppSpacing.medium)
             .padding(.bottom, AppSpacing.small)
 
             switch selectedTab {
+            case .strategy:
+                MacSavingsStrategyView()
             case .budgets:
                 MacBudgetsView()
             case .goals:

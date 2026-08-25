@@ -13,7 +13,7 @@ struct MacAppRootView: View {
     @State private var dashboardTab: MacDashboardTab = .overview
     @State private var activityTab: MacActivityTab = .transactions
     @State private var reviewTab: MacReviewTab = .reviewQueue
-    @State private var planningTab: MacPlanningTab = .budgets
+    @State private var planningTab: MacPlanningTab = .strategy
 
     var body: some View {
         ZStack {
