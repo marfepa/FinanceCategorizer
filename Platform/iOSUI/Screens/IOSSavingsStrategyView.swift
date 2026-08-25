@@ -14,8 +14,7 @@ struct IOSSavingsStrategyView: View {
                         .frame(maxWidth: .infinity)
                         .padding(.top, AppSpacing.xxLarge)
                 } else if let snapshot = viewModel.snapshot {
-                    monthRow
-                    presetRow
+                    chrome
                     hero(snapshot)
                     ForEach(snapshot.buckets) { result in
                         bucketCard(result)
@@ -28,7 +27,7 @@ struct IOSSavingsStrategyView: View {
                     EmptyStateView(
                         title: LocalizedStringKey("strategy.empty.title"),
                         message: LocalizedStringKey("strategy.empty.message"),
-                        systemImage: "circle.hexagongrid"
+                        systemImage: "chart.pie"
                     )
                     .padding(.top, AppSpacing.xxLarge)
                 }
@@ -61,55 +60,63 @@ struct IOSSavingsStrategyView: View {
         }
     }
 
-    private var monthRow: some View {
-        HStack {
-            Button {
-                viewModel.shiftMonth(by: -1, using: appContainer)
-            } label: {
-                Image(systemName: "chevron.left")
+    private var chrome: some View {
+        VStack(spacing: 10) {
+            HStack {
+                Button { viewModel.shiftMonth(by: -1, using: appContainer) } label: {
+                    Image(systemName: "chevron.left")
+                }
+                .disabled(!canShift(-1))
+                Spacer()
+                Text(monthTitle)
+                    .font(.headline)
+                    .monospacedDigit()
+                Spacer()
+                Button { viewModel.shiftMonth(by: 1, using: appContainer) } label: {
+                    Image(systemName: "chevron.right")
+                }
+                .disabled(!canShift(1))
             }
-            .disabled(!canShift(-1))
 
-            Spacer()
-            Text(monthTitle)
-                .font(.headline)
-                .monospacedDigit()
-            Spacer()
-
-            Button {
-                viewModel.shiftMonth(by: 1, using: appContainer)
-            } label: {
-                Image(systemName: "chevron.right")
-            }
-            .disabled(!canShift(1))
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .liquidGlassPill(padding: 0, tint: .white, interactive: true)
-    }
-
-    private var presetRow: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(SavingsStrategyPreset.allCases.filter { $0 != .custom }) { preset in
-                    Button {
-                        viewModel.applyPreset(preset, using: appContainer)
-                    } label: {
-                        Text(LocalizedStringKey(preset.titleKey))
-                            .font(.subheadline.weight(.semibold))
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 8)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(SavingsStrategyPreset.allCases.filter { $0 != .custom }) { preset in
+                        let selected = viewModel.config.preset == preset
+                        Button {
+                            viewModel.applyPreset(preset, using: appContainer)
+                        } label: {
+                            Text(LocalizedStringKey(preset.titleKey))
+                                .font(.subheadline.weight(.semibold))
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 7)
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(selected ? Color.primary : Color.secondary)
+                        .background {
+                            if selected {
+                                Capsule(style: .continuous)
+                                    .fill(Color.primary.opacity(0.08))
+                            }
+                        }
                     }
-                    .appSecondaryGlassButton()
-                    .opacity(viewModel.config.preset == preset ? 1 : 0.7)
                 }
             }
         }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .liquidGlassPanel(
+            padding: 0,
+            radius: AppRadius.card,
+            material: AppMaterials.subtleGlass,
+            tint: .white,
+            interactive: true
+        )
     }
 
     private func hero(_ snapshot: SavingsStrategySnapshot) -> some View {
-        VStack(spacing: AppSpacing.medium) {
-            SavingsStrategyRingsView(snapshot: snapshot, size: 176)
+        VStack(spacing: 16) {
+            SavingsStrategyRingsView(snapshot: snapshot, size: 172)
+            SavingsStrategyLegend()
             Text(LocalizedStringKey(snapshot.isOnTrack ? "strategy.hero.onTrack" : "strategy.hero.offTrack"))
                 .font(.title3.weight(.semibold))
                 .foregroundStyle(snapshot.isOnTrack ? AppColors.income : AppColors.warning)
@@ -139,21 +146,23 @@ struct IOSSavingsStrategyView: View {
     }
 
     private func bucketCard(_ result: SavingsStrategyBucketResult) -> some View {
-        VStack(alignment: .leading, spacing: AppSpacing.small) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Label(LocalizedStringKey(result.bucket.titleKey), systemImage: result.bucket.systemImage)
-                    .font(.headline)
+                Image(systemName: result.bucket.systemImage)
                     .foregroundStyle(result.bucket.tintColor)
+                Text(LocalizedStringKey(result.bucket.titleKey))
+                    .font(.headline)
                 Spacer()
-                Text(LocalizedStringKey(statusKey(result.status, bucket: result.bucket)))
+                Text(LocalizedStringKey(SavingsStrategyStatusStyle.key(result.status, bucket: result.bucket)))
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(statusColor(result.status, bucket: result.bucket))
+                    .foregroundStyle(SavingsStrategyStatusStyle.color(result.status, bucket: result.bucket))
             }
 
             HStack(alignment: .firstTextBaseline) {
                 Text(percentLabel(result.actualPercent))
                     .font(.system(size: 32, weight: .bold, design: .rounded))
                     .monospacedDigit()
+                    .foregroundStyle(SavingsStrategyStatusStyle.color(result.status, bucket: result.bucket))
                 Text(appLanguage.localized("strategy.target", "\(result.targetPercent)"))
                     .foregroundStyle(.secondary)
                 Spacer()
@@ -162,24 +171,20 @@ struct IOSSavingsStrategyView: View {
             }
 
             ProgressView(value: min(result.actualPercent / max(Double(result.targetPercent), 1), 1))
-                .tint(statusColor(result.status, bucket: result.bucket))
+                .tint(SavingsStrategyStatusStyle.color(result.status, bucket: result.bucket))
 
             Text(LocalizedStringKey(result.bucket.subtitleKey))
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
             HStack {
-                Button {
-                    viewModel.adjust(bucket: result.bucket, delta: -1, using: appContainer)
-                } label: {
+                Button { viewModel.adjust(bucket: result.bucket, delta: -1, using: appContainer) } label: {
                     Image(systemName: "minus")
                 }
                 .appSecondaryGlassButton()
                 Text("\(result.targetPercent)%")
                     .font(.subheadline.weight(.semibold).monospacedDigit())
-                Button {
-                    viewModel.adjust(bucket: result.bucket, delta: 1, using: appContainer)
-                } label: {
+                Button { viewModel.adjust(bucket: result.bucket, delta: 1, using: appContainer) } label: {
                     Image(systemName: "plus")
                 }
                 .appSecondaryGlassButton()
@@ -196,7 +201,7 @@ struct IOSSavingsStrategyView: View {
                 .font(.caption)
             }
         }
-        .contentCard(padding: AppSpacing.medium, radius: AppRadius.card)
+        .contentCard(padding: 18, radius: AppRadius.card)
     }
 
     private var mappingCard: some View {
@@ -251,22 +256,6 @@ struct IOSSavingsStrategyView: View {
             get: { viewModel.config.bucket(for: category) },
             set: { viewModel.assign(categoryID: category.id, to: $0, using: appContainer) }
         )
-    }
-
-    private func statusKey(_ status: SavingsStrategyRangeStatus, bucket: SavingsAllocationBucket) -> String {
-        switch status {
-        case .within: return "strategy.range.within"
-        case .over: return bucket == .investment ? "strategy.range.above" : "strategy.range.over"
-        case .under: return "strategy.range.under"
-        }
-    }
-
-    private func statusColor(_ status: SavingsStrategyRangeStatus, bucket: SavingsAllocationBucket) -> Color {
-        switch status {
-        case .within: return AppColors.income
-        case .over: return bucket == .investment ? AppColors.income : AppColors.expense
-        case .under: return AppColors.warning
-        }
     }
 
     private func heroDetail(_ snapshot: SavingsStrategySnapshot) -> String {

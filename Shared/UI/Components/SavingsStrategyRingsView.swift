@@ -9,7 +9,7 @@ struct SavingsStrategyRingsView: View {
             ForEach(ringSpecs, id: \.bucket) { spec in
                 ZStack {
                     Circle()
-                        .stroke(spec.color.opacity(0.14), lineWidth: spec.lineWidth)
+                        .stroke(spec.color.opacity(0.16), lineWidth: spec.lineWidth)
                     Circle()
                         .trim(from: 0, to: spec.progress)
                         .stroke(
@@ -22,13 +22,13 @@ struct SavingsStrategyRingsView: View {
                 .animation(.spring(response: 0.55, dampingFraction: 0.86), value: spec.progress)
             }
 
-            VStack(spacing: 2) {
+            VStack(spacing: 3) {
                 Text(ratioLabel)
-                    .font(.system(size: size < 170 ? 18 : 22, weight: .semibold, design: .rounded))
+                    .font(.system(size: size < 170 ? 17 : 21, weight: .semibold, design: .rounded))
                     .monospacedDigit()
                     .contentTransition(.numericText())
                 Text(LocalizedStringKey(snapshot.isOnTrack ? "strategy.status.onTrack" : "strategy.status.offTrack"))
-                    .font(.caption.weight(.medium))
+                    .font(.caption2.weight(.semibold))
                     .foregroundStyle(snapshot.isOnTrack ? AppColors.income : AppColors.warning)
             }
         }
@@ -44,31 +44,59 @@ struct SavingsStrategyRingsView: View {
     }
 
     private var ringSpecs: [RingSpec] {
-        let widths: [CGFloat] = [size * 0.085, size * 0.085, size * 0.085]
-        let diameters: [CGFloat] = [size, size * 0.74, size * 0.48]
-        return zip(SavingsAllocationBucket.allCases, zip(widths, diameters)).map { bucket, metrics in
+        let lineWidth = max(11, size * 0.092)
+        let diameters: [CGFloat] = [size, size - (lineWidth * 2.15), size - (lineWidth * 4.3)]
+        return zip(SavingsAllocationBucket.allCases, diameters).map { bucket, diameter in
             let result = snapshot.result(for: bucket)
             let target = max(Double(result?.targetPercent ?? 1), 1)
             let actual = result?.actualPercent ?? 0
-            let rawProgress = min(max(actual / target, 0), 1)
-            let color: Color
-            if result?.status == .over {
-                color = AppColors.expense
-            } else if result?.status == .under {
-                color = AppColors.warning
-            } else {
-                color = bucket.tintColor
-            }
             return RingSpec(
                 bucket: bucket,
-                progress: snapshot.hasIncome ? rawProgress : 0,
-                color: color,
-                lineWidth: metrics.0,
-                diameter: metrics.1
+                progress: snapshot.hasIncome ? min(max(actual / target, 0), 1) : 0,
+                color: SavingsStrategyStatusStyle.color(result?.status ?? .under, bucket: bucket),
+                lineWidth: lineWidth,
+                diameter: diameter
             )
         }
     }
+}
 
+struct SavingsStrategyLegend: View {
+    var body: some View {
+        HStack(spacing: 14) {
+            ForEach(SavingsAllocationBucket.allCases) { bucket in
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(bucket.tintColor)
+                        .frame(width: 7, height: 7)
+                    Text(LocalizedStringKey(bucket.titleKey))
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+}
+
+enum SavingsStrategyStatusStyle {
+    static func color(_ status: SavingsStrategyRangeStatus, bucket: SavingsAllocationBucket) -> Color {
+        switch status {
+        case .within:
+            return bucket.tintColor
+        case .over:
+            return bucket == .investment ? AppColors.income : AppColors.expense
+        case .under:
+            return AppColors.warning
+        }
+    }
+
+    static func key(_ status: SavingsStrategyRangeStatus, bucket: SavingsAllocationBucket) -> String {
+        switch status {
+        case .within: return "strategy.range.within"
+        case .over: return bucket == .investment ? "strategy.range.above" : "strategy.range.over"
+        case .under: return "strategy.range.under"
+        }
+    }
 }
 
 extension SavingsAllocationBucket {

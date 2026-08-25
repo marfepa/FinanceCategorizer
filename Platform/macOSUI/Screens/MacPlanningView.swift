@@ -28,6 +28,9 @@ struct MacPlanningView: View {
             }
             .pickerStyle(.segmented)
             .labelsHidden()
+            .padding(.horizontal, 4)
+            .padding(.vertical, 4)
+            .liquidGlassPill(padding: 0, tint: .white, interactive: true)
             .padding(.horizontal, AppSpacing.large)
             .padding(.top, AppSpacing.medium)
             .padding(.bottom, AppSpacing.small)
