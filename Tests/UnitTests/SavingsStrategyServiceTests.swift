@@ -21,9 +21,12 @@ final class SavingsStrategyServiceTests: XCTestCase {
         XCTAssertEqual(SavingsAllocationBucket.defaultBucket(forCategoryNamed: "Restauracion", isIncome: false), .wants)
         XCTAssertEqual(SavingsAllocationBucket.defaultBucket(forCategoryNamed: "Compras", isIncome: false), .wants)
         XCTAssertEqual(SavingsAllocationBucket.defaultBucket(forCategoryNamed: "Inversión", isIncome: false), .investment)
+        XCTAssertEqual(SavingsAllocationBucket.defaultBucket(forCategoryNamed: "Finanzas", isIncome: false), .needs)
         XCTAssertNil(SavingsAllocationBucket.defaultBucket(forCategoryNamed: "Ingresos", isIncome: true))
         XCTAssertNil(SavingsAllocationBucket.defaultBucket(forCategoryNamed: "Transferencias", isIncome: false))
-        XCTAssertNil(SavingsAllocationBucket.defaultBucket(forCategoryNamed: "Finanzas", isIncome: false))
+        XCTAssertEqual(SavingsAllocationBucket.inferred(from: "RECIBO HIPOTECA OPENBANK"), .needs)
+        XCTAssertEqual(SavingsAllocationBucket.inferred(from: "AMAZON EU SARL"), .wants)
+        XCTAssertEqual(SavingsAllocationBucket.inferred(from: "INDEXA CAPITAL"), .investment)
     }
 
     func testBalancedMonthStaysWithinFiftyThirtyTwenty() {
@@ -124,12 +127,12 @@ final class SavingsStrategyServiceTests: XCTestCase {
     }
 
     func testUnassignedSpendingDoesNotInflateInvestment() {
-        let unknown = category("Finanzas")
+        let unknown = category("Sin categorizar")
         let income = category("Ingresos", isIncome: true)
         let snapshot = SavingsStrategyService().buildSnapshot(
             transactions: [
                 transaction(date(2026, 4, 1), "NOMINA", 1000, .income, income.id),
-                transaction(date(2026, 4, 8), "COMISION", -100, .expense, unknown.id)
+                transaction(date(2026, 4, 8), "PAGO GENERICO", -100, .expense, unknown.id)
             ],
             categories: [unknown, income],
             config: .default,
@@ -141,6 +144,25 @@ final class SavingsStrategyServiceTests: XCTestCase {
         XCTAssertEqual(snapshot?.unassignedAmount, 100)
         XCTAssertEqual(snapshot?.result(for: .investment)?.actualAmount, 900)
         XCTAssertEqual(snapshot?.result(for: .investment)?.residualAmount, 900)
+    }
+
+    func testUncategorizedMortgageDescriptionFallsIntoFixedCosts() {
+        let unknown = category("Sin categorizar")
+        let income = category("Ingresos", isIncome: true)
+        let snapshot = SavingsStrategyService().buildSnapshot(
+            transactions: [
+                transaction(date(2026, 4, 1), "NOMINA", 2000, .income, income.id),
+                transaction(date(2026, 4, 3), "RECIBO HIPOTECA OPENBANK", -800, .expense, unknown.id)
+            ],
+            categories: [unknown, income],
+            config: .default,
+            monthStart: date(2026, 4, 1),
+            now: date(2026, 4, 20),
+            calendar: calendar
+        )
+
+        XCTAssertEqual(snapshot?.result(for: .needs)?.actualAmount, 800)
+        XCTAssertEqual(snapshot?.unassignedAmount, 0)
     }
 
     func testAdjustingPercentagesKeepsAHundredTotal() {

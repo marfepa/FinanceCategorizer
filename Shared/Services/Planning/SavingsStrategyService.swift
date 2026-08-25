@@ -54,16 +54,19 @@ struct SavingsStrategyService {
         for entry in monthEntries where classifier.isExpense(entry.transaction) {
             let amount = abs(entry.amount)
             let category = resolvedCategory(for: entry.transaction, categoryByID: categoryByID)
-            let bucket = category.flatMap { config.bucket(for: $0) }
+            let bucket = resolvedBucket(for: entry.transaction, category: category, config: config)
 
-            if let bucket, let category {
+            if let bucket {
                 amounts[bucket, default: .zero] += amount
                 counts[bucket, default: 0] += 1
                 var bucketCategories = categoryAmounts[bucket] ?? [:]
-                var current = bucketCategories[category.id] ?? (category.name, category.iconName, .zero, 0)
+                let breakdownID = category?.id ?? SavingsStrategyService.inferredID
+                let name = category?.name ?? bucketTitle(bucket)
+                let icon = category?.iconName ?? bucket.systemImage
+                var current = bucketCategories[breakdownID] ?? (name, icon, .zero, 0)
                 current.amount += amount
                 current.count += 1
-                bucketCategories[category.id] = current
+                bucketCategories[breakdownID] = current
                 categoryAmounts[bucket] = bucketCategories
             } else {
                 unassignedAmount += amount
@@ -183,6 +186,33 @@ struct SavingsStrategyService {
         return months.sorted(by: >)
     }
 
+    private func resolvedBucket(
+        for transaction: Transaction,
+        category: Category?,
+        config: SavingsStrategyConfig
+    ) -> SavingsAllocationBucket? {
+        if let category, let mapped = config.bucket(for: category) {
+            return mapped
+        }
+        let text = [
+            transaction.merchantCanonicalName,
+            transaction.merchantDisplayName,
+            transaction.cleanedDescription,
+            transaction.rawDescription
+        ]
+            .compactMap { $0 }
+            .joined(separator: " ")
+        return SavingsAllocationBucket.inferred(from: text)
+    }
+
+    private func bucketTitle(_ bucket: SavingsAllocationBucket) -> String {
+        switch bucket {
+        case .needs: return "Gastos fijos"
+        case .wants: return "Caprichos"
+        case .investment: return "Inversión"
+        }
+    }
+
     private func resolvedCategory(
         for transaction: Transaction,
         categoryByID: [UUID: Category]
@@ -223,4 +253,5 @@ struct SavingsStrategyService {
     }
 
     private static let uncategorizedID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+    private static let inferredID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
 }

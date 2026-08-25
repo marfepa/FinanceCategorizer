@@ -56,6 +56,25 @@ enum SavingsAllocationBucket: String, Codable, CaseIterable, Identifiable {
         return nil
     }
 
+    /// Fallback when a movement has no mapped category: read merchant and description.
+    static func inferred(from rawText: String) -> SavingsAllocationBucket? {
+        let normalized = normalize(rawText)
+        guard !normalized.isEmpty else { return nil }
+        if excludedInferenceTokens.contains(where: { normalized.contains($0) }) {
+            return nil
+        }
+        if investmentInferenceTokens.contains(where: { normalized.contains($0) }) {
+            return .investment
+        }
+        if needsInferenceTokens.contains(where: { normalized.contains($0) }) {
+            return .needs
+        }
+        if wantsInferenceTokens.contains(where: { normalized.contains($0) }) {
+            return .wants
+        }
+        return nil
+    }
+
     private static func normalize(_ name: String) -> String {
         name
             .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
@@ -82,7 +101,8 @@ enum SavingsAllocationBucket: String, Codable, CaseIterable, Identifiable {
         "alimentacion",
         "suscripciones",
         "internet",
-        "seguros"
+        "seguros",
+        "finanzas"
     ]
 
     private static let wantsCategoryNames: Set<String> = [
@@ -109,6 +129,30 @@ enum SavingsAllocationBucket: String, Codable, CaseIterable, Identifiable {
         "ingresos",
         "movimiento interno",
         "internal movement"
+    ]
+
+    private static let needsInferenceTokens = [
+        "hipoteca", "alquiler", "comunidad", "ibi", "suministro", "endesa", "iberdrola",
+        "naturgy", "movistar", "vodafone", "orange", "digi", "pepephone", "masmovil",
+        "internet", "electricidad", "gas natural", "aguas", "mercadona", "lidl", "aldi",
+        "carrefour", "consum", "seguro", "sanitas", "farmacia", "renfe", "gasolinera",
+        "repsol", "cepsa", "nominas ss", "autonomo"
+    ]
+
+    private static let wantsInferenceTokens = [
+        "amazon", "zara", "mango", "shein", "temu", "aliexpress", "primark",
+        "restaurante", "burger", "pizza", "glovo", "uber eats", "starbucks",
+        "cine", "steam", "playstation", "decathlon"
+    ]
+
+    private static let investmentInferenceTokens = [
+        "indexa", "myinvestor", "degiro", "trade republic", "binance", "coinbase",
+        "broker", "fondos", "fondo indexado", "inversores", "openbank inversion",
+        "renta 4", "self bank", "scalable"
+    ]
+
+    private static let excludedInferenceTokens = [
+        "traspaso", "cuenta propia", "transferencia interna"
     ]
 }
 
