@@ -32,14 +32,14 @@ Entregables:
 
 ### Fixtures anonimizados de extractos
 
-Estado: iniciado con fixture Openbank CSV multilinea.
+Estado: avance completado para el corte Openbank CSV/XLSX/PDF; la matriz CSV por banco sigue parcial.
 
 Entregables:
 
-- CSV por banco. Parcial.
-- XLSX representativo.
-- PDF convertido a texto o fixture PDF si se puede incluir legalmente.
-- Tests de regresion. Parcial.
+- CSV por banco. Hecho para Openbank, Cajamar y ABANCA con fixtures anonimizados y regresión común.
+- XLSX representativo. Hecho con fixture OOXML anonimizado.
+- PDF convertido a texto o fixture PDF si se puede incluir legalmente. Hecho con fixture PDF Openbank sintético.
+- Tests de regresion. Hecho para idempotencia, duplicados intra/inter-origen, direcciones sintéticas, ambos sentidos y errores parciales.
 
 ### Matriz de soporte banco/formato
 
