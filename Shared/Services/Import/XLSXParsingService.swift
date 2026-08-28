@@ -199,29 +199,17 @@ struct XLSXParsingService {
         }
 
         let startIndex = max(0, candidate.rowIndex)
-        var extracted: [[String]] = Array(rows[startIndex...])
-        var trailingSparseCount = 0
-        var cutIndex: Int?
+        let extracted: [[String]] = Array(rows[startIndex...])
+        guard let header = extracted.first else { return [] }
 
-        for (offset, row) in extracted.enumerated().dropFirst() {
+        // Keep the detected header and all data rows with at least 2 non-empty cells,
+        // avoiding premature truncation from empty spacer rows between months/sections.
+        let dataRows = extracted.dropFirst().filter { row in
             let nonEmptyCount = row.filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }.count
-            if nonEmptyCount <= 1 {
-                trailingSparseCount += 1
-            } else {
-                trailingSparseCount = 0
-            }
-
-            if trailingSparseCount >= 3 {
-                cutIndex = max(1, offset - 2)
-                break
-            }
+            return nonEmptyCount >= 2
         }
 
-        if let cutIndex {
-            extracted = Array(extracted.prefix(cutIndex))
-        }
-
-        return extracted
+        return [header] + dataRows
     }
 }
 

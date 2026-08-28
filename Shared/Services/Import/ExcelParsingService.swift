@@ -285,22 +285,33 @@ enum ImportValueParser {
     }
 
     private static func normalizedNumberString(from value: String) -> String {
-        let lastComma = value.lastIndex(of: ",")
-        let lastDot = value.lastIndex(of: ".")
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        let lastComma = trimmed.lastIndex(of: ",")
+        let lastDot = trimmed.lastIndex(of: ".")
 
-        if let decimalIndex = [lastComma, lastDot].compactMap({ $0 }).max() {
-            let fractionalStart = value.index(after: decimalIndex)
-            let integerPart = value[..<decimalIndex].filter(\.isNumber)
-            let fractionalPart = value[fractionalStart...].filter(\.isNumber)
-
-            if fractionalPart.isEmpty {
-                return String(integerPart)
-            }
-
-            return "\(integerPart).\(fractionalPart)"
+        // Case 1: Comma is present and after any dot (e.g., "1.250,50" or "1250,50")
+        if let comma = lastComma, (lastDot == nil || comma > lastDot!) {
+            let intPart = trimmed[..<comma].filter(\.isNumber)
+            let fracPart = trimmed[trimmed.index(after: comma)...].filter(\.isNumber)
+            return fracPart.isEmpty ? String(intPart) : "\(intPart).\(fracPart)"
         }
 
-        return String(value.filter(\.isNumber))
+        // Case 2: Dot is present
+        if let dot = lastDot {
+            let afterDot = trimmed[trimmed.index(after: dot)...].filter(\.isNumber)
+            let beforeDot = trimmed[..<dot].filter(\.isNumber)
+
+            // If there's no comma, exactly 3 digits after the dot, and digits before the dot,
+            // treat it as a thousands separator (e.g., "1.250" -> 1250, "50.000" -> 50000)
+            if afterDot.count == 3 && lastComma == nil && !beforeDot.isEmpty {
+                return String(beforeDot) + String(afterDot)
+            }
+
+            // Otherwise dot is decimal separator (e.g., "12.50" or "1,250.50")
+            return "\(beforeDot).\(afterDot)"
+        }
+
+        return String(trimmed.filter(\.isNumber))
     }
 }
 
