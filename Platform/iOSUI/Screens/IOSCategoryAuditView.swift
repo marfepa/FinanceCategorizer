@@ -3,6 +3,7 @@ import SwiftUI
 struct IOSCategoryAuditView: View {
     @Environment(\.appContainer) private var appContainer
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.english
+    @AppStorage("isPrivacyModeEnabled") private var isPrivacyModeEnabled: Bool = false
     @State private var viewModel = CategoryAuditViewModel()
     @State private var selectedTransaction: Transaction?
     @State private var analyzeTrigger: UUID?
@@ -179,7 +180,7 @@ struct IOSCategoryAuditView: View {
                     .font(.body.weight(.medium))
                     .lineLimit(1)
                 Spacer()
-                Text(transaction.amount.privacyFormatted(hidden: false, language: appLanguage, currencyCode: transaction.currencyCode))
+                Text(transaction.amount.privacyFormatted(hidden: isPrivacyModeEnabled, language: appLanguage, currencyCode: transaction.currencyCode))
                     .font(.subheadline.monospacedDigit())
                     .foregroundStyle(transaction.amount < 0 ? AppColors.expense : AppColors.income)
             }

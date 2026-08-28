@@ -3,6 +3,7 @@ import SwiftUI
 struct IOSCategoryAuditDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.english
+    @AppStorage("isPrivacyModeEnabled") private var isPrivacyModeEnabled: Bool = false
 
     let transaction: Transaction
     let categories: [Category]
@@ -26,7 +27,7 @@ struct IOSCategoryAuditDetailView: View {
                     Text(appLanguage.format(date: transaction.bookingDate, dateStyle: .long))
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    Text(transaction.amount.privacyFormatted(hidden: false, language: appLanguage, currencyCode: transaction.currencyCode))
+                    Text(transaction.amount.privacyFormatted(hidden: isPrivacyModeEnabled, language: appLanguage, currencyCode: transaction.currencyCode))
                         .font(.title.weight(.semibold).monospacedDigit())
                         .foregroundStyle(transaction.amount < 0 ? AppColors.expense : AppColors.income)
                 }

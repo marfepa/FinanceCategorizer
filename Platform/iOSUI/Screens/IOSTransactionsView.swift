@@ -3,6 +3,7 @@ import SwiftUI
 struct IOSTransactionsView: View {
     @Environment(\.appContainer) private var appContainer
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.english
+    @AppStorage("isPrivacyModeEnabled") private var isPrivacyModeEnabled: Bool = false
     @State private var viewModel = TransactionsViewModel()
     @State private var isShowingExportOptions = false
     @State private var isExporting = false
@@ -14,8 +15,8 @@ struct IOSTransactionsView: View {
         Group {
             if viewModel.transactions.isEmpty {
                 EmptyStateView(
-                    title: "No Transactions Yet",
-                    message: "Import a CSV from the Import tab and your transactions will appear here.",
+                    title: LocalizedStringKey("No Transactions Yet"),
+                    message: LocalizedStringKey("Import a CSV from the Import tab and your transactions will appear here."),
                     systemImage: "list.bullet.rectangle"
                 )
             } else {
@@ -86,14 +87,30 @@ struct IOSTransactionsView: View {
                     Section(LocalizedStringKey("Movements")) {
                         ForEach(viewModel.filteredTransactions) { transaction in
                             VStack(alignment: .leading, spacing: AppSpacing.xSmall) {
-                                Text(transaction.rawDescription)
-                                    .font(.headline)
-                                Text(appLanguage.format(date: transaction.bookingDate))
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                                Text(appLanguage.formatCurrency(transaction.amount, code: transaction.currencyCode))
-                                    .font(.subheadline.weight(.medium))
-                                    .foregroundStyle(transaction.amount < 0 ? AppColors.expense : AppColors.income)
+                                HStack(alignment: .firstTextBaseline) {
+                                    Text(transaction.rawDescription)
+                                        .font(.headline)
+                                        .lineLimit(1)
+                                    Spacer()
+                                    Text(transaction.amount.privacyFormatted(hidden: isPrivacyModeEnabled, language: appLanguage, currencyCode: transaction.currencyCode))
+                                        .font(.subheadline.weight(.medium).monospacedDigit())
+                                        .foregroundStyle(transaction.amount < 0 ? AppColors.expense : AppColors.income)
+                                }
+
+                                HStack(spacing: AppSpacing.xSmall) {
+                                    Text(appLanguage.format(date: transaction.bookingDate))
+                                    if let categoryID = transaction.categoryID,
+                                       let category = viewModel.categories.first(where: { $0.id == categoryID }) {
+                                        Text("•")
+                                        Text(category.name)
+                                    }
+                                    if let account = transaction.accountName, !account.isEmpty {
+                                        Text("•")
+                                        Text(account)
+                                    }
+                                }
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                             }
                             .padding(.vertical, AppSpacing.xSmall)
                         }

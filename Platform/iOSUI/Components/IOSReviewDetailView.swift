@@ -2,6 +2,7 @@ import SwiftUI
 
 struct IOSReviewDetailView: View {
     @Environment(\.dismiss) private var dismiss
+    @AppStorage("isPrivacyModeEnabled") private var isPrivacyModeEnabled: Bool = false
 
     let transaction: Transaction
     let categories: [Category]
@@ -15,7 +16,7 @@ struct IOSReviewDetailView: View {
             Form {
                 Section(LocalizedStringKey("Movement")) {
                     LabeledContent(LocalizedStringKey("Concept"), value: transaction.rawDescription)
-                    LabeledContent(LocalizedStringKey("Amount"), value: transaction.amount.privacyFormatted(hidden: false, currencyCode: transaction.currencyCode))
+                    LabeledContent(LocalizedStringKey("Amount"), value: transaction.amount.privacyFormatted(hidden: isPrivacyModeEnabled, currencyCode: transaction.currencyCode))
                     LabeledContent(LocalizedStringKey("Date"), value: transaction.bookingDate.formatted(date: .abbreviated, time: .omitted))
                 }
 
