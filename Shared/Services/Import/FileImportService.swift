@@ -50,11 +50,21 @@ struct FileImportService {
                 throw FileImportError.unsupportedFormat
             }
 
-            guard let text = try? String(contentsOf: url, encoding: .utf8) else {
-                throw FileImportError.unreadableFile
+            let encodings: [String.Encoding] = [
+                .utf8,
+                .windowsCP1252,
+                .isoLatin1,
+                .isoLatin2,
+                .macOSRoman
+            ]
+
+            for encoding in encodings {
+                if let text = try? String(contentsOf: url, encoding: encoding) {
+                    return text
+                }
             }
 
-            return text
+            throw FileImportError.unreadableFile
         }
     }
 

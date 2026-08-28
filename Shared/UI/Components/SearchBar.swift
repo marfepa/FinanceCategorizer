@@ -144,6 +144,8 @@ private struct GlassSegmentedGroupChrome: ViewModifier {
 }
 
 private struct SelectedSegmentCapsule: View {
+    @Environment(\.colorScheme) private var colorScheme
+
     var body: some View {
         Group {
             if #available(macOS 26.0, iOS 26.0, *) {
@@ -193,22 +195,31 @@ private struct SelectedSegmentCapsule: View {
             } else {
                 Capsule(style: .continuous)
                     .fill(
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(0.90),
-                                Color.white.opacity(0.74)
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
+                        colorScheme == .dark
+                            ? LinearGradient(
+                                colors: [
+                                    Color.white.opacity(0.22),
+                                    Color.white.opacity(0.12)
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                            : LinearGradient(
+                                colors: [
+                                    Color.white.opacity(0.92),
+                                    Color.white.opacity(0.78)
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
                     )
                     .overlay {
                         Capsule(style: .continuous)
                             .strokeBorder(
                                 LinearGradient(
                                     colors: [
-                                        Color.white.opacity(0.62),
-                                        Color.white.opacity(0.30)
+                                        colorScheme == .dark ? Color.white.opacity(0.35) : Color.white.opacity(0.62),
+                                        colorScheme == .dark ? Color.white.opacity(0.15) : Color.white.opacity(0.30)
                                     ],
                                     startPoint: .top,
                                     endPoint: .bottom
@@ -216,8 +227,8 @@ private struct SelectedSegmentCapsule: View {
                                 lineWidth: 0.95
                             )
                     }
-                    .shadow(color: .white.opacity(0.16), radius: 3, x: 0, y: -1)
-                    .shadow(color: .black.opacity(0.12), radius: 12, x: 0, y: 6)
+                    .shadow(color: colorScheme == .dark ? .clear : .white.opacity(0.16), radius: 3, x: 0, y: -1)
+                    .shadow(color: .black.opacity(colorScheme == .dark ? 0.25 : 0.12), radius: 10, x: 0, y: 4)
             }
         }
         .compositingGroup()

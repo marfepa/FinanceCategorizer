@@ -112,9 +112,9 @@ final class TransactionsViewModel {
                 var exp: Decimal = 0
                 for tx in result {
                     if tx.resolvedKind == .income {
-                        inc += tx.amount
+                        inc += abs(tx.amount)
                     } else if tx.resolvedKind == .expense {
-                        exp += tx.amount
+                        exp += abs(tx.amount)
                     }
                 }
                 

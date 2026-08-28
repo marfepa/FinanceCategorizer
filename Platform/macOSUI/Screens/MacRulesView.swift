@@ -72,8 +72,10 @@ struct MacRulesView: View {
                 
                 TableColumn(LocalizedStringKey("Category")) { rule in
                     if let category = categories.first(where: { $0.id == rule.targetCategoryID }) {
-                        HStack {
-                            Text(category.iconName)
+                        HStack(spacing: 6) {
+                            Image(systemName: category.iconName)
+                                .foregroundStyle(category.isIncome ? AppColors.income : AppColors.accent)
+                                .frame(width: 16, height: 16)
                             Text(category.name)
                         }
                     } else {

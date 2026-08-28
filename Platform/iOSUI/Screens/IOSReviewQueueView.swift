@@ -2,6 +2,7 @@ import SwiftUI
 
 struct IOSReviewQueueView: View {
     @Environment(\.appContainer) private var appContainer
+    @AppStorage("isPrivacyModeEnabled") private var isPrivacyModeEnabled: Bool = false
     @State private var viewModel = ReviewQueueViewModel()
     @State private var selectedTransaction: Transaction?
 
@@ -17,7 +18,7 @@ struct IOSReviewQueueView: View {
                             .foregroundStyle(.primary)
                             .lineLimit(1)
                         Spacer()
-                        Text(transaction.amount.privacyFormatted(hidden: false, currencyCode: transaction.currencyCode))
+                        Text(transaction.amount.privacyFormatted(hidden: isPrivacyModeEnabled, currencyCode: transaction.currencyCode))
                             .font(.subheadline.monospacedDigit())
                             .foregroundStyle(transaction.amount < 0 ? AppColors.expense : AppColors.income)
                     }

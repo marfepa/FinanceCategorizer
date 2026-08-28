@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum AppSpacing {
-    static let xSmall: CGFloat = 8
+    static let xSmall: CGFloat = 4
     static let small: CGFloat = 8
     static let medium: CGFloat = 16
     static let large: CGFloat = 24
@@ -11,7 +11,7 @@ enum AppSpacing {
 }
 
 enum AppLayoutMetrics {
-    static let microGap: CGFloat = 8
+    static let microGap: CGFloat = 4
     static let contentGap: CGFloat = 16
     static let blockGap: CGFloat = 24
     static let sectionGap: CGFloat = 24
