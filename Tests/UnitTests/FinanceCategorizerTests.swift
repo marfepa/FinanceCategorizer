@@ -1565,8 +1565,8 @@ final class FinanceCategorizerTests: XCTestCase {
         let digitsOnly = result.summary.filter(\.isNumber)
 
         XCTAssertTrue(digitsOnly.contains("1000"))
-        XCTAssertFalse(digitsOnly.contains("400"))
-        XCTAssertFalse(digitsOnly.contains("600"))
+        XCTAssertTrue(digitsOnly.contains("400"))
+        XCTAssertTrue(digitsOnly.contains("600"))
     }
 
     func testAppleAIFallbackDetectsCategoryCleanupSignals() async throws {
@@ -2949,5 +2949,46 @@ final class FinanceCategorizerTests: XCTestCase {
             guard let keyRange = Range(match.range(at: 1), in: text) else { return nil }
             return String(text[keyRange])
         })
+    }
+
+    func testEuropeanThousandsAndDecimalNumberParsing() {
+        // European thousands without comma (e.g., 1.250 EUR -> 1250)
+        XCTAssertEqual(ImportValueParser.parseAmount("1.250"), Decimal(1250))
+        XCTAssertEqual(ImportValueParser.parseAmount("50.000"), Decimal(50000))
+        XCTAssertEqual(ImportValueParser.parseAmount("1.250.000"), Decimal(1250000))
+
+        // European standard with comma decimal
+        XCTAssertEqual(ImportValueParser.parseAmount("1.250,50"), Decimal(string: "1250.50"))
+        XCTAssertEqual(ImportValueParser.parseAmount("1250,50"), Decimal(string: "1250.50"))
+        XCTAssertEqual(ImportValueParser.parseAmount("12,50"), Decimal(string: "12.50"))
+
+        // Negative European amounts
+        XCTAssertEqual(ImportValueParser.parseAmount("-1.250,00"), Decimal(-1250))
+        XCTAssertEqual(ImportValueParser.parseAmount("-50.000"), Decimal(-50000))
+
+        // US standard with dot decimal
+        XCTAssertEqual(ImportValueParser.parseAmount("12.50"), Decimal(string: "12.50"))
+        XCTAssertEqual(ImportValueParser.parseAmount("1,250.50"), Decimal(string: "1250.50"))
+    }
+
+    func testMultiEncodingFileImportServiceReadsWindows1252AndUTF8() throws {
+        let service = FileImportService()
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let testContent = "Fecha;Concepto;Importe\n01/08/2026;Nómina y transferencias;1.500,00 €\n"
+
+        // Test UTF-8
+        let utf8URL = tempDir.appendingPathComponent("test_utf8.csv")
+        try testContent.data(using: .utf8)?.write(to: utf8URL)
+        let utf8Read = try service.readText(from: utf8URL)
+        XCTAssertTrue(utf8Read.contains("Nómina"))
+
+        // Test Windows-1252
+        let winURL = tempDir.appendingPathComponent("test_win1252.csv")
+        try testContent.data(using: .windowsCP1252)?.write(to: winURL)
+        let winRead = try service.readText(from: winURL)
+        XCTAssertTrue(winRead.contains("Nómina"))
     }
 }
