@@ -344,7 +344,6 @@ struct GlassInspectorPanel<Primary: View, Advanced: View, Footer: View>: View {
 
             footer
         }
-        .padding(AppLayoutMetrics.sectionGap)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .liquidGlassPanel(
             padding: AppLayoutMetrics.sectionGap,

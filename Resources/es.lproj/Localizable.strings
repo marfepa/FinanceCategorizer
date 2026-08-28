@@ -885,3 +885,8 @@
 "Account name, for example Main account" = "Nombre de la cuenta, por ejemplo Cuenta principal";
 "Data recovery mode" = "Modo de recuperación de datos";
 "The local database could not be opened. Your original files were preserved and changes made in this session will not be saved." = "No se ha podido abrir la base de datos local. Los archivos originales se han conservado y los cambios de esta sesión no se guardarán.";
+"Import Bank Transactions" = "Importar movimientos bancarios";
+"Choose a CSV, XLSX, or PDF export from your bank, or paste CSV text below." = "Elige un extracto en CSV, XLSX o PDF de tu banco, o pega texto CSV abajo.";
+"Choose File" = "Seleccionar archivo";
+"CSV, XLSX, or PDF" = "CSV, XLSX o PDF";
+"Or paste CSV text directly" = "O pega texto CSV directamente";

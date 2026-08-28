@@ -877,3 +877,8 @@
 "Account name, for example Main account" = "Account name, for example Main account";
 "Data recovery mode" = "Data recovery mode";
 "The local database could not be opened. Your original files were preserved and changes made in this session will not be saved." = "The local database could not be opened. Your original files were preserved and changes made in this session will not be saved.";
+"Import Bank Transactions" = "Import Bank Transactions";
+"Choose a CSV, XLSX, or PDF export from your bank, or paste CSV text below." = "Choose a CSV, XLSX, or PDF export from your bank, or paste CSV text below.";
+"Choose File" = "Choose File";
+"CSV, XLSX, or PDF" = "CSV, XLSX, or PDF";
+"Or paste CSV text directly" = "Or paste CSV text directly";

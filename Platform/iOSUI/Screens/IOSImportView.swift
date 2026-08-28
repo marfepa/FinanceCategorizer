@@ -1,20 +1,54 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct IOSImportView: View {
     @Environment(\.appContainer) private var appContainer
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.english
     @State private var viewModel = ImportViewModel()
+    @State private var isFileImporterPresented = false
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: AppSpacing.large) {
                 VStack(alignment: .leading, spacing: AppSpacing.small) {
-                    Text(LocalizedStringKey("Paste CSV"))
+                    Text(LocalizedStringKey("Import Bank Transactions"))
                         .font(AppTypography.screenTitle)
-                    Text(LocalizedStringKey("Expected header: date, concept, amount"))
+                    Text(LocalizedStringKey("Choose a CSV, XLSX, or PDF export from your bank, or paste CSV text below."))
                         .font(AppTypography.body)
                         .foregroundStyle(.secondary)
                 }
+
+                Button {
+                    isFileImporterPresented = true
+                } label: {
+                    HStack {
+                        Image(systemName: "doc.badge.plus")
+                            .font(.title3)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(LocalizedStringKey("Choose File"))
+                                .font(.headline)
+                            if let selectedURL = viewModel.selectedFileURL {
+                                Text(selectedURL.lastPathComponent)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            } else {
+                                Text(LocalizedStringKey("CSV, XLSX, or PDF"))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(AppSpacing.medium)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(AppColors.cardBackground)
+                    )
+                }
+                .buttonStyle(.plain)
 
                 TextField(LocalizedStringKey("Source file name"), text: $viewModel.sourceFileName)
                     .textFieldStyle(.roundedBorder)
@@ -22,14 +56,20 @@ struct IOSImportView: View {
                 TextField(LocalizedStringKey("Account name, for example Main account"), text: $viewModel.accountName)
                     .textFieldStyle(.roundedBorder)
 
-                TextEditor(text: $viewModel.csvText)
-                    .scrollDisabled(true)
-                    .frame(minHeight: 220)
-                    .padding(AppSpacing.small)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(AppColors.cardBackground)
-                    )
+                VStack(alignment: .leading, spacing: AppSpacing.xSmall) {
+                    Text(LocalizedStringKey("Or paste CSV text directly"))
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.secondary)
+
+                    TextEditor(text: $viewModel.csvText)
+                        .scrollDisabled(true)
+                        .frame(minHeight: 160)
+                        .padding(AppSpacing.small)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(AppColors.cardBackground)
+                        )
+                }
 
                 HStack(spacing: AppSpacing.small) {
                     PrimaryButton(title: LocalizedStringKey("Preview")) {
@@ -88,5 +128,22 @@ struct IOSImportView: View {
             .padding(AppSpacing.large)
         }
         .navigationTitle(LocalizedStringKey("Import"))
+        .fileImporter(
+            isPresented: $isFileImporterPresented,
+            allowedContentTypes: [.commaSeparatedText, .spreadsheet, .pdf],
+            allowsMultipleSelection: false
+        ) { result in
+            switch result {
+            case .success(let urls):
+                guard let url = urls.first else { return }
+                guard url.startAccessingSecurityScopedResource() else { return }
+                defer { url.stopAccessingSecurityScopedResource() }
+                viewModel.selectedFileURL = url
+                viewModel.sourceFileName = url.lastPathComponent
+                viewModel.preview(using: appContainer, language: appLanguage)
+            case .failure(let error):
+                viewModel.errorMessage = error.localizedDescription
+            }
+        }
     }
 }
