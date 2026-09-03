@@ -1041,6 +1041,32 @@ final class FinanceCategorizerTests: XCTestCase {
             resolver.resolve(rawDescription: "BIZUM A FAVOR DE MARIA C M", cleanedDescription: "BIZUM A FAVOR DE MARIA C M", amount: -10),
             .expense
         )
+        XCTAssertEqual(
+            resolver.resolve(rawDescription: "DISPOSICION PRESTAMO PTMO.:000208616490004729", cleanedDescription: "DISPOSICION PRESTAMO", amount: 30000),
+            .transfer
+        )
+        XCTAssertEqual(
+            resolver.resolve(rawDescription: "Tu retirada de la cuenta de compensacion de Trade Republic", cleanedDescription: "Trade Republic", amount: 20295.33),
+            .transfer
+        )
+        XCTAssertEqual(
+            resolver.resolve(rawDescription: "TRASPASO ES7530580990232728050967", cleanedDescription: "TRASPASO ES7530580990232728050967", amount: 10000),
+            .transfer
+        )
+    }
+
+    func testOpenbankPDFParserDoesNotSwallowYearDigitsIntoAmount() throws {
+        let text = """
+        Openbank
+        Fecha Operación Fecha Valor Concepto Importe Saldo
+        28/08/2026 28/08/2026 TRANSFERENCIA DE GENERALITAT VALENCIANA, CONCEPTO NOMINA EDUCACION C.PRIVADOS 08-2026 830,02 1.527,55
+        Página: 1 / 1
+        """
+        let preview = try PDFParsingService().preview(text: text)
+        XCTAssertEqual(preview.rows.count, 1)
+        XCTAssertEqual(preview.rows.first?.amount, Decimal(string: "830.02"))
+        XCTAssertEqual(preview.rows.first?.balance, Decimal(string: "1527.55"))
+        XCTAssertTrue(preview.rows.first?.concept.contains("08-2026") == true)
     }
 
     func testCSVPreviewClosesQuotedMultilineRowsIndependently() throws {
@@ -1519,7 +1545,7 @@ final class FinanceCategorizerTests: XCTestCase {
         let currentMonth = calendar.component(.month, from: now)
 
         let payroll = Transaction(
-            bookingDate: date(year: currentYear, month: currentMonth, day: 10),
+            bookingDate: date(year: currentYear, month: currentMonth, day: 1),
             rawDescription: "NOMINA EMPRESA",
             cleanedDescription: "NOMINA EMPRESA",
             merchantDisplayName: "Empresa",
@@ -1539,7 +1565,7 @@ final class FinanceCategorizerTests: XCTestCase {
             isRecurringCandidate: false
         )
         let expense = Transaction(
-            bookingDate: date(year: currentYear, month: currentMonth, day: 11),
+            bookingDate: date(year: currentYear, month: currentMonth, day: 1),
             rawDescription: "ALQUILER ENERO",
             cleanedDescription: "ALQUILER ENERO",
             merchantDisplayName: "Casero",
