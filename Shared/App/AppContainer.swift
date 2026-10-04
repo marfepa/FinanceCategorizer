@@ -31,6 +31,7 @@ final class AppContainer {
     let recategorizationService: RecategorizationService
     let correctionLearningService: CorrectionLearningService
     var correctionBatchService: CorrectionBatchService { correctionLearningService.batchService }
+    let transferPairService: TransferPairService
     let localModelManager: LocalModelManager
     let aiAvailabilityService: AIAvailabilityService
     let aiSuggestionService: AISuggestionService
@@ -101,6 +102,7 @@ final class AppContainer {
             localModelManager: localModelManager
         )
         let correctionLearningService = CorrectionLearningService(batchService: correctionBatchService)
+        self.transferPairService = TransferPairService(modelContainer: modelContainer, batchService: correctionBatchService)
         let aiSuggestionService = AISuggestionService(
             availabilityService: aiAvailabilityService,
             promptBuilder: AIPromptBuilder(),

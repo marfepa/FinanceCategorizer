@@ -915,3 +915,34 @@
 "review.similar.confirmAction" = "Aplicar a %@";
 "review.similar.cancel" = "Cancelar";
 "review.undo.ruleRemoved" = "Regla eliminada.";
+
+/* Transfer pairs */
+"review.filter.transferPairs" = "Posibles traspasos";
+"review.transferPair.outgoing" = "Sale de";
+"review.transferPair.incoming" = "Entra en";
+"review.transferPair.unnamedAccount" = "Cuenta sin nombre";
+"review.transferPair.confirm" = "Es un traspaso";
+"review.transferPair.confirmHint" = "Marca los dos movimientos como traspaso entre tus cuentas para que no cuenten como ingreso ni gasto.";
+"review.transferPair.reject" = "No es un traspaso";
+"review.transferPair.rejectHint" = "No lo cuenta como traspaso. Puede volver a aparecer la próxima vez que abras la app.";
+"review.transferPair.sameDay" = "mismo día";
+"review.transferPair.dayGap.one" = "1 día de diferencia";
+"review.transferPair.dayGap.other" = "%@ días de diferencia";
+"review.transferPair.likely" = "Traspaso probable";
+"review.transferPair.possible" = "Posible traspaso";
+"review.transferPair.nameAccountsTip" = "Consejo: da nombre a tus cuentas al importar para detectar mejor los traspasos.";
+"review.transferPair.emptyTitle" = "Sin posibles traspasos";
+"review.transferPair.emptyMessage" = "No hay movimientos del mismo importe entre tus cuentas pendientes de confirmar.";
+"review.transferPair.footer" = "Parece que moviste dinero entre tus propias cuentas: sale de una y entra en otra por el mismo importe. Si lo confirmas, no contará como gasto ni como ingreso.";
+"review.undo.transferPairSaved" = "Guardado: traspaso entre cuentas.";
+"accounts.transferPairs.pending.one" = "1 posible traspaso entre tus cuentas por revisar";
+"accounts.transferPairs.pending.other" = "%@ posibles traspasos entre tus cuentas por revisar";
+"accounts.transferPairs.footer" = "Revísalos en la cola de revisión: hasta entonces se cuentan como ingresos y gastos.";
+"review.transferPair.route" = "de %@ a %@";
+"review.transferPair.confirmContext" = "Es un traspaso, %@";
+"review.transferPair.rejectContext" = "No es un traspaso, %@";
+"review.transferPair.hiddenAmount" = "importe oculto";
+"review.transferPair.accessibilitySummary" = "%1$@: %2$@ %3$@. Sale: %4$@. Entra: %5$@.";
+"review.transferPair.showCount" = "Posibles traspasos (%@)";
+"review.transferPair.backToQueue" = "Volver a la cola";
+"review.transferPair.error.changed" = "Alguno de estos movimientos ha cambiado desde la propuesta. Vuelve a revisarlo.";

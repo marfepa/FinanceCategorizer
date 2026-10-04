@@ -14,6 +14,7 @@ enum ReviewListFilter: String, CaseIterable, Identifiable {
     case uncategorized
     case suggestions
     case similar
+    case transferPairs
 
     var id: String { rawValue }
 
@@ -25,6 +26,7 @@ enum ReviewListFilter: String, CaseIterable, Identifiable {
         case .uncategorized: return language.localized("review.filter.uncategorized")
         case .suggestions: return language.localized("review.filter.suggestions")
         case .similar: return language.localized("review.filter.similar")
+        case .transferPairs: return language.localized("review.filter.transferPairs")
         }
     }
 }
@@ -66,6 +68,8 @@ final class ReviewQueueViewModel {
     /// Most recent undoable batch, shown in the undo banner.
     var lastBatch: CorrectionBatch?
     var similarApplyPreview: SimilarApplyPreview?
+    /// Possible transfers between own accounts, awaiting confirmation.
+    private(set) var transferPairs: [TransferPairProposal] = []
     @ObservationIgnored weak var undoManager: UndoManager?
     var suggestedGroups: [SimilarTransactionGroup] = [] {
         didSet { updateFilteredListCache() }
@@ -114,6 +118,8 @@ final class ReviewQueueViewModel {
                     return snapshots.filter { t in
                         ids.contains(t.id) || similarIds.contains(t.id)
                     }.map { $0.id }
+                case .transferPairs:
+                    return []
                 }
             }.value
             
@@ -147,6 +153,8 @@ final class ReviewQueueViewModel {
             selectedKind = selectedTransaction?.resolvedKind ?? .expense
             newCategoryIsIncome = (selectedTransaction?.amount ?? 0) > 0
             suggestedGroups = buildSuggestedGroups(from: transactions)
+            // Proposals are advisory: a failure must not hide the review queue.
+            transferPairs = (try? container.transferPairService.proposals()) ?? []
             recategorizationSummary = nil
             errorMessage = nil
         } catch {
@@ -393,6 +401,19 @@ final class ReviewQueueViewModel {
         }
     }
 
+    // MARK: Transfer pairs
+
+    func confirmTransferPair(_ proposal: TransferPairProposal, using container: AppContainer) {
+        perform(advancingFrom: nil, using: container) {
+            try container.transferPairService.confirm(proposal)
+        }
+    }
+
+    func dismissTransferPair(_ proposal: TransferPairProposal, using container: AppContainer) {
+        container.transferPairService.dismiss(proposal)
+        transferPairs.removeAll { $0.id == proposal.id }
+    }
+
     // MARK: Undo
 
     func undo(_ batch: CorrectionBatch, using container: AppContainer) {
@@ -460,6 +481,9 @@ final class ReviewQueueViewModel {
         let language = AppLanguage.currentSelection
         if batch.totalCount == 0 {
             return language.localized("review.undo.ruleCreated")
+        }
+        if batch.action == .confirmTransferPair {
+            return language.localized("review.undo.transferPairSaved")
         }
         if batch.propagatedCount > 0 {
             return language.localized(
