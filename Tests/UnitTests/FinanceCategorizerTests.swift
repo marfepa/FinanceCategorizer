@@ -417,7 +417,12 @@ final class FinanceCategorizerTests: XCTestCase {
             ("BARBERIA JAVI ALGEMESI", "Cuidado personal"),
             ("DECATHLON CARCAIXENT", "Deportes"),
             ("APPLE BILL ITUNES", "Suscripciones"),
-            ("PARROQUIA SAN PIO X ALGEMESI", "Donaciones")
+            ("PARROQUIA SAN PIO X ALGEMESI", "Donaciones"),
+            ("RECIBO HIPOTECA OPENBANK", "Hogar"),
+            ("ENDESA ENERGIA SA", "Suministros"),
+            ("AMAZON EU SARL", "Compras"),
+            ("INDEXA CAPITAL", "Inversión"),
+            ("PEDIDO GLOVO", "Restauracion")
         ]
 
         for testCase in cases {
