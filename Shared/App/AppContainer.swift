@@ -30,6 +30,7 @@ final class AppContainer {
     let categorizationOrchestrator: CategorizationOrchestrator
     let recategorizationService: RecategorizationService
     let correctionLearningService: CorrectionLearningService
+    var correctionBatchService: CorrectionBatchService { correctionLearningService.batchService }
     let localModelManager: LocalModelManager
     let aiAvailabilityService: AIAvailabilityService
     let aiSuggestionService: AISuggestionService
@@ -94,16 +95,12 @@ final class AppContainer {
             foundationResolver: foundationResolver,
             confidenceScorer: ConfidenceScorer()
         )
-        let merchantLearningStore = MerchantLearningStore(merchantRepository: merchantRepository)
-        let correctionLearningService = CorrectionLearningService(
-            correctionRepository: correctionRepository,
-            categoryRepository: categoryRepository,
-            merchantLearningStore: merchantLearningStore,
-            ruleRepository: ruleRepository,
-            transactionRepository: transactionRepository,
+        let correctionBatchService = CorrectionBatchService(
+            modelContainer: modelContainer,
             ruleSuggestionEngine: RuleSuggestionEngine(),
             localModelManager: localModelManager
         )
+        let correctionLearningService = CorrectionLearningService(batchService: correctionBatchService)
         let aiSuggestionService = AISuggestionService(
             availabilityService: aiAvailabilityService,
             promptBuilder: AIPromptBuilder(),
