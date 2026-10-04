@@ -8,10 +8,13 @@
   - [x] "Aplicar a similares" con confirmación y número exacto de afectados.
   - [x] La propagación nunca toca movimientos con origen `manual`.
   - [x] Reglas: en la cola solo se crean si el usuario lo pide; si el motor las sugiere, se ofrecen en el aviso.
+  - [x] Posibles traspasos entre cuentas propias (`TransferPairDetector` + `TransferPairService`): se proponen en la cola (filtro en macOS, sección en iOS) y se confirman como un lote deshacible. Aviso en Cuentas.
 - **Pendiente / Roadmap:**
   - [ ] Conectar deshacer en Transacciones y Auditoría de categorías (ya pasan por el servicio, falta UI).
   - [ ] Historial persistente entre sesiones (requiere estrategia de migración, ver Trampas).
   - [ ] `dismissSuggestedCategory` y `updateSelectedKind` todavía no son deshacibles.
+  - [ ] Persistir parejas y descartes de traspasos (requiere congelar el esquema V1).
+  - [ ] Señales fuertes de traspaso: IBAN propio y nombre del titular (hoy no se guardan).
 - **Deuda técnica:** el servicio carga todos los `Transaction` en memoria para calcular la propagación; con historiales grandes conviene acotar por `kindRaw` y signo en el `#Predicate`.
 
 ## 2. Terreno de Juego (Ficheros y Límites)
@@ -19,7 +22,8 @@
   - `Shared/Services/Learning/CorrectionBatchService.swift`
   - `Shared/Services/Learning/LearningService.swift` (`CorrectionLearningService`, `RuleSuggestionEngine`)
   - `Shared/Features/Transactions/ReviewQueueViewModel.swift`
-  - `Shared/UI/Components/CorrectionUndoBanner.swift`
+  - `Shared/UI/Components/CorrectionUndoBanner.swift`, `Shared/UI/Components/TransferPairRow.swift`
+  - `Shared/Services/Insights/TransferPairDetector.swift`, `Shared/Services/Insights/TransferPairService.swift`
   - `Platform/macOSUI/Screens/MacReviewQueueView.swift`, `Platform/iOSUI/Screens/IOSReviewQueueView.swift`
   - `Tests/UnitTests/CorrectionBatchServiceTests.swift`
 - **Dependencias externas (solo lectura):** `TransactionRepository` (`TransactionNameMatcher`), `CategoryDirectionPolicy`, `LocalModelManager`, modelos `Transaction`, `UserCorrection`, `Merchant`, `Rule`.
@@ -41,3 +45,11 @@
 - ⚠ **`CategoryDirectionPolicy`:** transferencias y ajustes son compatibles con cualquier categoría; solo ingreso↔gasto se rechaza. Los previews filtran incompatibles con `compatibleTransactionIDs` para que un lote confirmado no falle entero.
 - ⚠ **Deshacer exige que existan todos los movimientos del lote:** si uno se borró, la reversión se rechaza entera (`transactionNotFound`) en vez de restaurar a medias.
 - ⚠ **`isSimilar` (VM) y `TransactionNameMatcher` (propagación) son criterios distintos:** el diálogo de confirmación separa "de la cola" y "anteriores del mismo comercio"; al confirmar se recalcula y, si cambió, se vuelve a pedir confirmación.
+- ⚠ **`accountName` es opcional al importar:** sin nombre de cuenta, el detector solo empareja movimientos de importaciones distintas y con menor confianza. Animar a nombrar cuentas mejora la detección.
+- ⚠ **Traspasos ambiguos:** si un movimiento tiene más de una contrapartida posible no se propone ninguna (ADR 0002). No "arreglar" eligiendo la más cercana sin una señal adicional.
+- ⚠ **Traspasos: misma divisa y misma cantidad.** El detector agrupa por importe y divisa; un traspaso con cambio de moneda nunca coincide en importe, así que no se propone.
+- ⚠ **Compra y devolución:** dos movimientos con la misma descripción normalizada (misma tienda) no son un traspaso aunque el importe coincida.
+- ⚠ **Ventana de días en días naturales** (`calendarDayGap`), no en segundos: el cambio de hora convierte 3 días en 71 o 73 horas.
+- ⚠ **Confirmar una pareja revalida** que ningún lado se haya decidido a mano ni marcado como traspaso desde la propuesta (`transferPairNoLongerValid`).
+- ⚠ **La barra segmentada de la cola ya no cabe con 5 filtros en 420 pt** (deuda previa): los traspasos van en un botón aparte, no como sexto segmento.
+

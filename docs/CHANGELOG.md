@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Deshacer en la cola de revisión (aviso, ⌘Z en macOS) para aprobar, reasignar, aceptar sugerencias, aplicar a similares, aceptar alta confianza y marcar como transferencia.
 - Confirmación con número de movimientos afectados antes de "Aplicar a similares".
+- Detección de posibles traspasos entre cuentas propias (mismo importe saliendo de una cuenta y entrando en otra en ≤3 días), propuestos en la cola de revisión y confirmables con deshacer; aviso en Cuentas.
 
 ### Changed
 - Aprobar o reasignar en la cola solo modifica el movimiento seleccionado; la propagación a movimientos con el mismo comercio es explícita.
