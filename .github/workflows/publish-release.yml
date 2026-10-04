@@ -11,12 +11,28 @@ on:
 jobs:
   publish:
     name: Validate and Publish Release
-    runs-on: macos-15
+    runs-on: macos-26
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0 # Necesario para historial completo de tags/ramas
+
+      - name: Select Xcode 26
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '26'
+
+      - name: Show toolchain
+        run: |
+          xcodebuild -version
+          xcodebuild -showsdks
+          xcrun simctl list devices available
+          if ! xcrun simctl list devices available | grep -q "iPhone 17 "; then
+            echo "::error::Simulator 'iPhone 17' not available on this runner image. Available iPhones:"
+            xcrun simctl list devices available | grep iPhone || true
+            exit 1
+          fi
 
       - name: Verify Version Input Matches project.yml
         run: |
