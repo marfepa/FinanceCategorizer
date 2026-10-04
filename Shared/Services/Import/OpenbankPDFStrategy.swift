@@ -10,7 +10,7 @@ struct OpenbankPDFStrategy: PDFBankStrategy {
 
     init() {
         dateStartRegex = try? NSRegularExpression(pattern: #"^(\d{2}[/-]\d{2}[/-]\d{4})\b"#)
-        spanishAmountRegex = try? NSRegularExpression(pattern: #"[-+−]?\s*\d{1,3}(?:[.\s]\d{3})*,\d{2}(?=\s*(?:EUR|€)?(?:\s|$))"#)
+        spanishAmountRegex = try? NSRegularExpression(pattern: #"(?:(?<=\s)|^)[-+−]?\s*\d{1,3}(?:\.\d{3})*,\d{2}(?=\s*(?:EUR|€)?(?:\s|$))"#)
     }
     
     func matches(fullText: String) -> Double {

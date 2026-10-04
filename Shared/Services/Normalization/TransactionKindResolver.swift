@@ -44,10 +44,28 @@ struct TransactionKindResolver {
             "TRASPASO MISMO TITULAR",
             "TRANSFERENCIA DE FERNANDEZ PARDO MARIO",
             "TRANSFERENCIA DE MARIO FERNANDEZ PARDO",
-            "TRANSFERENCIA DE FERNANDEZ MARIO"
+            "TRANSFERENCIA DE FERNANDEZ MARIO",
+            "DISPOSICION PRESTAMO",
+            "DISPOSICION DE PRESTAMO",
+            "DISPOSICION CREDITO",
+            "DISPOSICION DE CREDITO",
+            "PRESTAMO VIVIENDA",
+            "CUENTA DE COMPENSACION",
+            "TRADE REPUBLIC",
+            "ENVIO DE DINERO IMAGINBANK",
+            "S ORD TRANSFERENCIA TRASPASO"
         ]
 
-        return signals.contains { normalized.contains($0) }
+        if signals.contains(where: { normalized.contains($0) }) {
+            return true
+        }
+
+        // Movements starting with TRASPASO followed by an account or IBAN
+        if normalized.hasPrefix("TRASPASO ES") || normalized.hasPrefix("TRASPASO CUENTA") {
+            return true
+        }
+
+        return false
     }
 
     private func normalize(_ text: String) -> String {

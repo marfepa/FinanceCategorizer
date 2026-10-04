@@ -6,6 +6,8 @@ struct MacReviewQueueView: View {
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.english
     @State private var viewModel = ReviewQueueViewModel()
     @State private var isAdvancedExpanded = false
+    @Environment(\.undoManager) private var undoManager
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         HSplitView {
@@ -41,13 +43,36 @@ struct MacReviewQueueView: View {
                 }
             }
         }
+        .confirmationDialog(
+            appLanguage.localized("review.similar.confirmTitle"),
+            isPresented: Binding(
+                get: { viewModel.similarApplyPreview != nil },
+                set: { if !$0 { viewModel.similarApplyPreview = nil } }
+            ),
+            titleVisibility: .visible,
+            presenting: viewModel.similarApplyPreview
+        ) { preview in
+            Button(appLanguage.localized("review.similar.confirmAction", ReviewQueueViewModel.movementCount(preview.totalCount, language: appLanguage))) {
+                viewModel.confirmApplyToSimilar(using: appContainer)
+            }
+            Button(appLanguage.localized("review.similar.cancel"), role: .cancel) {
+                viewModel.similarApplyPreview = nil
+            }
+        } message: { preview in
+            Text(verbatim: similarConfirmationMessage(for: preview))
+        }
         .onAppear {
+            viewModel.undoManager = undoManager
             viewModel.load(using: appContainer)
+        }
+        .onChange(of: undoManager) { _, newValue in
+            viewModel.undoManager = newValue
         }
         .onReceive(NotificationCenter.default.publisher(for: AppContainer.importDidFinishNotification)) { _ in
             viewModel.load(using: appContainer)
         }
         .onKeyPress(.return) {
+            guard viewModel.listFilter != .transferPairs else { return .ignored }
             viewModel.approveSelected(using: appContainer)
             return .handled
         }
@@ -70,7 +95,9 @@ struct MacReviewQueueView: View {
                     .background(.blue.opacity(0.08), in: RoundedRectangle(cornerRadius: AppRadius.inner, style: .continuous))
             }
 
-            if viewModel.transactions.isEmpty {
+            if viewModel.listFilter == .transferPairs {
+                transferPairsContent
+            } else if viewModel.transactions.isEmpty {
                 Spacer()
                 EmptyStateView(
                     title: LocalizedStringKey("Review Queue Empty"),
@@ -92,6 +119,51 @@ struct MacReviewQueueView: View {
         }
         .padding(AppLayoutMetrics.sectionGap)
         .background(AppMaterials.sidebar, in: Rectangle())
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            undoBanner
+        }
+        .animation(reduceMotion ? nil : .snappy, value: viewModel.lastBatch?.id)
+    }
+
+    @ViewBuilder
+    private var transferPairsContent: some View {
+        if viewModel.transferPairs.isEmpty {
+            Spacer()
+            ContentUnavailableView(
+                appLanguage.localized("review.transferPair.emptyTitle"),
+                systemImage: "arrow.left.arrow.right",
+                description: Text(verbatim: appLanguage.localized("review.transferPair.emptyMessage"))
+            )
+            Spacer()
+        } else {
+            List(viewModel.transferPairs) { proposal in
+                TransferPairRow(
+                    proposal: proposal,
+                    language: appLanguage,
+                    isPrivacyModeEnabled: isPrivacyModeEnabled,
+                    onConfirm: { viewModel.confirmTransferPair(proposal, using: appContainer) },
+                    onDismiss: { viewModel.dismissTransferPair(proposal, using: appContainer) }
+                )
+            }
+            .scrollContentBackground(.hidden)
+        }
+    }
+
+    @ViewBuilder
+    private var undoBanner: some View {
+        if let batch = viewModel.lastBatch {
+            CorrectionUndoBanner(
+                batchID: batch.id,
+                message: viewModel.bannerMessage(for: batch),
+                errorMessage: viewModel.errorMessage,
+                showsRuleSuggestion: batch.hasRuleSuggestion,
+                language: appLanguage,
+                onUndo: { viewModel.undoFromBanner(batch, using: appContainer) },
+                onCreateRule: { viewModel.createSuggestedRule(using: appContainer) },
+                onDismiss: { viewModel.dismissUndoBanner() }
+            )
+            .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
+        }
     }
 
     private var listHeader: some View {
@@ -105,14 +177,36 @@ struct MacReviewQueueView: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
+                transferPairsToggle
             }
 
             FloatingGlassSegmentedBar(
-                options: ReviewListFilter.allCases,
+                options: ReviewListFilter.allCases.filter { $0 != .transferPairs },
                 title: { $0.title },
                 selection: $viewModel.listFilter
             )
             .frame(maxWidth: 420, alignment: .leading)
+        }
+    }
+
+    /// Transfer pairs are a different review flow (confirm or reject a pair),
+    /// so they get their own toggle instead of a segment in the filter bar.
+    @ViewBuilder
+    private var transferPairsToggle: some View {
+        let isShowingPairs = viewModel.listFilter == .transferPairs
+        if isShowingPairs || !viewModel.transferPairs.isEmpty {
+            Button {
+                viewModel.listFilter = isShowingPairs ? .all : .transferPairs
+            } label: {
+                Label(
+                    isShowingPairs
+                        ? appLanguage.localized("review.transferPair.backToQueue")
+                        : appLanguage.localized("review.transferPair.showCount", appLanguage.formatInteger(viewModel.transferPairs.count)),
+                    systemImage: isShowingPairs ? "chevron.backward" : "arrow.left.arrow.right"
+                )
+            }
+            .appSecondaryGlassButton()
+            .controlSize(.small)
         }
     }
 
@@ -358,7 +452,7 @@ struct MacReviewQueueView: View {
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                             Button(LocalizedStringKey("Apply Category to Similar")) {
-                                viewModel.applyToSimilar(using: appContainer)
+                                viewModel.prepareApplyToSimilar(using: appContainer)
                             }
                             .appSecondaryGlassButton()
                         }
@@ -421,6 +515,17 @@ struct MacReviewQueueView: View {
                     .foregroundStyle(.red)
             }
         }
+    }
+
+    private func similarConfirmationMessage(for preview: SimilarApplyPreview) -> String {
+        let base = appLanguage.localized(
+            "review.similar.confirmMessage",
+            ReviewQueueViewModel.movementCount(preview.explicitIDs.count, language: appLanguage),
+            preview.categoryName
+        )
+        guard preview.propagatedCount > 0 else { return base }
+        let history = appLanguage.localized("review.similar.confirmHistory", ReviewQueueViewModel.movementCount(preview.propagatedCount, language: appLanguage))
+        return base + " " + history
     }
 
     private func infoBlock(_ title: LocalizedStringKey, _ value: String) -> some View {
