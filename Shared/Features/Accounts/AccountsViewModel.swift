@@ -23,6 +23,8 @@ struct AccountSummary: Identifiable {
 final class AccountsViewModel {
     private(set) var accounts: [AccountSummary] = []
     private(set) var netWorth: Decimal = 0
+    /// Possible transfers between own accounts still waiting in the review queue.
+    private(set) var pendingTransferPairCount = 0
     var name = ""
     var institution = ""
     var currencyCode = AppConfig.defaultCurrencyCode
@@ -50,6 +52,7 @@ final class AccountsViewModel {
             }
             .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
             netWorth = accounts.compactMap(\.signedBalance).reduce(.zero, +)
+            pendingTransferPairCount = (try? container.transferPairService.proposals().count) ?? 0
             errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription

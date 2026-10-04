@@ -198,61 +198,18 @@ final class TransactionRepository {
     }
 
     func fetchMatchingNameTransactions(for transaction: Transaction) throws -> [Transaction] {
+        let matcher = TransactionNameMatcher(target: transaction)
         let targetID = transaction.id
         let targetKindRaw = transaction.kindRaw
-        let targetIsIncome = transaction.amount >= 0
-        let targetMerchant = transaction.merchantCanonicalName?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
-        let targetCleaned = transaction.cleanedDescription.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        let targetRaw = transaction.rawDescription.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        let targetFingerprint = transaction.fingerprint.trimmingCharacters(in: .whitespacesAndNewlines)
-
         let context = makeContext()
-        // We do a broader fetch that filters out the exact same ID, and then memory filter the complex conditions
-        // Wait, the prompt says: "Replace fetchAll().filter { } with proper #Predicate statements in FetchDescriptor."
-        // We can put most conditions in the predicate!
-        let hasMerchant = !targetMerchant.isEmpty && !targetMerchant.isGenericBankingNoise
-        let hasCleaned = !targetCleaned.isEmpty && !targetCleaned.isGenericBankingNoise
-        let hasRaw = !targetRaw.isEmpty && !targetRaw.isGenericBankingNoise
-        let hasFingerprint = !targetFingerprint.isEmpty && !targetCleaned.isGenericBankingNoise
-
         let descriptor = FetchDescriptor<Transaction>(
             predicate: #Predicate { t in
                 t.id != targetID &&
                 t.kindRaw == targetKindRaw
             }
         )
-        
-        return try context.fetch(descriptor).filter { t in
-            guard (t.amount >= 0) == targetIsIncome else { return false }
-
-            if hasMerchant,
-               let merchant = t.merchantCanonicalName?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
-               !merchant.isEmpty, merchant == targetMerchant {
-                return true
-            }
-
-            if hasCleaned {
-                let cleaned = t.cleanedDescription.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-                if cleaned == targetCleaned {
-                    return true
-                }
-            }
-
-            if hasRaw {
-                let raw = t.rawDescription.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-                if raw == targetRaw {
-                    return true
-                }
-            }
-
-            if hasFingerprint, t.fingerprint == targetFingerprint {
-                return true
-            }
-
-            return false
-        }
+        return try context.fetch(descriptor).filter(matcher.matches)
     }
-
 
     func applyDecision(
         transactionID: UUID,
@@ -466,5 +423,56 @@ final class TransactionRepository {
         transaction.suggestedConfidence = nil
         transaction.suggestedSourceRaw = nil
         transaction.suggestedReason = nil
+    }
+}
+
+/// Decides whether two movements describe the same counterparty, so a user
+/// decision on one can be offered for the others. Kind and sign must match.
+struct TransactionNameMatcher {
+    private let targetID: UUID
+    private let targetKindRaw: String?
+    private let targetIsIncome: Bool
+    private let targetMerchant: String
+    private let targetCleaned: String
+    private let targetRaw: String
+    private let targetFingerprint: String
+    private let hasMerchant: Bool
+    private let hasCleaned: Bool
+    private let hasRaw: Bool
+    private let hasFingerprint: Bool
+
+    init(target transaction: Transaction) {
+        targetID = transaction.id
+        targetKindRaw = transaction.kindRaw
+        targetIsIncome = transaction.amount >= 0
+        targetMerchant = transaction.merchantCanonicalName?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
+        targetCleaned = transaction.cleanedDescription.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        targetRaw = transaction.rawDescription.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        targetFingerprint = transaction.fingerprint.trimmingCharacters(in: .whitespacesAndNewlines)
+        hasMerchant = !targetMerchant.isEmpty && !targetMerchant.isGenericBankingNoise
+        hasCleaned = !targetCleaned.isEmpty && !targetCleaned.isGenericBankingNoise
+        hasRaw = !targetRaw.isEmpty && !targetRaw.isGenericBankingNoise
+        hasFingerprint = !targetFingerprint.isEmpty && !targetCleaned.isGenericBankingNoise
+    }
+
+    func matches(_ t: Transaction) -> Bool {
+        guard t.id != targetID, t.kindRaw == targetKindRaw else { return false }
+        guard (t.amount >= 0) == targetIsIncome else { return false }
+
+        if hasMerchant,
+           let merchant = t.merchantCanonicalName?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
+           !merchant.isEmpty, merchant == targetMerchant {
+            return true
+        }
+        if hasCleaned, t.cleanedDescription.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == targetCleaned {
+            return true
+        }
+        if hasRaw, t.rawDescription.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == targetRaw {
+            return true
+        }
+        if hasFingerprint, t.fingerprint == targetFingerprint {
+            return true
+        }
+        return false
     }
 }

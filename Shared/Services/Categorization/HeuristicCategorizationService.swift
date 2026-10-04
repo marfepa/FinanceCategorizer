@@ -46,7 +46,8 @@ private struct CategoryHeuristicMatcher {
             name: "Alimentacion",
             strongTerms: [
                 "MERCADONA", "CONSUM", "CARREFOUR", "ALDI", "LIDL", "PRIMAPRIX",
-                "FRUTERIA", "SUPERMERCADO", "MERCAT", "EL REBOST", "DULCES RAF"
+                "FRUTERIA", "SUPERMERCADO", "MERCAT", "EL REBOST", "DULCES RAF",
+                "AHORRAMAS", "ALCAMPO", "EROSKI", "DIA ", "MASYMAS"
             ],
             supportingTerms: ["ALIMENTACION", "COMESTIBLES", "TIENDA", "KUUPS", "MERKA"]
         ),
@@ -54,23 +55,26 @@ private struct CategoryHeuristicMatcher {
             name: "Restauracion",
             strongTerms: [
                 "RESTAURANTE", "PIZZA", "BURGER", "BURGUER", "CHURRERIA", "HORNO",
-                "TAVERNA", "CAFETERIA", "CAFE", "BAR ", "VENDING", "GOURMET"
+                "TAVERNA", "CAFETERIA", "CAFE", "BAR ", "VENDING", "GOURMET",
+                "GLOVO", "UBER EATS", "JUST EAT", "STARBUCKS", "MCDONALDS", "KFC"
             ],
-            supportingTerms: ["COMIDA", "CENA", "DESAYUNO", "MENU", "ANEM DE PIZZA"]
+            supportingTerms: ["COMIDA", "CENA", "DESAYUNO", "MENU", "ANEM DE PIZZA", "TAKEAWAY"]
         ),
         CategoryHeuristicDefinition(
             name: "Compras",
             strongTerms: [
                 "AMAZON", "WALLAPOP", "SPRINGFIELD", "ZAPATERIA", "ZARA", "PEPCO",
-                "MANGO", "YILISHA", "XTI FOOTWEAR", "TIENDAS", "COMPRAS", "MULTIPRECIO"
+                "MANGO", "YILISHA", "XTI FOOTWEAR", "TIENDAS", "COMPRAS", "MULTIPRECIO",
+                "SHEIN", "TEMU", "ALIEXPRESS", "PRIMARK", "PULL BEAR", "BERSHKA", "HM "
             ],
-            supportingTerms: ["TIENDA", "OUTLET", "MARKETPLACE"]
+            supportingTerms: ["TIENDA", "OUTLET", "MARKETPLACE", "ROPA"]
         ),
         CategoryHeuristicDefinition(
             name: "Transporte",
             strongTerms: [
                 "CEPSA", "GASOLINERA", "RENFE", "IRYO", "METRO", "TAXI", "CABIFY",
-                "TOYOTA", "TALLER", "REPARACION COCHE", "REPSOL ESTACION"
+                "TOYOTA", "TALLER", "REPARACION COCHE", "REPSOL ESTACION",
+                "GALP", "SHELL", "BP ", "EMT", "BLABLACAR"
             ],
             supportingTerms: ["PARKING", "APARCAMIENTO", "PEAJE", "TRANSPORTE", "UBER"]
         ),
@@ -78,23 +82,25 @@ private struct CategoryHeuristicMatcher {
             name: "Hogar",
             strongTerms: [
                 "IKEA", "LEROY MERLIN", "FERRETERIA", "INSTALACIONES", "REPARACION",
-                "HOGAR PLUS", "MUEBLES", "ELECTRODOMESTICOS", "SEGURO HOGAR", "AUREUM", "TEIKA"
+                "HOGAR PLUS", "MUEBLES", "ELECTRODOMESTICOS", "SEGURO HOGAR", "AUREUM", "TEIKA",
+                "HIPOTECA", "ALQUILER", "AMORTIZACION HIPOTECA", "COMUNIDAD PROPIETARIOS"
             ],
-            supportingTerms: ["CASA", "COMUNIDAD", "ALQUILER", "DECORACION"]
+            supportingTerms: ["CASA", "COMUNIDAD", "DECORACION", "VIVIENDA"]
         ),
         CategoryHeuristicDefinition(
             name: "Suministros",
             strongTerms: [
                 "REPSOL COMERCIALIZADORA", "ELECTRICIDAD", "ENDESA", "IBERDROLA", "NATURGY",
-                "AGUA", "AGUAS DE VALENCIA", "DIGI", "GAS NATURAL", "MOVISTAR", "VODAFONE", "ORANGE", "TELEFONIA"
+                "AGUA", "AGUAS DE VALENCIA", "DIGI", "GAS NATURAL", "MOVISTAR", "VODAFONE", "ORANGE", "TELEFONIA",
+                "JAZZTEL", "MASMOVIL", "YOIGO", "PEPEPHONE", "AQUALIA", "FACTURA LUZ"
             ],
-            supportingTerms: ["LUZ", "GAS", "INTERNET", "SUMINISTRO", "FACTURA ELECTRICA"]
+            supportingTerms: ["LUZ", "GAS", "INTERNET", "SUMINISTRO", "FACTURA ELECTRICA", "FIBRA"]
         ),
         CategoryHeuristicDefinition(
             name: "Suscripciones",
             strongTerms: [
                 "NETFLIX", "SPOTIFY", "APPLE BILL", "ITUNES", "ICLOUD", "YOUTUBE PREMIUM",
-                "OPENAI", "CHATGPT", "AMAZON PRIME"
+                "OPENAI", "CHATGPT", "AMAZON PRIME", "DISNEY PLUS", "HBO", "DAZN", "ICLOUD"
             ],
             supportingTerms: ["SUSCRIPCION", "SUBSCRIPTION", "PREMIUM", "CUOTA DIGITAL"]
         ),
@@ -102,7 +108,7 @@ private struct CategoryHeuristicMatcher {
             name: "Salud",
             strongTerms: [
                 "HSN STORE", "FARMACIA", "HOSPITAL", "CLINICA", "DENTAL", "SEGURO SALUD",
-                "MEDICO", "SANITAS", "NUTRIBEN"
+                "MEDICO", "SANITAS", "NUTRIBEN", "ADESLAS", "ASISA"
             ],
             supportingTerms: ["SALUD", "MEDICAMENTO", "FISIOTERAPIA", "NUTRICION"]
         ),
@@ -117,9 +123,27 @@ private struct CategoryHeuristicMatcher {
             supportingTerms: ["DEPORTE", "FITNESS", "RUNNING"]
         ),
         CategoryHeuristicDefinition(
+            name: "Ocio",
+            strongTerms: ["CINESA", "YELMO", "CINE", "STEAM", "PLAYSTATION", "CONCIERTO", "ENTRADAS"],
+            supportingTerms: ["OCIO", "ESPECTACULO", "VIDEOJUEGO"]
+        ),
+        CategoryHeuristicDefinition(
+            name: "Educacion",
+            strongTerms: ["UNIVERSIDAD", "COLEGIO", "ACADEMIA", "UDEMY", "COURSERA", "MATRICULA"],
+            supportingTerms: ["EDUCACION", "FORMACION", "CURSO"]
+        ),
+        CategoryHeuristicDefinition(
             name: "Viajes",
-            strongTerms: ["HOTEL", "AIRBNB", "CAMPING", "IRYO", "VIAJE", "GATE GOURMET"],
+            strongTerms: ["HOTEL", "AIRBNB", "CAMPING", "IRYO", "VIAJE", "GATE GOURMET", "BOOKING", "RYANAIR", "VUELING"],
             supportingTerms: ["ALOJAMIENTO", "RESERVA", "TURISMO"]
+        ),
+        CategoryHeuristicDefinition(
+            name: "Inversión",
+            strongTerms: [
+                "INDEXA", "MYINVESTOR", "DEGIRO", "TRADE REPUBLIC", "BINANCE", "COINBASE",
+                "OPENBANK INVERSION", "RENTA 4", "SELF BANK", "SCALABLE", "INVERSIS", "BROKER"
+            ],
+            supportingTerms: ["FONDOS", "FONDO", "INVERSION", "CARTERA"]
         ),
         CategoryHeuristicDefinition(
             name: "Efectivo",
@@ -139,7 +163,7 @@ private struct CategoryHeuristicMatcher {
         CategoryHeuristicDefinition(
             name: "Finanzas",
             strongTerms: [
-                "COMISION", "INTERESES", "AMORTIZACION", "PRESTAMO", "HIPOTECA", "VISA",
+                "COMISION", "INTERESES", "AMORTIZACION", "PRESTAMO", "VISA",
                 "MASTERCARD", "TARJETA DE CREDITO", "CAPITAL SOCIAL"
             ],
             supportingTerms: ["BANCO", "CREDITO", "FINANCIACION", "CUOTA"]

@@ -5,59 +5,84 @@ struct IOSReviewQueueView: View {
     @AppStorage("isPrivacyModeEnabled") private var isPrivacyModeEnabled: Bool = false
     @State private var viewModel = ReviewQueueViewModel()
     @State private var selectedTransaction: Transaction?
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.english
+    @Environment(\.undoManager) private var undoManager
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        List(viewModel.transactions) { transaction in
-            Button {
-                viewModel.select(transaction)
-                selectedTransaction = transaction
-            } label: {
-                VStack(alignment: .leading, spacing: AppSpacing.xSmall) {
-                    HStack {
-                        Text(transaction.rawDescription)
-                            .foregroundStyle(.primary)
-                            .lineLimit(1)
-                        Spacer()
-                        Text(transaction.amount.privacyFormatted(hidden: isPrivacyModeEnabled, currencyCode: transaction.currencyCode))
-                            .font(.subheadline.monospacedDigit())
-                            .foregroundStyle(transaction.amount < 0 ? AppColors.expense : AppColors.income)
+        List {
+            if !viewModel.transferPairs.isEmpty {
+                Section {
+                    ForEach(viewModel.transferPairs) { proposal in
+                        TransferPairRow(
+                            proposal: proposal,
+                            language: appLanguage,
+                            isPrivacyModeEnabled: isPrivacyModeEnabled,
+                            onConfirm: { viewModel.confirmTransferPair(proposal, using: appContainer) },
+                            onDismiss: { viewModel.dismissTransferPair(proposal, using: appContainer) }
+                        )
                     }
-
-                    if let suggestedCategoryID = transaction.suggestedCategoryID,
-                       let suggestedCategory = viewModel.categories.first(where: { $0.id == suggestedCategoryID }) {
-                        Text("\(categoryName(for: transaction.categoryID)) → \(suggestedCategory.name)")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(AppColors.income)
-                    } else {
-                        Text(categoryName(for: transaction.categoryID))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    Text(transaction.categorizationReason ?? String(localized: "Pending review"))
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
+                } header: {
+                    Text(verbatim: appLanguage.localized("review.filter.transferPairs"))
+                } footer: {
+                    Text(verbatim: appLanguage.localized("review.transferPair.footer"))
                 }
             }
-            .buttonStyle(.plain)
-            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                if transaction.hasRecategorizationSuggestion {
-                    Button {
-                        viewModel.select(transaction)
-                        viewModel.acceptSuggestedCategory(using: appContainer)
-                    } label: {
-                        Label(LocalizedStringKey("Accept"), systemImage: "checkmark")
-                    }
-                    .tint(AppColors.income)
 
+            Section {
+                ForEach(viewModel.transactions) { transaction in
                     Button {
                         viewModel.select(transaction)
-                        viewModel.dismissSuggestedCategory(using: appContainer)
+                        selectedTransaction = transaction
                     } label: {
-                        Label(LocalizedStringKey("Dismiss"), systemImage: "xmark")
+                        VStack(alignment: .leading, spacing: AppSpacing.xSmall) {
+                            HStack {
+                                Text(transaction.rawDescription)
+                                    .foregroundStyle(.primary)
+                                    .lineLimit(1)
+                                Spacer()
+                                Text(transaction.amount.privacyFormatted(hidden: isPrivacyModeEnabled, currencyCode: transaction.currencyCode))
+                                    .font(.subheadline.monospacedDigit())
+                                    .foregroundStyle(transaction.amount < 0 ? AppColors.expense : AppColors.income)
+                            }
+
+                            if let suggestedCategoryID = transaction.suggestedCategoryID,
+                               let suggestedCategory = viewModel.categories.first(where: { $0.id == suggestedCategoryID }) {
+                                Text("\(categoryName(for: transaction.categoryID)) → \(suggestedCategory.name)")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(AppColors.income)
+                            } else {
+                                Text(categoryName(for: transaction.categoryID))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            Text(transaction.categorizationReason ?? String(localized: "Pending review"))
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(2)
+                        }
                     }
-                    .tint(AppColors.warning)
+                    .buttonStyle(.plain)
+                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                        if transaction.hasRecategorizationSuggestion {
+                            Button {
+                                viewModel.select(transaction)
+                                viewModel.acceptSuggestedCategory(using: appContainer)
+                            } label: {
+                                Label(LocalizedStringKey("Accept"), systemImage: "checkmark")
+                            }
+                            .tint(AppColors.income)
+
+                            Button {
+                                viewModel.select(transaction)
+                                viewModel.dismissSuggestedCategory(using: appContainer)
+                            } label: {
+                                Label(LocalizedStringKey("Dismiss"), systemImage: "xmark")
+                            }
+                            .tint(AppColors.warning)
+                        }
+                    }
                 }
             }
         }
@@ -79,13 +104,31 @@ struct IOSReviewQueueView: View {
                 .disabled(viewModel.isRecategorizing)
             }
         }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if let batch = viewModel.lastBatch {
+                CorrectionUndoBanner(
+                    batchID: batch.id,
+                    message: viewModel.bannerMessage(for: batch),
+                errorMessage: viewModel.errorMessage,
+                    showsRuleSuggestion: batch.hasRuleSuggestion,
+                    language: appLanguage,
+                    onUndo: { viewModel.undoFromBanner(batch, using: appContainer) },
+                    onCreateRule: { viewModel.createSuggestedRule(using: appContainer) },
+                    onDismiss: { viewModel.dismissUndoBanner() }
+                )
+                .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
+            }
+        }
         .overlay(alignment: .bottom) {
-            if let message = viewModel.recategorizationSummary ?? viewModel.statusMessage {
-                Text(message)
+            if viewModel.lastBatch == nil,
+               let message = viewModel.errorMessage ?? viewModel.recategorizationSummary ?? viewModel.statusMessage {
+                Label(message, systemImage: viewModel.errorMessage == nil ? "info.circle" : "exclamationmark.triangle.fill")
                     .font(.footnote)
+                    .foregroundStyle(viewModel.errorMessage == nil ? Color.primary : AppColors.warning)
                     .padding(.horizontal, AppSpacing.medium)
                     .padding(.vertical, AppSpacing.small)
-                    .background(.thinMaterial, in: Capsule())
+                    .background(.thinMaterial, in: RoundedRectangle(cornerRadius: AppRadius.inner, style: .continuous))
+                    .padding(.horizontal, AppSpacing.medium)
                     .padding(.bottom, AppSpacing.small)
             }
         }
@@ -111,8 +154,13 @@ struct IOSReviewQueueView: View {
                 }
             )
         }
+        .animation(reduceMotion ? nil : .snappy, value: viewModel.lastBatch?.id)
         .onAppear {
+            viewModel.undoManager = undoManager
             viewModel.load(using: appContainer)
+        }
+        .onChange(of: undoManager) { _, newValue in
+            viewModel.undoManager = newValue
         }
         .onReceive(NotificationCenter.default.publisher(for: AppContainer.importDidFinishNotification)) { _ in
             viewModel.load(using: appContainer)

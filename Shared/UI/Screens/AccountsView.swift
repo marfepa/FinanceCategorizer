@@ -18,6 +18,19 @@ struct AccountsView: View {
                 }
             }
 
+            if viewModel.pendingTransferPairCount > 0 {
+                Section {
+                    Label {
+                        Text(verbatim: ReviewQueueViewModel.plural("accounts.transferPairs.pending", viewModel.pendingTransferPairCount, language: appLanguage))
+                    } icon: {
+                        Image(systemName: "arrow.left.arrow.right.circle.fill")
+                            .foregroundStyle(AppColors.warning)
+                    }
+                } footer: {
+                    Text(verbatim: appLanguage.localized("accounts.transferPairs.footer"))
+                }
+            }
+
             Section(LocalizedStringKey("Add or update account")) {
                 TextField(LocalizedStringKey("Account name"), text: $viewModel.name)
                 TextField(LocalizedStringKey("Financial institution"), text: $viewModel.institution)
