@@ -21,6 +21,7 @@ final class CategoryRepository {
         ("Viajes", "airplane", "#26A69A", false),
         ("Educacion", "book", "#42A5F5", false),
         ("Finanzas", "creditcard", "#78909C", false),
+        ("Inversión", "chart.line.uptrend.xyaxis", "#2E7D32", false),
         ("Impuestos", "building.columns", "#8E24AA", false),
         ("Efectivo", "banknote", "#607D8B", false),
         ("Ingresos", "arrow.down.circle", "#2E7D32", true),
@@ -49,10 +50,6 @@ final class CategoryRepository {
 
     func ensureBaseCategories() throws {
         let context = makeContext()
-        let count = try context.fetchCount(FetchDescriptor<Category>())
-        if count >= baseCategories.count {
-            return
-        }
         let existing = try context.fetch(FetchDescriptor<Category>())
         let existingNames = Set(existing.map(\.name))
 
