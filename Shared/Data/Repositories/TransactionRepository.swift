@@ -110,14 +110,14 @@ final class TransactionRepository {
         let rawTransfer = TransactionKind.transfer.rawValue
         let descriptor = FetchDescriptor<Transaction>(
             predicate: #Predicate {
-                ($0.kindRaw == nil || $0.kindRaw != rawTransfer) &&
-                ($0.needsReview ||
-                 $0.categoryID == nil ||
-                 $0.reviewStatusRaw == rawPending ||
-                 $0.suggestedCategoryID != nil)
+                $0.needsReview ||
+                $0.categoryID == nil ||
+                $0.reviewStatusRaw == rawPending ||
+                $0.suggestedCategoryID != nil
             }
         )
         return try context.fetch(descriptor)
+            .filter { $0.kindRaw != rawTransfer }
             .sorted {
                 if $0.confidence == $1.confidence {
                     return $0.bookingDate > $1.bookingDate
