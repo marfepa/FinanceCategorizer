@@ -63,7 +63,7 @@ Estado: mitigado. Ahora se preservan los ficheros de store en `RecoveryBackups` 
 
 Hay tests utiles de parser, normalizacion y thresholds, pero falta cobertura end-to-end de importacion real, duplicados, repositorios, categorizacion, migraciones SwiftData y UI critica.
 
-Accion: definir fixtures anonimizados y suite de regresion para CSV/XLSX/PDF.
+Estado: mitigado para Openbank, Cajamar y ABANCA en CSV, y Openbank en XLSX/PDF, con fixtures anonimizados y regresiones de preview/importacion. Se cubren idempotencia, duplicados intra/inter-origen, direcciones sinteticas, sentidos ingreso/gasto y errores parciales.
 
 ### P1 - Funcionalidad anunciada incompleta
 
