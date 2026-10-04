@@ -5,6 +5,9 @@ struct IOSReviewQueueView: View {
     @AppStorage("isPrivacyModeEnabled") private var isPrivacyModeEnabled: Bool = false
     @State private var viewModel = ReviewQueueViewModel()
     @State private var selectedTransaction: Transaction?
+    @AppStorage("appLanguage") private var appLanguage = AppLanguage.english
+    @Environment(\.undoManager) private var undoManager
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         List(viewModel.transactions) { transaction in
@@ -79,13 +82,31 @@ struct IOSReviewQueueView: View {
                 .disabled(viewModel.isRecategorizing)
             }
         }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if let batch = viewModel.lastBatch {
+                CorrectionUndoBanner(
+                    batchID: batch.id,
+                    message: viewModel.bannerMessage(for: batch),
+                errorMessage: viewModel.errorMessage,
+                    showsRuleSuggestion: batch.hasRuleSuggestion,
+                    language: appLanguage,
+                    onUndo: { viewModel.undoFromBanner(batch, using: appContainer) },
+                    onCreateRule: { viewModel.createSuggestedRule(using: appContainer) },
+                    onDismiss: { viewModel.dismissUndoBanner() }
+                )
+                .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
+            }
+        }
         .overlay(alignment: .bottom) {
-            if let message = viewModel.recategorizationSummary ?? viewModel.statusMessage {
-                Text(message)
+            if viewModel.lastBatch == nil,
+               let message = viewModel.errorMessage ?? viewModel.recategorizationSummary ?? viewModel.statusMessage {
+                Label(message, systemImage: viewModel.errorMessage == nil ? "info.circle" : "exclamationmark.triangle.fill")
                     .font(.footnote)
+                    .foregroundStyle(viewModel.errorMessage == nil ? Color.primary : AppColors.warning)
                     .padding(.horizontal, AppSpacing.medium)
                     .padding(.vertical, AppSpacing.small)
-                    .background(.thinMaterial, in: Capsule())
+                    .background(.thinMaterial, in: RoundedRectangle(cornerRadius: AppRadius.inner, style: .continuous))
+                    .padding(.horizontal, AppSpacing.medium)
                     .padding(.bottom, AppSpacing.small)
             }
         }
@@ -111,8 +132,13 @@ struct IOSReviewQueueView: View {
                 }
             )
         }
+        .animation(reduceMotion ? nil : .snappy, value: viewModel.lastBatch?.id)
         .onAppear {
+            viewModel.undoManager = undoManager
             viewModel.load(using: appContainer)
+        }
+        .onChange(of: undoManager) { _, newValue in
+            viewModel.undoManager = newValue
         }
         .onReceive(NotificationCenter.default.publisher(for: AppContainer.importDidFinishNotification)) { _ in
             viewModel.load(using: appContainer)

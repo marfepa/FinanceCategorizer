@@ -890,3 +890,28 @@
 "Choose File" = "Seleccionar archivo";
 "CSV, XLSX, or PDF" = "CSV, XLSX o PDF";
 "Or paste CSV text directly" = "O pega texto CSV directamente";
+
+/* Review undo */
+"review.undo.saved.one" = "Guardado: 1 movimiento.";
+"review.undo.saved.other" = "Guardado: %@ movimientos.";
+"review.undo.savedWithSimilar" = "Guardado: %@ y %@ del mismo comercio.";
+"review.count.movements.one" = "1 movimiento";
+"review.count.movements.other" = "%@ movimientos";
+"review.undo.button" = "Deshacer";
+"review.undo.buttonHint" = "Devuelve los movimientos afectados a su estado anterior.";
+"review.undo.dismiss" = "Cerrar";
+"review.undo.createRule" = "Crear regla";
+"review.undo.createRuleHint" = "Categoriza igual los próximos movimientos de este comercio.";
+"review.undo.ruleCreated" = "Regla creada para futuros movimientos.";
+"review.undo.done.one" = "Deshecho: 1 movimiento restaurado.";
+"review.undo.done.other" = "Deshecho: %@ movimientos restaurados.";
+"review.undo.actionName" = "Decisión de revisión";
+"review.undo.error.transactionNotFound" = "No se encontró el movimiento. Puede que se haya eliminado.";
+"review.undo.error.batchNotFound" = "Esa acción ya no se puede deshacer.";
+"review.undo.error.conflict" = "No se puede deshacer: alguno de estos movimientos ha cambiado después. Deshaz primero los cambios más recientes.";
+"review.similar.confirmTitle" = "¿Aplicar la categoría a movimientos similares?";
+"review.similar.confirmMessage" = "Se asignará «%2$@» a %1$@ de la cola.";
+"review.similar.confirmHistory" = "También se actualizarán %@ anteriores del mismo comercio. Tus decisiones manuales no se tocan.";
+"review.similar.confirmAction" = "Aplicar a %@";
+"review.similar.cancel" = "Cancelar";
+"review.undo.ruleRemoved" = "Regla eliminada.";

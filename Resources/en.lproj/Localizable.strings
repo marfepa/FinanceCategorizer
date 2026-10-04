@@ -882,3 +882,28 @@
 "Choose File" = "Choose File";
 "CSV, XLSX, or PDF" = "CSV, XLSX, or PDF";
 "Or paste CSV text directly" = "Or paste CSV text directly";
+
+/* Review undo */
+"review.undo.saved.one" = "Saved: 1 movement.";
+"review.undo.saved.other" = "Saved: %@ movements.";
+"review.undo.savedWithSimilar" = "Saved: %@ and %@ from the same merchant.";
+"review.count.movements.one" = "1 movement";
+"review.count.movements.other" = "%@ movements";
+"review.undo.button" = "Undo";
+"review.undo.buttonHint" = "Restores the affected movements to their previous state.";
+"review.undo.dismiss" = "Dismiss";
+"review.undo.createRule" = "Create rule";
+"review.undo.createRuleHint" = "Categorizes future movements from this merchant the same way.";
+"review.undo.ruleCreated" = "Rule created for future movements.";
+"review.undo.done.one" = "Undone: 1 movement restored.";
+"review.undo.done.other" = "Undone: %@ movements restored.";
+"review.undo.actionName" = "Review Decision";
+"review.undo.error.transactionNotFound" = "The movement could not be found. It may have been deleted.";
+"review.undo.error.batchNotFound" = "That action can no longer be undone.";
+"review.undo.error.conflict" = "Can't undo: some of these movements changed afterwards. Undo the most recent changes first.";
+"review.similar.confirmTitle" = "Apply category to similar movements?";
+"review.similar.confirmMessage" = "“%2$@” will be assigned to %1$@ in the queue.";
+"review.similar.confirmHistory" = "%@ earlier from the same merchant will also be updated. Your manual decisions are left untouched.";
+"review.similar.confirmAction" = "Apply to %@";
+"review.similar.cancel" = "Cancel";
+"review.undo.ruleRemoved" = "Rule removed.";

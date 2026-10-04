@@ -6,6 +6,8 @@ struct MacReviewQueueView: View {
     @AppStorage("appLanguage") private var appLanguage = AppLanguage.english
     @State private var viewModel = ReviewQueueViewModel()
     @State private var isAdvancedExpanded = false
+    @Environment(\.undoManager) private var undoManager
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         HSplitView {
@@ -41,8 +43,30 @@ struct MacReviewQueueView: View {
                 }
             }
         }
+        .confirmationDialog(
+            appLanguage.localized("review.similar.confirmTitle"),
+            isPresented: Binding(
+                get: { viewModel.similarApplyPreview != nil },
+                set: { if !$0 { viewModel.similarApplyPreview = nil } }
+            ),
+            titleVisibility: .visible,
+            presenting: viewModel.similarApplyPreview
+        ) { preview in
+            Button(appLanguage.localized("review.similar.confirmAction", ReviewQueueViewModel.movementCount(preview.totalCount, language: appLanguage))) {
+                viewModel.confirmApplyToSimilar(using: appContainer)
+            }
+            Button(appLanguage.localized("review.similar.cancel"), role: .cancel) {
+                viewModel.similarApplyPreview = nil
+            }
+        } message: { preview in
+            Text(verbatim: similarConfirmationMessage(for: preview))
+        }
         .onAppear {
+            viewModel.undoManager = undoManager
             viewModel.load(using: appContainer)
+        }
+        .onChange(of: undoManager) { _, newValue in
+            viewModel.undoManager = newValue
         }
         .onReceive(NotificationCenter.default.publisher(for: AppContainer.importDidFinishNotification)) { _ in
             viewModel.load(using: appContainer)
@@ -92,6 +116,27 @@ struct MacReviewQueueView: View {
         }
         .padding(AppLayoutMetrics.sectionGap)
         .background(AppMaterials.sidebar, in: Rectangle())
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            undoBanner
+        }
+        .animation(reduceMotion ? nil : .snappy, value: viewModel.lastBatch?.id)
+    }
+
+    @ViewBuilder
+    private var undoBanner: some View {
+        if let batch = viewModel.lastBatch {
+            CorrectionUndoBanner(
+                batchID: batch.id,
+                message: viewModel.bannerMessage(for: batch),
+                errorMessage: viewModel.errorMessage,
+                showsRuleSuggestion: batch.hasRuleSuggestion,
+                language: appLanguage,
+                onUndo: { viewModel.undoFromBanner(batch, using: appContainer) },
+                onCreateRule: { viewModel.createSuggestedRule(using: appContainer) },
+                onDismiss: { viewModel.dismissUndoBanner() }
+            )
+            .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
+        }
     }
 
     private var listHeader: some View {
@@ -358,7 +403,7 @@ struct MacReviewQueueView: View {
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                             Button(LocalizedStringKey("Apply Category to Similar")) {
-                                viewModel.applyToSimilar(using: appContainer)
+                                viewModel.prepareApplyToSimilar(using: appContainer)
                             }
                             .appSecondaryGlassButton()
                         }
@@ -421,6 +466,17 @@ struct MacReviewQueueView: View {
                     .foregroundStyle(.red)
             }
         }
+    }
+
+    private func similarConfirmationMessage(for preview: SimilarApplyPreview) -> String {
+        let base = appLanguage.localized(
+            "review.similar.confirmMessage",
+            ReviewQueueViewModel.movementCount(preview.explicitIDs.count, language: appLanguage),
+            preview.categoryName
+        )
+        guard preview.propagatedCount > 0 else { return base }
+        let history = appLanguage.localized("review.similar.confirmHistory", ReviewQueueViewModel.movementCount(preview.propagatedCount, language: appLanguage))
+        return base + " " + history
     }
 
     private func infoBlock(_ title: LocalizedStringKey, _ value: String) -> some View {

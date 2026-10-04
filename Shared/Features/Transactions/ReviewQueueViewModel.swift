@@ -29,6 +29,18 @@ enum ReviewListFilter: String, CaseIterable, Identifiable {
     }
 }
 
+struct SimilarApplyPreview: Identifiable {
+    let id = UUID()
+    let categoryID: UUID
+    let categoryName: String
+    /// Selected movement plus similar pending ones.
+    let explicitIDs: [UUID]
+    /// Historical movements that will also change because they match by name.
+    let propagatedCount: Int
+
+    var totalCount: Int { explicitIDs.count + propagatedCount }
+}
+
 @MainActor
 @Observable
 final class ReviewQueueViewModel {
@@ -51,6 +63,10 @@ final class ReviewQueueViewModel {
     var recategorizationSummary: String?
     var errorMessage: String?
     var statusMessage: String?
+    /// Most recent undoable batch, shown in the undo banner.
+    var lastBatch: CorrectionBatch?
+    var similarApplyPreview: SimilarApplyPreview?
+    @ObservationIgnored weak var undoManager: UndoManager?
     var suggestedGroups: [SimilarTransactionGroup] = [] {
         didSet { updateFilteredListCache() }
     }
@@ -195,16 +211,11 @@ final class ReviewQueueViewModel {
             errorMessage = language.localized("review.error.selectTransactionBeforeTransfer")
             return
         }
-        do {
-            try container.transactionRepository.updateTransactionKind(transactionID: transaction.id, kind: .transfer)
-            let previousID = transaction.id
-            load(using: container)
-            advanceSelection(after: previousID)
+        perform(advancingFrom: transaction.id, using: container) {
+            try container.correctionBatchService.markAsTransfer(transactionID: transaction.id)
+        }
+        if errorMessage == nil {
             statusMessage = language.localized("review.status.markedAsTransfer")
-            errorMessage = nil
-            NotificationCenter.default.post(name: AppContainer.importDidFinishNotification, object: nil)
-        } catch {
-            errorMessage = error.localizedDescription
         }
     }
 
@@ -221,11 +232,7 @@ final class ReviewQueueViewModel {
             errorMessage = language.localized("review.error.selectTransactionWithCategory")
             return
         }
-        let previousID = transaction.id
-        applyDecision(for: transaction, categoryID: categoryID, using: container)
-        if errorMessage == nil {
-            advanceSelection(after: previousID)
-        }
+        applyDecision(for: transaction, categoryID: categoryID, action: .approve, using: container)
     }
 
     func reassignSelected(using container: AppContainer) {
@@ -235,11 +242,7 @@ final class ReviewQueueViewModel {
             errorMessage = language.localized("review.error.chooseCategoryBeforeCorrection")
             return
         }
-        let previousID = transaction.id
-        applyDecision(for: transaction, categoryID: categoryID, using: container)
-        if errorMessage == nil {
-            advanceSelection(after: previousID)
-        }
+        applyDecision(for: transaction, categoryID: categoryID, action: .reassign, using: container)
     }
 
     func acceptSuggestedCategory(using container: AppContainer) {
@@ -250,19 +253,20 @@ final class ReviewQueueViewModel {
             return
         }
 
-        do {
-            try container.correctionLearningService.applyCorrection(
-                for: transaction,
-                categoryID: suggestedCategoryID,
-                subcategoryID: transaction.suggestedSubcategoryID,
-                applyToFuture: createRuleFromCorrection
+        let request = CorrectionRequest(
+            transactionID: transaction.id,
+            categoryID: suggestedCategoryID,
+            subcategoryID: transaction.suggestedSubcategoryID
+        )
+        let createRules = createRuleFromCorrection
+        perform(advancingFrom: transaction.id, using: container) {
+            try container.correctionBatchService.applyCategories(
+                [request],
+                action: .acceptSuggestion,
+                propagateToMatches: false,
+                rulePolicy: .explicit,
+                createRules: createRules
             )
-            statusMessage = language.localized("review.status.suggestionAccepted")
-            errorMessage = nil
-            load(using: container)
-            NotificationCenter.default.post(name: AppContainer.importDidFinishNotification, object: nil)
-        } catch {
-            errorMessage = error.localizedDescription
         }
     }
 
@@ -293,29 +297,39 @@ final class ReviewQueueViewModel {
                     ($0.suggestedConfidence ?? 0) >= AppConfig.softAutoCategorizationThreshold
                 }
 
-            for transaction in candidates {
-                guard let categoryID = transaction.suggestedCategoryID else { continue }
-                try container.correctionLearningService.applyCorrection(
-                    for: transaction,
+            let requests = candidates.compactMap { transaction -> CorrectionRequest? in
+                guard let categoryID = transaction.suggestedCategoryID else { return nil }
+                return CorrectionRequest(
+                    transactionID: transaction.id,
                     categoryID: categoryID,
-                    subcategoryID: transaction.suggestedSubcategoryID,
-                    applyToFuture: false
+                    subcategoryID: transaction.suggestedSubcategoryID
                 )
             }
-
-            load(using: container)
+            guard !requests.isEmpty else {
+                statusMessage = language.localized("review.status.acceptedHighConfidence", language.formatInteger(0))
+                errorMessage = nil
+                return
+            }
+            let batch = try container.correctionBatchService.applyCategories(
+                requests,
+                action: .acceptHighConfidence,
+                propagateToMatches: false,
+                rulePolicy: .none,
+                createRules: false
+            )
+            didCommit(batch, using: container)
             statusMessage = language.localized(
                 "review.status.acceptedHighConfidence",
-                language.formatInteger(candidates.count)
+                language.formatInteger(batch.explicitCount)
             )
-            errorMessage = nil
-            NotificationCenter.default.post(name: AppContainer.importDidFinishNotification, object: nil)
         } catch {
             errorMessage = error.localizedDescription
         }
     }
 
-    func applyToSimilar(using container: AppContainer) {
+    /// Computes how many movements "apply to similar" would change, so the
+    /// view can ask for confirmation before anything is written.
+    func prepareApplyToSimilar(using container: AppContainer) {
         let language = AppLanguage.currentSelection
         guard let transaction = selectedTransaction,
               let categoryID = selectedCategoryID else {
@@ -330,27 +344,177 @@ final class ReviewQueueViewModel {
         }
 
         do {
-            try container.correctionLearningService.applyCorrection(
-                for: transaction,
-                categoryID: categoryID,
-                applyToFuture: createRuleFromCorrection
+            let explicitIDs = try container.correctionBatchService.compatibleTransactionIDs(
+                [transaction.id] + similar.map(\.id),
+                categoryID: categoryID
             )
-
-            for item in similar {
-                try container.correctionLearningService.applyCorrection(
-                    for: item,
-                    categoryID: categoryID,
-                    applyToFuture: false
-                )
+            guard explicitIDs.first == transaction.id else {
+                errorMessage = language.localized("review.error.incompatibleCategory")
+                return
             }
-
-            statusMessage = language.localized("review.status.appliedToSimilar", language.formatInteger(similar.count + 1))
+            let propagatedCount = try container.correctionBatchService.propagationCount(for: explicitIDs)
+            similarApplyPreview = SimilarApplyPreview(
+                categoryID: categoryID,
+                categoryName: categories.first(where: { $0.id == categoryID })?.name ?? "",
+                explicitIDs: explicitIDs,
+                propagatedCount: propagatedCount
+            )
             errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func confirmApplyToSimilar(using container: AppContainer) {
+        guard let preview = similarApplyPreview else { return }
+        similarApplyPreview = nil
+        // An import or edit may have changed the scope since the dialog opened:
+        // never apply a different number than the one the user confirmed.
+        if let current = try? container.correctionBatchService.propagationCount(for: preview.explicitIDs),
+           current != preview.propagatedCount {
+            similarApplyPreview = SimilarApplyPreview(
+                categoryID: preview.categoryID,
+                categoryName: preview.categoryName,
+                explicitIDs: preview.explicitIDs,
+                propagatedCount: current
+            )
+            return
+        }
+        let requests = preview.explicitIDs.map { CorrectionRequest(transactionID: $0, categoryID: preview.categoryID) }
+        let createRules = createRuleFromCorrection
+        perform(advancingFrom: preview.explicitIDs.first, using: container) {
+            try container.correctionBatchService.applyCategories(
+                requests,
+                action: .applyToSimilar,
+                propagateToMatches: true,
+                rulePolicy: .explicit,
+                createRules: createRules
+            )
+        }
+    }
+
+    // MARK: Undo
+
+    func undo(_ batch: CorrectionBatch, using container: AppContainer) {
+        let language = AppLanguage.currentSelection
+        guard !container.correctionBatchService.isReverted(batch.id) else { return }
+        do {
+            try container.correctionBatchService.revert(batchID: batch.id)
+            if lastBatch?.id == batch.id {
+                lastBatch = nil
+            }
             load(using: container)
+            if let restoredID = batch.transactionIDs.first,
+               let restored = transactions.first(where: { $0.id == restoredID }) {
+                select(restored)
+            }
+            statusMessage = batch.totalCount == 0
+                ? language.localized("review.undo.ruleRemoved")
+                : Self.plural("review.undo.done", batch.totalCount, language: language)
+            errorMessage = nil
             NotificationCenter.default.post(name: AppContainer.importDidFinishNotification, object: nil)
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    /// Undo triggered from the banner. When the batch is the top entry of the
+    /// window's undo stack it goes through the UndoManager, so the next ⌘Z
+    /// targets the previous action instead of a no-op.
+    func undoFromBanner(_ batch: CorrectionBatch, using container: AppContainer) {
+        let actionName = AppLanguage.currentSelection.localized("review.undo.actionName")
+        if let undoManager, undoManager.canUndo, undoManager.undoActionName == actionName,
+           lastBatch?.id == batch.id {
+            undoManager.undo()
+        } else {
+            undo(batch, using: container)
+        }
+    }
+
+    func undoLast(using container: AppContainer) {
+        guard let lastBatch else { return }
+        undo(lastBatch, using: container)
+    }
+
+    func createSuggestedRule(using container: AppContainer) {
+        let language = AppLanguage.currentSelection
+        guard let batch = lastBatch, batch.hasRuleSuggestion else { return }
+        do {
+            if let ruleBatch = try container.correctionBatchService.createSuggestedRule(from: batch) {
+                lastBatch = ruleBatch
+                registerUndo(for: ruleBatch, using: container)
+                statusMessage = language.localized("review.undo.ruleCreated")
+                errorMessage = nil
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func dismissUndoBanner() {
+        lastBatch = nil
+    }
+
+    /// Message for the undo banner, e.g. "Saved: 1 movement and 12 from the same merchant."
+    func bannerMessage(for batch: CorrectionBatch) -> String {
+        let language = AppLanguage.currentSelection
+        if batch.totalCount == 0 {
+            return language.localized("review.undo.ruleCreated")
+        }
+        if batch.propagatedCount > 0 {
+            return language.localized(
+                "review.undo.savedWithSimilar",
+                Self.movementCount(batch.explicitCount, language: language),
+                Self.movementCount(batch.propagatedCount, language: language)
+            )
+        }
+        return Self.plural("review.undo.saved", batch.explicitCount, language: language)
+    }
+
+    /// "1 movement" / "3 movements", localized.
+    static func movementCount(_ count: Int, language: AppLanguage) -> String {
+        plural("review.count.movements", count, language: language)
+    }
+
+    static func plural(_ key: String, _ count: Int, language: AppLanguage) -> String {
+        count == 1
+            ? language.localized(key + ".one")
+            : language.localized(key + ".other", language.formatInteger(count))
+    }
+
+    private func perform(
+        advancingFrom transactionID: UUID?,
+        using container: AppContainer,
+        _ work: () throws -> CorrectionBatch
+    ) {
+        do {
+            let batch = try work()
+            didCommit(batch, using: container)
+            if let transactionID {
+                advanceSelection(after: transactionID)
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func didCommit(_ batch: CorrectionBatch, using container: AppContainer) {
+        lastBatch = batch
+        errorMessage = nil
+        statusMessage = nil
+        registerUndo(for: batch, using: container)
+        load(using: container)
+        NotificationCenter.default.post(name: AppContainer.importDidFinishNotification, object: nil)
+    }
+
+    private func registerUndo(for batch: CorrectionBatch, using container: AppContainer) {
+        guard let undoManager else { return }
+        undoManager.registerUndo(withTarget: self) { viewModel in
+            MainActor.assumeIsolated {
+                viewModel.undo(batch, using: container)
+            }
+        }
+        undoManager.setActionName(AppLanguage.currentSelection.localized("review.undo.actionName"))
     }
 
     func requestAISuggestion(using container: AppContainer) async {
@@ -432,28 +596,22 @@ final class ReviewQueueViewModel {
 
     // MARK: - Private helpers
 
-    private func applyDecision(for transaction: Transaction, categoryID: UUID, using container: AppContainer) {
-        let language = AppLanguage.currentSelection
-        do {
-            guard let category = try container.categoryRepository.fetch(categoryID: categoryID),
-                  directionPolicy.isCompatible(
-                    categoryIsIncome: category.isIncome,
-                    transactionKind: transaction.resolvedKind
-                  ) else {
-                errorMessage = language.localized("review.error.incompatibleCategory")
-                return
-            }
-            try container.correctionLearningService.applyCorrection(
-                for: transaction,
-                categoryID: categoryID,
-                applyToFuture: createRuleFromCorrection
+    private func applyDecision(
+        for transaction: Transaction,
+        categoryID: UUID,
+        action: CorrectionAction,
+        using container: AppContainer
+    ) {
+        let request = CorrectionRequest(transactionID: transaction.id, categoryID: categoryID)
+        let createRules = createRuleFromCorrection
+        perform(advancingFrom: transaction.id, using: container) {
+            try container.correctionBatchService.applyCategories(
+                [request],
+                action: action,
+                propagateToMatches: false,
+                rulePolicy: .explicit,
+                createRules: createRules
             )
-            statusMessage = language.localized("review.status.savedDecision", transaction.rawDescription)
-            errorMessage = nil
-            load(using: container)
-            NotificationCenter.default.post(name: AppContainer.importDidFinishNotification, object: nil)
-        } catch {
-            errorMessage = error.localizedDescription
         }
     }
 
