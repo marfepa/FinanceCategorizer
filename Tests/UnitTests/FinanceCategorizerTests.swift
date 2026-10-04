@@ -1519,7 +1519,7 @@ final class FinanceCategorizerTests: XCTestCase {
         let currentMonth = calendar.component(.month, from: now)
 
         let payroll = Transaction(
-            bookingDate: date(year: currentYear, month: currentMonth, day: 10),
+            bookingDate: date(year: currentYear, month: currentMonth, day: 1),
             rawDescription: "NOMINA EMPRESA",
             cleanedDescription: "NOMINA EMPRESA",
             merchantDisplayName: "Empresa",
@@ -1539,7 +1539,7 @@ final class FinanceCategorizerTests: XCTestCase {
             isRecurringCandidate: false
         )
         let expense = Transaction(
-            bookingDate: date(year: currentYear, month: currentMonth, day: 11),
+            bookingDate: date(year: currentYear, month: currentMonth, day: 1),
             rawDescription: "ALQUILER ENERO",
             cleanedDescription: "ALQUILER ENERO",
             merchantDisplayName: "Casero",
