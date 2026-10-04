@@ -10,6 +10,7 @@ enum CorrectionAction: String {
     case applyToSimilar
     case acceptHighConfidence
     case markAsTransfer
+    case confirmTransferPair
 }
 
 struct CorrectionRequest {
@@ -39,6 +40,7 @@ enum CorrectionBatchError: LocalizedError {
     case transactionNotFound
     case batchNotFound
     case conflictingLaterChanges
+    case transferPairNoLongerValid
 
     var errorDescription: String? {
         let language = AppLanguage.currentSelection
@@ -49,6 +51,8 @@ enum CorrectionBatchError: LocalizedError {
             return language.localized("review.undo.error.batchNotFound")
         case .conflictingLaterChanges:
             return language.localized("review.undo.error.conflict")
+        case .transferPairNoLongerValid:
+            return language.localized("review.transferPair.error.changed")
         }
     }
 }
@@ -387,26 +391,54 @@ final class CorrectionBatchService {
 
     @discardableResult
     func markAsTransfer(transactionID: UUID) throws -> CorrectionBatch {
+        try markAsTransfer(transactionIDs: [transactionID], action: .markAsTransfer, reason: "Marked manually as transfer.")
+    }
+
+    /// Marks both sides of a confirmed transfer between own accounts in one
+    /// undoable batch.
+    @discardableResult
+    func markAsTransferPair(outgoingID: UUID, incomingID: UUID) throws -> CorrectionBatch {
+        try markAsTransfer(
+            transactionIDs: [outgoingID, incomingID],
+            action: .confirmTransferPair,
+            reason: "Paired with a matching movement in another account as an internal transfer."
+        )
+    }
+
+    private func markAsTransfer(transactionIDs: [UUID], action: CorrectionAction, reason: String) throws -> CorrectionBatch {
         let context = ModelContext(modelContainer)
         context.autosaveEnabled = false
         let appliedAt = Date.now
         do {
-            let descriptor = FetchDescriptor<Transaction>(predicate: #Predicate { $0.id == transactionID })
-            guard let transaction = try context.fetch(descriptor).first else {
-                throw CorrectionBatchError.transactionNotFound
-            }
-            let previous = CorrectionBatch.TransactionState(transaction)
+            var states: [CorrectionBatch.TransactionState] = []
+            var firstDescription: String?
+            for transactionID in transactionIDs {
+                let descriptor = FetchDescriptor<Transaction>(predicate: #Predicate { $0.id == transactionID })
+                guard let transaction = try context.fetch(descriptor).first else {
+                    throw CorrectionBatchError.transactionNotFound
+                }
+                if action == .confirmTransferPair {
+                    // The proposal is a snapshot: never overwrite a decision made since.
+                    let kind = transaction.resolvedKind
+                    guard kind != .transfer, kind != .adjustment,
+                          transaction.categorizationSourceRaw != CategorizationSource.manual.rawValue else {
+                        throw CorrectionBatchError.transferPairNoLongerValid
+                    }
+                }
+                states.append(CorrectionBatch.TransactionState(transaction))
+                firstDescription = firstDescription ?? transaction.rawDescription
 
-            transaction.kindRaw = TransactionKind.transfer.rawValue
-            transaction.categoryID = nil
-            transaction.subcategoryID = nil
-            clearSuggestion(on: transaction)
-            transaction.categorizationSourceRaw = CategorizationSource.manual.rawValue
-            transaction.confidence = 1
-            transaction.needsReview = false
-            transaction.reviewStatusRaw = ReviewStatus.accepted.rawValue
-            transaction.categorizationReason = "Marked manually as transfer."
-            transaction.updatedAt = appliedAt
+                transaction.kindRaw = TransactionKind.transfer.rawValue
+                transaction.categoryID = nil
+                transaction.subcategoryID = nil
+                clearSuggestion(on: transaction)
+                transaction.categorizationSourceRaw = CategorizationSource.manual.rawValue
+                transaction.confidence = 1
+                transaction.needsReview = false
+                transaction.reviewStatusRaw = ReviewStatus.accepted.rawValue
+                transaction.categorizationReason = reason
+                transaction.updatedAt = appliedAt
+            }
 
             if failBeforeSaveForTesting {
                 throw CocoaError(.coderInvalidValue)
@@ -415,14 +447,14 @@ final class CorrectionBatchService {
 
             let batch = CorrectionBatch(
                 id: UUID(),
-                action: .markAsTransfer,
+                action: action,
                 appliedAt: appliedAt,
-                explicitCount: 1,
+                explicitCount: states.count,
                 propagatedCount: 0,
-                primaryDescription: transaction.rawDescription,
+                primaryDescription: firstDescription,
                 ruleSuggestionTransactionID: nil,
                 ruleSuggestionCategoryID: nil,
-                transactionStates: [previous],
+                transactionStates: states,
                 insertedCorrectionIDs: [],
                 insertedMerchantIDs: [],
                 modifiedMerchants: [],
